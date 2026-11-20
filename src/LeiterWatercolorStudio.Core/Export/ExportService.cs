@@ -5,14 +5,12 @@ using System.Collections.Generic;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
-using Leiter.Algorithms.DataStructures;
-using Leiter.Algorithms.Segmentation;
 using Leiter.Algorithms.Stylization.Watercolor;
 using Leiter.Core;
 using Leiter.Pixels;
-using Leiter.Pixels.ColorSpaces;
 using Leiter.Platform.ImageSharp;
 using LeiterWatercolorStudio.Core.Models;
+using LeiterWatercolorStudio.Core.Pipeline;
 using LeiterWatercolorStudio.Core.Presets;
 
 /// <summary>
@@ -30,10 +28,6 @@ public static class ExportService
         string FileName,
         StageViewId View,
         VisualizationMode Mode);
-
-    private static readonly Rgb8 QualifiedBoundaryColor = new(0, 255, 255);
-    private static readonly Rgb8 RejectedBoundaryColor = new(160, 48, 48);
-    private static readonly Rgb8 NeutralSignedDensityColor = new(128, 128, 128);
 
     /// <summary>
     /// Gets the ordered list of all 24 diagnostic stage PNG entries produced by <see cref="ExportAllStagesAsync"/>.
@@ -167,7 +161,7 @@ public static class ExportService
 
                 IReadOnlyMatrix<Rgb8> rendered = customVisualizer is not null
                     ? customVisualizer(entry.View, entry.Mode)
-                    : RenderFallback(entry.View, entry.Mode, source, result);
+                    : StageVisualizers.RenderView(entry.View, entry.Mode, source, result, options);
 
                 string filePath = Path.Combine(outputDir, entry.FileName);
                 rendered.SaveImage(filePath);
@@ -225,185 +219,5 @@ public static class ExportService
             Options = options,
             StepTimingsMs = stepTimingsMs,
         };
-    }
-
-    private static IReadOnlyMatrix<Rgb8> RenderFallback(
-        StageViewId view,
-        VisualizationMode mode,
-        IReadOnlyMatrix<Rgb8> source,
-        WatercolorResult result) =>
-        (view, mode) switch
-        {
-            (StageViewId.Input, _) => source,
-            (StageViewId.ColorTransfer, _) => result.ColorTransferred,
-            (StageViewId.SaliencyPreBlur, _) => result.EgbiPreBlurred,
-            (StageViewId.SaliencyEgbiRegions, VisualizationMode.RegionAverageColor) =>
-                SegmentationVisualizer.ColorRegions(
-                    result.EgbiPreBlurred,
-                    result.EgbiGraph,
-                    SegmentationVisualizer.AverageColorAssigner()),
-            (StageViewId.SaliencyEgbiRegions, VisualizationMode.RegionRandomColor) =>
-                SegmentationVisualizer.ColorRegions(result.EgbiPreBlurred, result.EgbiGraph, seed: 42),
-            (StageViewId.SaliencyRcMap, _) => result.SaliencyMap.ToGrayscaleRgb8(),
-            (StageViewId.SaliencyCutMask, _) => result.SalientMask.ToGrayscaleRgb8(),
-            (StageViewId.SaliencyDistanceField, VisualizationMode.DistanceRawGrayscale) =>
-                result.RawSaliencyDistanceField.ToGrayscaleRgb8(),
-            (StageViewId.SaliencyDistanceField, VisualizationMode.DistanceSmoothedGrayscale) =>
-                result.SaliencyDistanceField.ToGrayscaleRgb8(),
-            (StageViewId.SegmentationMeanShiftFiltered, _) => result.MeanShiftFiltered,
-            (StageViewId.SegmentationMeanShiftRegions, VisualizationMode.RegionAverageColor) =>
-                SegmentationVisualizer.ColorRegions(
-                    result.MeanShiftFiltered,
-                    result.SegmentationGraph,
-                    SegmentationVisualizer.AverageColorAssigner()),
-            (StageViewId.SegmentationMeanShiftRegions, VisualizationMode.RegionRandomColor) =>
-                SegmentationVisualizer.ColorRegions(result.MeanShiftFiltered, result.SegmentationGraph, seed: 42),
-            (StageViewId.LodAbstraction, _) => result.LodAbstracted,
-            (StageViewId.WetInWetImage, _) => result.WetInWet.Image,
-            (StageViewId.WetInWetAreaMask, _) => result.WetInWet.WetAreaMask.ToGrayscaleRgb8(),
-            (StageViewId.WetInWetQualifyingBoundaries, _) => RenderQualifyingBoundaries(result),
-            (StageViewId.HandTremor, _) => result.HandTremor,
-            (StageViewId.FinishingEdgeDarkening, _) =>
-                RenderNonNegativeDensityField(result.EdgeDensityField, result.Image.Size),
-            (StageViewId.FinishingTurbulenceFlow, _) =>
-                RenderSignedDensityField(result.TurbulenceDensityField, result.Image.Size),
-            (StageViewId.FinishingCombinedPigment, _) => result.DensityAdjusted,
-            (StageViewId.FinishingToneCurve, _) => result.ToneAdjusted,
-            (StageViewId.FinishingPaperGranulation, VisualizationMode.PaperHeightGrayscale) =>
-                result.PaperHeightMap is not null
-                    ? result.PaperHeightMap.ToGrayscaleRgb8()
-                    : new SequentialMatrix<Rgb8>(result.Image.Size),
-            (StageViewId.FinishingPaperGranulation, _) => result.Granulated,
-            (StageViewId.FinishingFinalFxaa, _) => result.Image,
-            _ => throw new ArgumentOutOfRangeException(
-                nameof(view),
-                (view, mode),
-                $"Unsupported stage export combination ({view}, {mode}).")
-        };
-
-    private static Matrix<Rgb8> RenderQualifyingBoundaries(WatercolorResult result)
-    {
-        Matrix<Rgb8> canvas = result.LodAbstracted.Clone();
-        IReadOnlyList<RegionBoundary> boundaries = result.SegmentationGraph.Boundaries;
-        IReadOnlyList<bool> qualifying = result.WetInWet.QualifyingBoundaries;
-        int count = Math.Min(boundaries.Count, qualifying.Count);
-
-        // Paint rejected boundaries first so shared border pixels prioritize qualified cyan highlights.
-        for (int pass = 0; pass < 2; pass++)
-        {
-            bool targetQualified = pass == 1;
-            Rgb8 color = targetQualified ? QualifiedBoundaryColor : RejectedBoundaryColor;
-
-            for (int i = 0; i < count; i++)
-            {
-                if (qualifying[i] != targetQualified)
-                {
-                    continue;
-                }
-
-                RegionBoundary boundary = boundaries[i];
-                PaintCoords(canvas, boundary.FirstBorderPixels.Span, color);
-                PaintCoords(canvas, boundary.SecondBorderPixels.Span, color);
-            }
-        }
-
-        return canvas;
-    }
-
-    private static void PaintCoords(Matrix<Rgb8> target, ReadOnlySpan<Coord> coords, Rgb8 color)
-    {
-        for (int i = 0; i < coords.Length; i++)
-        {
-            Coord coord = coords[i];
-            target[coord.X, coord.Y] = color;
-        }
-    }
-
-    private static Matrix<Rgb8> RenderNonNegativeDensityField(
-        IReadOnlyMatrix<DoublePixel>? field,
-        Size size)
-    {
-        var output = new SequentialMatrix<Rgb8>(size);
-        if (field is null || field.Count == 0)
-        {
-            return output;
-        }
-
-        double maxValue = 0.0;
-        for (int y = 0; y < size.Height; y++)
-        {
-            for (int x = 0; x < size.Width; x++)
-            {
-                double val = field[x, y].Value;
-                if (double.IsFinite(val) && val > maxValue)
-                {
-                    maxValue = val;
-                }
-            }
-        }
-
-        if (maxValue <= 0.0)
-        {
-            return output;
-        }
-
-        double invMax = 1.0 / maxValue;
-        for (int y = 0; y < size.Height; y++)
-        {
-            for (int x = 0; x < size.Width; x++)
-            {
-                double val = field[x, y].Value;
-                double normalized = double.IsFinite(val) && val > 0.0 ? val * invMax : 0.0;
-                byte channel = Rgb8.ClampRoundedByte(normalized * 255.0);
-                output[x, y] = new Rgb8(channel, channel, channel);
-            }
-        }
-
-        return output;
-    }
-
-    private static Matrix<Rgb8> RenderSignedDensityField(
-        IReadOnlyMatrix<DoublePixel>? field,
-        Size size)
-    {
-        var output = new SequentialMatrix<Rgb8>(size);
-        if (field is null || field.Count == 0)
-        {
-            output.AsSpan().Fill(NeutralSignedDensityColor);
-            return output;
-        }
-
-        double maxAbs = 0.0;
-        for (int y = 0; y < size.Height; y++)
-        {
-            for (int x = 0; x < size.Width; x++)
-            {
-                double absVal = Math.Abs(field[x, y].Value);
-                if (double.IsFinite(absVal) && absVal > maxAbs)
-                {
-                    maxAbs = absVal;
-                }
-            }
-        }
-
-        if (maxAbs <= 0.0)
-        {
-            output.AsSpan().Fill(NeutralSignedDensityColor);
-            return output;
-        }
-
-        double invScale = 0.5 / maxAbs;
-        for (int y = 0; y < size.Height; y++)
-        {
-            for (int x = 0; x < size.Width; x++)
-            {
-                double val = field[x, y].Value;
-                double normalized = double.IsFinite(val) ? 0.5 + (val * invScale) : 0.5;
-                byte channel = Rgb8.ClampRoundedByte(normalized * 255.0);
-                output[x, y] = new Rgb8(channel, channel, channel);
-            }
-        }
-
-        return output;
     }
 }
