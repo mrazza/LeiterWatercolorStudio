@@ -1,0 +1,388 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="clr-namespace:LeiterWatercolorStudio.App.Controls"
+             x:Class="LeiterWatercolorStudio.App.Controls.ZoomPanViewport"
+             x:DataType="controls:ZoomPanViewport"
+             DragDrop.AllowDrop="True"
+             Focusable="True"
+             ClipToBounds="True"
+             Background="#14161B">
+    <UserControl.Styles>
+        <Style Selector="Border.hud-pill">
+            <Setter Property="Background" Value="#DC1A1D24" />
+            <Setter Property="BorderBrush" Value="#2CFFFFFF" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="10" />
+            <Setter Property="Padding" Value="5,4" />
+        </Style>
+
+        <Style Selector="Border.pane-badge">
+            <Setter Property="Background" Value="#CC15181F" />
+            <Setter Property="BorderBrush" Value="#30FFFFFF" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="Padding" Value="8,3" />
+        </Style>
+
+        <Style Selector="Button.hud-btn">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="#D4D8E1" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="Padding" Value="8,4" />
+            <Setter Property="MinHeight" Value="24" />
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="FontWeight" Value="Medium" />
+            <Setter Property="Cursor" Value="Hand" />
+        </Style>
+
+        <Style Selector="Button.hud-btn:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="#28FFFFFF" />
+            <Setter Property="Foreground" Value="#FFFFFF" />
+        </Style>
+
+        <Style Selector="Button.hud-btn:pressed /template/ ContentPresenter">
+            <Setter Property="Background" Value="#38FFFFFF" />
+        </Style>
+
+        <Style Selector="Button.mode-chip">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="#C4C9D4" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="Padding" Value="9,4" />
+            <Setter Property="MinHeight" Value="24" />
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="FontWeight" Value="Medium" />
+            <Setter Property="Cursor" Value="Hand" />
+        </Style>
+
+        <Style Selector="Button.mode-chip:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="#22FFFFFF" />
+            <Setter Property="Foreground" Value="#FFFFFF" />
+        </Style>
+
+        <Style Selector="Button.mode-chip.active">
+            <Setter Property="Background" Value="#2563EB" />
+            <Setter Property="Foreground" Value="#FFFFFF" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+
+        <Style Selector="Button.mode-chip.active:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="#3B82F6" />
+            <Setter Property="Foreground" Value="#FFFFFF" />
+        </Style>
+
+        <Style Selector="Button.reseed-chip">
+            <Setter Property="Background" Value="#1E293B" />
+            <Setter Property="Foreground" Value="#93C5FD" />
+            <Setter Property="BorderBrush" Value="#4060A5FA" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="Padding" Value="9,4" />
+            <Setter Property="MinHeight" Value="24" />
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="FontWeight" Value="Medium" />
+            <Setter Property="Cursor" Value="Hand" />
+        </Style>
+
+        <Style Selector="Button.reseed-chip:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="#263B59" />
+            <Setter Property="Foreground" Value="#DBEAFE" />
+        </Style>
+    </UserControl.Styles>
+
+    <Grid>
+        <!-- Rendered bitmap surface -->
+        <controls:ViewportSurface x:Name="PART_Surface"
+                                  IsHitTestVisible="False" />
+
+        <!-- Split-wipe interactive divider & handle -->
+        <Canvas x:Name="PART_WipeOverlay"
+                IsVisible="False">
+            <Border x:Name="PART_WipeLine"
+                    Width="2"
+                    Background="#D9FFFFFF"
+                    IsHitTestVisible="False" />
+            <Border x:Name="PART_WipeHandle"
+                    Width="32"
+                    Height="32"
+                    CornerRadius="16"
+                    Background="#EC1B1F27"
+                    BorderBrush="#CCFFFFFF"
+                    BorderThickness="1.5"
+                    Cursor="SizeWestEast">
+                <TextBlock Text="◄ ►"
+                           FontSize="10"
+                           FontWeight="Bold"
+                           Foreground="#F8FAFC"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Center" />
+            </Border>
+        </Canvas>
+
+        <!-- Floating Studio HUD Overlay -->
+        <Grid x:Name="PART_HudOverlay"
+              Margin="12"
+              RowDefinitions="Auto,*,Auto">
+            <!-- Row 0: Visualization Modes (Top-Left) + Zoom Controls (Top-Right) -->
+            <Grid Grid.Row="0"
+                  ColumnDefinitions="*,Auto">
+                <Border x:Name="PART_ModeBar"
+                        Grid.Column="0"
+                        Classes="hud-pill"
+                        HorizontalAlignment="Left"
+                        VerticalAlignment="Top"
+                        IsVisible="False">
+                    <StackPanel Orientation="Horizontal"
+                                Spacing="4">
+                        <WrapPanel x:Name="PART_ModeChips"
+                                   Orientation="Horizontal" />
+                        <Border x:Name="PART_ReseedSeparator"
+                                Width="1"
+                                Margin="2,3"
+                                Background="#28FFFFFF"
+                                IsVisible="False" />
+                        <Button x:Name="PART_ReseedButton"
+                                Classes="reseed-chip"
+                                Content="Reseed"
+                                ToolTip.Tip="Generate a new random noise seed"
+                                IsVisible="False" />
+                    </StackPanel>
+                </Border>
+
+                <Border x:Name="PART_ZoomBar"
+                        Grid.Column="1"
+                        Classes="hud-pill"
+                        HorizontalAlignment="Right"
+                        VerticalAlignment="Top"
+                        Margin="10,0,0,0">
+                    <StackPanel Orientation="Horizontal"
+                                Spacing="2">
+                        <Button x:Name="PART_FitButton"
+                                Classes="hud-btn"
+                                Content="Fit"
+                                ToolTip.Tip="Fit image to viewport" />
+                        <Button x:Name="PART_OneToOneButton"
+                                Classes="hud-btn"
+                                Content="1:1"
+                                ToolTip.Tip="Zoom to 100% (1:1 pixels)" />
+                        <Border Width="1"
+                                Margin="3,4"
+                                Background="#26FFFFFF" />
+                        <Button x:Name="PART_ZoomOutButton"
+                                Classes="hud-btn"
+                                Content="−"
+                                Width="26"
+                                Padding="0"
+                                HorizontalContentAlignment="Center"
+                                ToolTip.Tip="Zoom out" />
+                        <TextBlock x:Name="PART_ZoomText"
+                                   Text="100%"
+                                   MinWidth="46"
+                                   FontSize="11"
+                                   FontWeight="SemiBold"
+                                   Foreground="#E5E7EB"
+                                   TextAlignment="Center"
+                                   VerticalAlignment="Center"
+                                   HorizontalAlignment="Center" />
+                        <Button x:Name="PART_ZoomInButton"
+                                Classes="hud-btn"
+                                Content="+"
+                                Width="26"
+                                Padding="0"
+                                HorizontalContentAlignment="Center"
+                                ToolTip.Tip="Zoom in" />
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <!-- Row 1: Pane labels for SplitWipe / SideBySide -->
+            <Grid Grid.Row="1"
+                  Margin="0,8,0,0"
+                  IsHitTestVisible="False">
+                <!-- Side-by-Side pane labels -->
+                <Grid x:Name="PART_SideBySideLabels"
+                      ColumnDefinitions="*,*"
+                      IsVisible="False">
+                    <Border x:Name="PART_SideCompareBadge"
+                            Grid.Column="0"
+                            Classes="pane-badge"
+                            HorizontalAlignment="Left"
+                            VerticalAlignment="Top"
+                            IsVisible="False">
+                        <TextBlock x:Name="PART_SideCompareLabel"
+                                   FontSize="11"
+                                   FontWeight="SemiBold"
+                                   Foreground="#E2E8F0" />
+                    </Border>
+                    <Border x:Name="PART_SidePrimaryBadge"
+                            Grid.Column="1"
+                            Margin="10,0,0,0"
+                            Classes="pane-badge"
+                            HorizontalAlignment="Left"
+                            VerticalAlignment="Top"
+                            IsVisible="False">
+                        <TextBlock x:Name="PART_SidePrimaryLabel"
+                                   FontSize="11"
+                                   FontWeight="SemiBold"
+                                   Foreground="#E2E8F0" />
+                    </Border>
+                </Grid>
+
+                <!-- Split-Wipe pane labels -->
+                <Grid x:Name="PART_WipeLabels"
+                      IsVisible="False">
+                    <Border x:Name="PART_WipeCompareBadge"
+                            Classes="pane-badge"
+                            HorizontalAlignment="Left"
+                            VerticalAlignment="Top"
+                            IsVisible="False">
+                        <TextBlock x:Name="PART_WipeCompareLabel"
+                                   FontSize="11"
+                                   FontWeight="SemiBold"
+                                   Foreground="#E2E8F0" />
+                    </Border>
+                    <Border x:Name="PART_WipePrimaryBadge"
+                            Classes="pane-badge"
+                            HorizontalAlignment="Right"
+                            VerticalAlignment="Top"
+                            IsVisible="False">
+                        <TextBlock x:Name="PART_WipePrimaryLabel"
+                                   FontSize="11"
+                                   FontWeight="SemiBold"
+                                   Foreground="#E2E8F0" />
+                    </Border>
+                </Grid>
+            </Grid>
+
+            <!-- Row 2: Hover Pixel HUD (Bottom-Left) + Processing Pill (Bottom-Right) -->
+            <Grid Grid.Row="2"
+                  ColumnDefinitions="*,Auto"
+                  IsHitTestVisible="False">
+                <Border x:Name="PART_HoverHud"
+                        Grid.Column="0"
+                        Classes="hud-pill"
+                        Padding="10,7"
+                        HorizontalAlignment="Left"
+                        VerticalAlignment="Bottom"
+                        IsVisible="False">
+                    <StackPanel Orientation="Horizontal"
+                                Spacing="10"
+                                VerticalAlignment="Center">
+                        <Border x:Name="PART_HoverSwatch"
+                                Width="20"
+                                Height="20"
+                                CornerRadius="4"
+                                BorderBrush="#66FFFFFF"
+                                BorderThickness="1"
+                                VerticalAlignment="Center"
+                                IsVisible="False" />
+                        <TextBlock x:Name="PART_HoverHudText"
+                                   FontFamily="Consolas, Menlo, Monaco, monospace"
+                                   FontSize="11"
+                                   LineHeight="16"
+                                   Foreground="#E5E7EB"
+                                   VerticalAlignment="Center" />
+                    </StackPanel>
+                </Border>
+
+                <Border x:Name="PART_ProcessingPill"
+                        Grid.Column="1"
+                        Classes="hud-pill"
+                        Padding="10,6"
+                        Margin="10,0,0,0"
+                        HorizontalAlignment="Right"
+                        VerticalAlignment="Bottom"
+                        IsVisible="False">
+                    <StackPanel Orientation="Horizontal"
+                                Spacing="8"
+                                VerticalAlignment="Center">
+                        <Ellipse Width="8"
+                                 Height="8"
+                                 Fill="#60A5FA"
+                                 VerticalAlignment="Center" />
+                        <TextBlock x:Name="PART_ProcessingText"
+                                   Text="Processing..."
+                                   FontSize="11"
+                                   FontWeight="Medium"
+                                   Foreground="#E2E8F0"
+                                   VerticalAlignment="Center" />
+                    </StackPanel>
+                </Border>
+            </Grid>
+        </Grid>
+
+        <!-- Empty State Card -->
+        <Border x:Name="PART_EmptyState"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                MaxWidth="420"
+                Padding="32,28"
+                CornerRadius="14"
+                Background="#EE1B1F27"
+                BorderBrush="#33FFFFFF"
+                BorderThickness="1"
+                IsVisible="True">
+            <StackPanel Spacing="12"
+                        HorizontalAlignment="Center">
+                <Border Width="48"
+                        Height="48"
+                        CornerRadius="24"
+                        Background="#1F3B82F6"
+                        BorderBrush="#5560A5FA"
+                        BorderThickness="1"
+                        HorizontalAlignment="Center">
+                    <TextBlock Text="🎨"
+                               FontSize="20"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center" />
+                </Border>
+                <TextBlock Text="Open an Image to Begin"
+                           FontSize="17"
+                           FontWeight="SemiBold"
+                           Foreground="#F1F5F9"
+                           HorizontalAlignment="Center" />
+                <TextBlock Text="Drag and drop a PNG, JPEG, BMP, or WebP image here, or choose a file from disk."
+                           FontSize="12"
+                           Foreground="#94A3B8"
+                           TextAlignment="Center"
+                           TextWrapping="Wrap" />
+                <Button x:Name="PART_OpenImageButton"
+                        Content="Open Image..."
+                        HorizontalAlignment="Center"
+                        Margin="0,6,0,0"
+                        Padding="18,8"
+                        CornerRadius="8"
+                        Background="#2563EB"
+                        Foreground="#FFFFFF"
+                        FontSize="13"
+                        FontWeight="SemiBold"
+                        Cursor="Hand" />
+            </StackPanel>
+        </Border>
+
+        <!-- Drag-and-Drop Overlay -->
+        <Border x:Name="PART_DropOverlay"
+                Margin="8"
+                CornerRadius="12"
+                BorderBrush="#93C5FD"
+                BorderThickness="2"
+                Background="#331D4ED8"
+                IsHitTestVisible="False"
+                IsVisible="False">
+            <Border HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    Padding="18,10"
+                    CornerRadius="10"
+                    Background="#EC15181F"
+                    BorderBrush="#60A5FA"
+                    BorderThickness="1">
+                <TextBlock Text="Drop image to open"
+                           FontSize="14"
+                           FontWeight="SemiBold"
+                           Foreground="#EFF6FF" />
+            </Border>
+        </Border>
+    </Grid>
+</UserControl>
