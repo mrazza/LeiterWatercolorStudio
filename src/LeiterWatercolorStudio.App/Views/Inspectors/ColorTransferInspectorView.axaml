@@ -1,0 +1,325 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="using:LeiterWatercolorStudio.App.Views.Inspectors"
+             xmlns:controls="using:LeiterWatercolorStudio.App.Controls"
+             xmlns:converters="using:LeiterWatercolorStudio.App.Converters"
+             xmlns:models="clr-namespace:LeiterWatercolorStudio.Core.Models;assembly=LeiterWatercolorStudio.Core"
+             xmlns:stages="clr-namespace:LeiterWatercolorStudio.Core.Parameters.Stages;assembly=LeiterWatercolorStudio.Core"
+             xmlns:lcolor="clr-namespace:Leiter.Algorithms.Color;assembly=Leiter"
+             xmlns:lpixels="clr-namespace:Leiter.Pixels;assembly=Leiter"
+             xmlns:lpixcs="clr-namespace:Leiter.Pixels.ColorSpaces;assembly=Leiter"
+             x:Class="LeiterWatercolorStudio.App.Views.Inspectors.ColorTransferInspectorView"
+             x:DataType="stages:ColorTransferStageViewModel">
+
+    <UserControl.Styles>
+        <Style Selector="Border.inspector-card">
+            <Setter Property="Background" Value="#1264748B" />
+            <Setter Property="BorderBrush" Value="#3064748B" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="Padding" Value="10,9" />
+        </Style>
+        <Style Selector="TextBlock.section-title">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Opacity" Value="0.7" />
+        </Style>
+        <Style Selector="ListBox.segmented">
+            <Setter Property="Background" Value="#1464748B" />
+            <Setter Property="BorderBrush" Value="#3864748B" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="Padding" Value="2" />
+        </Style>
+        <Style Selector="ListBox.segmented ListBoxItem">
+            <Setter Property="Padding" Value="6,5" />
+            <Setter Property="MinHeight" Value="28" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="CornerRadius" Value="4" />
+            <Setter Property="FontSize" Value="11.5" />
+            <Setter Property="Cursor" Value="Hand" />
+        </Style>
+        <Style Selector="ListBox.segmented ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#2563EB" />
+            <Setter Property="Foreground" Value="#FFFFFF" />
+        </Style>
+        <Style Selector="ListBox.segmented ListBoxItem:selected">
+            <Setter Property="Foreground" Value="#FFFFFF" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+    </UserControl.Styles>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto"
+                  HorizontalScrollBarVisibility="Disabled">
+        <StackPanel Spacing="12" Margin="12">
+            <!-- Stage Header -->
+            <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+                <StackPanel Grid.Column="0" Spacing="1" VerticalAlignment="Center">
+                    <TextBlock Text="1. Color Transfer"
+                               FontSize="14"
+                               FontWeight="SemiBold" />
+                    <TextBlock Text="CIELAB Reinhard palette wash"
+                               FontSize="11.5"
+                               Opacity="0.68" />
+                </StackPanel>
+
+                <ToggleSwitch x:Name="PART_EnableToggle"
+                              Grid.Column="1"
+                              IsChecked="{Binding EnableColorTransfer, Mode=TwoWay}"
+                              OnContent=""
+                              OffContent=""
+                              MinWidth="0"
+                              Padding="0"
+                              VerticalAlignment="Center"
+                              ToolTip.Tip="Enable or bypass Stage 1 Color Transfer" />
+
+                <Button x:Name="PART_ResetButton"
+                        Grid.Column="2"
+                        x:DataType="local:ColorTransferInspectorView"
+                        Content="↺"
+                        Width="28"
+                        Height="28"
+                        Padding="0"
+                        FontSize="13"
+                        HorizontalContentAlignment="Center"
+                        VerticalContentAlignment="Center"
+                        VerticalAlignment="Center"
+                        Command="{Binding ResetStageCommand, RelativeSource={RelativeSource AncestorType=local:ColorTransferInspectorView}}"
+                        CommandParameter="{x:Static models:PrimaryStageId.ColorTransfer}"
+                        ToolTip.Tip="Reset Stage 1 Color Transfer to baseline" />
+            </Grid>
+
+            <!-- Stage Body -->
+            <StackPanel Spacing="10"
+                        Opacity="{Binding EnableColorTransfer, Converter={x:Static converters:BoolToOpacityConverter.Instance}}">
+                <!-- Palette Mode Selector -->
+                <StackPanel Spacing="4">
+                    <TextBlock Classes="section-title" Text="PALETTE MODE" />
+                    <ListBox x:Name="PART_PaletteModeSelector"
+                             Classes="segmented"
+                             ItemsSource="{x:Static local:ColorTransferInspectorView.PaletteModes}"
+                             SelectedItem="{Binding PaletteMode, Mode=TwoWay}"
+                             SelectionMode="Single,AlwaysSelected">
+                        <ListBox.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <UniformGrid Columns="3" />
+                            </ItemsPanelTemplate>
+                        </ListBox.ItemsPanel>
+                        <ListBox.ItemTemplate>
+                            <DataTemplate x:DataType="models:PaletteMode">
+                                <TextBlock Text="{Binding Converter={x:Static converters:EnumDisplayNameConverter.Instance}}"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center" />
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </StackPanel>
+
+                <!-- Built-in Palette Selector (visible when PaletteMode == BuiltIn) -->
+                <StackPanel x:Name="PART_BuiltInSection"
+                            Spacing="4"
+                            IsVisible="{Binding PaletteMode, Converter={x:Static local:PaletteModeMatchConverter.BuiltIn}}">
+                    <TextBlock Classes="section-title" Text="BUILT-IN PALETTE" />
+                    <ComboBox x:Name="PART_BuiltInPaletteComboBox"
+                              HorizontalAlignment="Stretch"
+                              ItemsSource="{Binding BuiltInPalettes}"
+                              SelectedItem="{Binding SelectedBuiltInPalette, Mode=TwoWay}">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate x:DataType="lcolor:ColorTransferProfile">
+                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                    <TextBlock Grid.Column="0"
+                                               Text="{Binding Name}"
+                                               VerticalAlignment="Center"
+                                               TextTrimming="CharacterEllipsis" />
+                                    <ItemsControl Grid.Column="1"
+                                                  ItemsSource="{Binding Converter={x:Static local:ProfileToSwatchesConverter.Instance}}"
+                                                  VerticalAlignment="Center">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <StackPanel Orientation="Horizontal" Spacing="2" />
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="lpixels:Rgb8">
+                                                <Border Width="11"
+                                                        Height="11"
+                                                        CornerRadius="2"
+                                                        BorderThickness="0.5"
+                                                        BorderBrush="#40FFFFFF"
+                                                        Background="{Binding Converter={x:Static converters:Rgb8ToBrushConverter.Instance}}" />
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </Grid>
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
+                </StackPanel>
+
+                <!-- Extract Reference Palette Action -->
+                <Button x:Name="PART_ExtractPaletteButton"
+                        x:DataType="local:ColorTransferInspectorView"
+                        Content="Extract from Reference Image..."
+                        HorizontalAlignment="Stretch"
+                        HorizontalContentAlignment="Center"
+                        Padding="10,7"
+                        Command="{Binding ExtractPaletteCommand, RelativeSource={RelativeSource AncestorType=local:ColorTransferInspectorView}}" />
+
+                <!-- Transfer Strength Slider -->
+                <controls:NumericSlider Label="Transfer Strength"
+                                        Description="Blend weight between original colors (0) and transferred watercolor palette (1)."
+                                        Minimum="0"
+                                        Maximum="1"
+                                        Step="0.01"
+                                        FormatString="F2"
+                                        BaselineValue="1"
+                                        Value="{Binding ColorTransferStrength, Mode=TwoWay}" />
+
+                <!-- Live Matched / Active Palette Swatch Preview -->
+                <Border x:Name="PART_ActivePaletteCard" Classes="inspector-card">
+                    <StackPanel Spacing="6">
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+                            <TextBlock Grid.Column="0"
+                                       Classes="section-title"
+                                       Text="ACTIVE PALETTE"
+                                       VerticalAlignment="Center" />
+                            <Border Grid.Column="1"
+                                    Background="#2438BDF8"
+                                    BorderBrush="#5038BDF8"
+                                    BorderThickness="1"
+                                    CornerRadius="4"
+                                    Padding="6,2">
+                                <TextBlock x:Name="PART_ActivePaletteBadgeText"
+                                           Text="Auto"
+                                           FontSize="10.5"
+                                           FontWeight="SemiBold" />
+                            </Border>
+                        </Grid>
+
+                        <TextBlock x:Name="PART_ActivePaletteNameText"
+                                   Text="Awaiting render..."
+                                   FontSize="12.5"
+                                   FontWeight="SemiBold"
+                                   TextTrimming="CharacterEllipsis" />
+
+                        <TextBlock x:Name="PART_ActivePaletteMetaText"
+                                   Text="Closest watercolor palette is selected automatically"
+                                   FontSize="11"
+                                   Opacity="0.68"
+                                   TextWrapping="Wrap" />
+
+                        <UniformGrid x:Name="PART_ActiveSwatchStrip"
+                                     Columns="5"
+                                     IsVisible="False">
+                            <Border x:Name="PART_Swatch0" Height="22" Margin="0,0,2,0" CornerRadius="4" BorderThickness="1" BorderBrush="#3864748B" />
+                            <Border x:Name="PART_Swatch1" Height="22" Margin="1,0,1,0" CornerRadius="4" BorderThickness="1" BorderBrush="#3864748B" />
+                            <Border x:Name="PART_Swatch2" Height="22" Margin="1,0,1,0" CornerRadius="4" BorderThickness="1" BorderBrush="#3864748B" />
+                            <Border x:Name="PART_Swatch3" Height="22" Margin="1,0,1,0" CornerRadius="4" BorderThickness="1" BorderBrush="#3864748B" />
+                            <Border x:Name="PART_Swatch4" Height="22" Margin="2,0,0,0" CornerRadius="4" BorderThickness="1" BorderBrush="#3864748B" />
+                        </UniformGrid>
+                    </StackPanel>
+                </Border>
+
+                <!-- Advanced CIELAB 6D Parameters -->
+                <Expander x:Name="PART_AdvancedExpander"
+                          Header="Advanced"
+                          HorizontalAlignment="Stretch"
+                          IsExpanded="False">
+                    <StackPanel Spacing="8" Margin="0,6,0,0">
+                        <Border Classes="inspector-card"
+                                IsVisible="{Binding PaletteMode, Converter={x:Static local:PaletteModeMatchConverter.NotCustom}}">
+                            <StackPanel Spacing="6">
+                                <TextBlock Text="Custom CIELAB statistics are read-only outside Custom mode."
+                                           FontSize="11"
+                                           Opacity="0.72"
+                                           TextWrapping="Wrap" />
+                                <Button x:Name="PART_EditAsCustomCopyButton"
+                                        Content="Edit as Custom Copy"
+                                        HorizontalAlignment="Stretch"
+                                        HorizontalContentAlignment="Center"
+                                        Padding="8,5" />
+                            </StackPanel>
+                        </Border>
+
+                        <StackPanel Spacing="3">
+                            <TextBlock Text="Custom Palette Name" FontSize="12" />
+                            <TextBox x:Name="PART_CustomPaletteNameTextBox"
+                                     Text="{Binding CustomPaletteName, Mode=TwoWay}"
+                                     IsReadOnly="{Binding PaletteMode, Converter={x:Static local:PaletteModeMatchConverter.NotCustom}}" />
+                        </StackPanel>
+
+                        <StackPanel Spacing="3">
+                            <TextBlock Text="Illuminant" FontSize="12" />
+                            <ComboBox x:Name="PART_CustomIlluminantComboBox"
+                                      HorizontalAlignment="Stretch"
+                                      ItemsSource="{x:Static local:ColorTransferInspectorView.Illuminants}"
+                                      SelectedItem="{Binding CustomIlluminant, Mode=TwoWay}"
+                                      IsEnabled="{Binding PaletteMode, Converter={x:Static local:PaletteModeMatchConverter.Custom}}">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate x:DataType="lpixcs:Illuminant">
+                                        <TextBlock Text="{Binding Converter={x:Static converters:EnumDisplayNameConverter.Instance}}" />
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                            </ComboBox>
+                        </StackPanel>
+
+                        <controls:NumericSlider Label="Mean L*"
+                                                Minimum="0"
+                                                Maximum="100"
+                                                Step="0.1"
+                                                FormatString="F2"
+                                                HasBaseline="False"
+                                                IsReadOnly="{Binding PaletteMode, Converter={x:Static local:PaletteModeMatchConverter.NotCustom}}"
+                                                Value="{Binding MeanL, Mode=TwoWay}" />
+
+                        <controls:NumericSlider Label="Mean a*"
+                                                Minimum="-128"
+                                                Maximum="127"
+                                                Step="0.1"
+                                                FormatString="F2"
+                                                HasBaseline="False"
+                                                IsReadOnly="{Binding PaletteMode, Converter={x:Static local:PaletteModeMatchConverter.NotCustom}}"
+                                                Value="{Binding MeanA, Mode=TwoWay}" />
+
+                        <controls:NumericSlider Label="Mean b*"
+                                                Minimum="-128"
+                                                Maximum="127"
+                                                Step="0.1"
+                                                FormatString="F2"
+                                                HasBaseline="False"
+                                                IsReadOnly="{Binding PaletteMode, Converter={x:Static local:PaletteModeMatchConverter.NotCustom}}"
+                                                Value="{Binding MeanB, Mode=TwoWay}" />
+
+                        <controls:NumericSlider Label="StdDev L*"
+                                                Minimum="0"
+                                                Maximum="100"
+                                                Step="0.1"
+                                                FormatString="F2"
+                                                HasBaseline="False"
+                                                IsReadOnly="{Binding PaletteMode, Converter={x:Static local:PaletteModeMatchConverter.NotCustom}}"
+                                                Value="{Binding StdDevL, Mode=TwoWay}" />
+
+                        <controls:NumericSlider Label="StdDev a*"
+                                                Minimum="0"
+                                                Maximum="128"
+                                                Step="0.1"
+                                                FormatString="F2"
+                                                HasBaseline="False"
+                                                IsReadOnly="{Binding PaletteMode, Converter={x:Static local:PaletteModeMatchConverter.NotCustom}}"
+                                                Value="{Binding StdDevA, Mode=TwoWay}" />
+
+                        <controls:NumericSlider Label="StdDev b*"
+                                                Minimum="0"
+                                                Maximum="128"
+                                                Step="0.1"
+                                                FormatString="F2"
+                                                HasBaseline="False"
+                                                IsReadOnly="{Binding PaletteMode, Converter={x:Static local:PaletteModeMatchConverter.NotCustom}}"
+                                                Value="{Binding StdDevB, Mode=TwoWay}" />
+                    </StackPanel>
+                </Expander>
+            </StackPanel>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

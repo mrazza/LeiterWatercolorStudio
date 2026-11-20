@@ -1,0 +1,142 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="using:LeiterWatercolorStudio.App.Views.Inspectors"
+             x:Class="LeiterWatercolorStudio.App.Views.Inspectors.InputInspectorView"
+             x:Name="Root"
+             x:DataType="local:InputInspectorView">
+
+    <UserControl.Styles>
+        <Style Selector="Border.inspector-card">
+            <Setter Property="Background" Value="#1264748B" />
+            <Setter Property="BorderBrush" Value="#3064748B" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="Padding" Value="10,9" />
+        </Style>
+        <Style Selector="TextBlock.section-title">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Opacity" Value="0.7" />
+        </Style>
+        <Style Selector="TextBlock.meta-label">
+            <Setter Property="FontSize" Value="11.5" />
+            <Setter Property="Opacity" Value="0.68" />
+        </Style>
+        <Style Selector="TextBlock.meta-value">
+            <Setter Property="FontSize" Value="11.5" />
+            <Setter Property="FontWeight" Value="Medium" />
+        </Style>
+    </UserControl.Styles>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto"
+                  HorizontalScrollBarVisibility="Disabled">
+        <StackPanel Spacing="12" Margin="12">
+            <!-- Stage Header -->
+            <StackPanel Spacing="2">
+                <TextBlock Text="Input &amp; Summary"
+                           FontSize="14"
+                           FontWeight="SemiBold" />
+                <TextBlock Text="Source image metadata, active baseline, and output actions"
+                           FontSize="11.5"
+                           Opacity="0.68"
+                           TextWrapping="Wrap" />
+            </StackPanel>
+
+            <!-- Empty State Hint -->
+            <Border Classes="inspector-card"
+                    IsVisible="{Binding !#Root.HasImage}">
+                <TextBlock Text="No source image loaded. Open an image or drag and drop a file onto the viewport to start watercolorization."
+                           FontSize="11.5"
+                           Opacity="0.82"
+                           TextWrapping="Wrap" />
+            </Border>
+
+            <!-- Image Metadata Card -->
+            <Border Classes="inspector-card">
+                <StackPanel Spacing="8">
+                    <TextBlock Classes="section-title" Text="SOURCE IMAGE" />
+
+                    <StackPanel Spacing="2">
+                        <TextBlock Classes="meta-label" Text="File Path" />
+                        <TextBlock x:Name="PART_SourcePathText"
+                                   Classes="meta-value"
+                                   Text="{Binding #Root.SourcePathText}"
+                                   ToolTip.Tip="{Binding #Root.SourcePathText}"
+                                   TextWrapping="Wrap" />
+                    </StackPanel>
+
+                    <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto" ColumnSpacing="12" RowSpacing="4">
+                        <TextBlock Grid.Row="0" Grid.Column="0" Classes="meta-label" Text="Native Size" />
+                        <TextBlock x:Name="PART_NativeDimensionsText"
+                                   Grid.Row="0" Grid.Column="1"
+                                   Classes="meta-value"
+                                   HorizontalAlignment="Right"
+                                   Text="{Binding #Root.NativeDimensionsText}" />
+
+                        <TextBlock Grid.Row="1" Grid.Column="0" Classes="meta-label" Text="Preview Size" />
+                        <TextBlock x:Name="PART_PreviewDimensionsText"
+                                   Grid.Row="1" Grid.Column="1"
+                                   Classes="meta-value"
+                                   HorizontalAlignment="Right"
+                                   Text="{Binding #Root.PreviewDimensionsText}" />
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <!-- Pipeline Summary Card -->
+            <Border Classes="inspector-card">
+                <StackPanel Spacing="8">
+                    <TextBlock Classes="section-title" Text="ACTIVE CONFIGURATION" />
+
+                    <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto" ColumnSpacing="12" RowSpacing="6">
+                        <TextBlock Grid.Row="0" Grid.Column="0" Classes="meta-label" Text="Baseline" VerticalAlignment="Top" />
+                        <TextBlock x:Name="PART_BaselineSummaryText"
+                                   Grid.Row="0" Grid.Column="1"
+                                   Classes="meta-value"
+                                   HorizontalAlignment="Right"
+                                   TextAlignment="Right"
+                                   TextWrapping="Wrap"
+                                   Text="{Binding #Root.BaselineSummaryText}" />
+
+                        <TextBlock Grid.Row="1" Grid.Column="0" Classes="meta-label" Text="Palette" VerticalAlignment="Top" />
+                        <TextBlock x:Name="PART_PaletteSummaryText"
+                                   Grid.Row="1" Grid.Column="1"
+                                   Classes="meta-value"
+                                   HorizontalAlignment="Right"
+                                   TextAlignment="Right"
+                                   TextWrapping="Wrap"
+                                   Text="{Binding #Root.PaletteSummaryText}" />
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <!-- Quick Actions -->
+            <StackPanel Spacing="6">
+                <TextBlock Classes="section-title" Text="QUICK ACTIONS" />
+
+                <Button x:Name="PART_OpenImageButton"
+                        Content="Open Image..."
+                        HorizontalAlignment="Stretch"
+                        HorizontalContentAlignment="Center"
+                        Padding="10,7"
+                        Command="{Binding #Root.OpenImageCommand}" />
+
+                <StackPanel Spacing="6" IsEnabled="{Binding #Root.HasImage}">
+                    <Button x:Name="PART_RenderFullResButton"
+                            Content="Render Full Resolution"
+                            HorizontalAlignment="Stretch"
+                            HorizontalContentAlignment="Center"
+                            Padding="10,7"
+                            Command="{Binding #Root.RenderFullResCommand}" />
+
+                    <Button x:Name="PART_ExportFinalButton"
+                            Content="Export Final Image..."
+                            HorizontalAlignment="Stretch"
+                            HorizontalContentAlignment="Center"
+                            Padding="10,7"
+                            Command="{Binding #Root.ExportFinalCommand}" />
+                </StackPanel>
+            </StackPanel>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

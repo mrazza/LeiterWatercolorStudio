@@ -1,0 +1,146 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="using:LeiterWatercolorStudio.App.Views.Inspectors"
+             xmlns:controls="using:LeiterWatercolorStudio.App.Controls"
+             xmlns:converters="using:LeiterWatercolorStudio.App.Converters"
+             xmlns:models="clr-namespace:LeiterWatercolorStudio.Core.Models;assembly=LeiterWatercolorStudio.Core"
+             xmlns:stages="clr-namespace:LeiterWatercolorStudio.Core.Parameters.Stages;assembly=LeiterWatercolorStudio.Core"
+             xmlns:ldata="clr-namespace:Leiter.Algorithms.DataStructures;assembly=Leiter"
+             x:Class="LeiterWatercolorStudio.App.Views.Inspectors.SegmentationInspectorView"
+             x:DataType="stages:SegmentationStageViewModel">
+
+    <UserControl.Styles>
+        <Style Selector="Border.inspector-card">
+            <Setter Property="Background" Value="#1264748B" />
+            <Setter Property="BorderBrush" Value="#3064748B" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="Padding" Value="10,9" />
+        </Style>
+        <Style Selector="TextBlock.section-title">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Opacity" Value="0.7" />
+        </Style>
+    </UserControl.Styles>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto"
+                  HorizontalScrollBarVisibility="Disabled">
+        <StackPanel Spacing="12" Margin="12">
+            <!-- Stage Header -->
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                <StackPanel Grid.Column="0" Spacing="1" VerticalAlignment="Center">
+                    <TextBlock Text="3a. Mean-Shift Segmentation"
+                               FontSize="14"
+                               FontWeight="SemiBold" />
+                    <TextBlock Text="CIELAB spatial-range mode seeking and region clustering"
+                               FontSize="11.5"
+                               Opacity="0.68"
+                               TextWrapping="Wrap" />
+                </StackPanel>
+
+                <Button x:Name="PART_ResetButton"
+                        Grid.Column="1"
+                        x:DataType="local:SegmentationInspectorView"
+                        Content="↺"
+                        Width="28"
+                        Height="28"
+                        Padding="0"
+                        FontSize="13"
+                        HorizontalContentAlignment="Center"
+                        VerticalContentAlignment="Center"
+                        VerticalAlignment="Center"
+                        Command="{Binding ResetStageCommand, RelativeSource={RelativeSource AncestorType=local:SegmentationInspectorView}}"
+                        CommandParameter="{x:Static models:PrimaryStageId.Segmentation}"
+                        ToolTip.Tip="Reset Stage 3a Segmentation to baseline" />
+            </Grid>
+
+            <!-- Live Segmentation Statistics Readout -->
+            <Border Classes="inspector-card">
+                <StackPanel Spacing="4">
+                    <TextBlock Classes="section-title" Text="SEGMENTATION STATS" />
+                    <TextBlock x:Name="PART_StatsText"
+                               x:DataType="local:SegmentationInspectorView"
+                               Text="{Binding StatsText, RelativeSource={RelativeSource AncestorType=local:SegmentationInspectorView}, TargetNullValue='Run pipeline to view region statistics'}"
+                               FontSize="12"
+                               FontWeight="Medium"
+                               TextWrapping="Wrap" />
+                </StackPanel>
+            </Border>
+
+            <!-- Basic Tier Parameters -->
+            <StackPanel Spacing="8">
+                <controls:NumericSlider Label="Spatial Radius"
+                                        Description="Spatial search window radius in pixels for Mean-Shift filtering."
+                                        Minimum="1"
+                                        Maximum="32"
+                                        Step="1"
+                                        IsInteger="True"
+                                        FormatString="F0"
+                                        Unit="px"
+                                        BaselineValue="8"
+                                        Value="{Binding SpatialRadius, Mode=TwoWay, Converter={x:Static converters:IntToDoubleConverter.Instance}}" />
+
+                <controls:NumericSlider Label="Range Radius"
+                                        Description="CIELAB color distance window radius controlling region color similarity."
+                                        Minimum="0.5"
+                                        Maximum="30"
+                                        Step="0.5"
+                                        FormatString="F1"
+                                        BaselineValue="5.5"
+                                        Value="{Binding RangeRadius, Mode=TwoWay}" />
+
+                <controls:NumericSlider Label="Min Region Size"
+                                        Description="Minimum pixel count per segmented region before small-region merging."
+                                        Minimum="0"
+                                        Maximum="2000"
+                                        Step="10"
+                                        IsInteger="True"
+                                        FormatString="F0"
+                                        Unit="px"
+                                        BaselineValue="50"
+                                        Value="{Binding MinRegionSize, Mode=TwoWay, Converter={x:Static converters:IntToDoubleConverter.Instance}}" />
+            </StackPanel>
+
+            <!-- Advanced Expander -->
+            <Expander x:Name="PART_AdvancedExpander"
+                      Header="Advanced"
+                      HorizontalAlignment="Stretch"
+                      IsExpanded="False">
+                <StackPanel Spacing="8" Margin="0,6,0,0">
+                    <controls:NumericSlider Label="Max Iterations"
+                                            Description="Maximum Mean-Shift mode-seeking iterations per pixel."
+                                            Minimum="1"
+                                            Maximum="50"
+                                            Step="1"
+                                            IsInteger="True"
+                                            FormatString="F0"
+                                            BaselineValue="20"
+                                            Value="{Binding MaxIterations, Mode=TwoWay, Converter={x:Static converters:IntToDoubleConverter.Instance}}" />
+
+                    <controls:NumericSlider Label="Convergence Epsilon"
+                                            Description="5D spatial-range convergence threshold halting iteration."
+                                            Minimum="0.001"
+                                            Maximum="1.0"
+                                            Step="0.005"
+                                            FormatString="F3"
+                                            BaselineValue="0.05"
+                                            Value="{Binding ConvergenceEpsilon, Mode=TwoWay}" />
+
+                    <StackPanel Spacing="3">
+                        <TextBlock Text="Connectivity" FontSize="12" />
+                        <ComboBox HorizontalAlignment="Stretch"
+                                  ItemsSource="{x:Static local:SegmentationInspectorView.GridConnectivities}"
+                                  SelectedItem="{Binding Connectivity, Mode=TwoWay}">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate x:DataType="ldata:GridConnectivity">
+                                    <TextBlock Text="{Binding Converter={x:Static converters:EnumDisplayNameConverter.Instance}}" />
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                    </StackPanel>
+                </StackPanel>
+            </Expander>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

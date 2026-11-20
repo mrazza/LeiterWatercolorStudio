@@ -1,0 +1,328 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="using:LeiterWatercolorStudio.App.Views.Inspectors"
+             xmlns:controls="using:LeiterWatercolorStudio.App.Controls"
+             xmlns:converters="using:LeiterWatercolorStudio.App.Converters"
+             xmlns:models="clr-namespace:LeiterWatercolorStudio.Core.Models;assembly=LeiterWatercolorStudio.Core"
+             xmlns:stages="clr-namespace:LeiterWatercolorStudio.Core.Parameters.Stages;assembly=LeiterWatercolorStudio.Core"
+             xmlns:ldata="clr-namespace:Leiter.Algorithms.DataStructures;assembly=Leiter"
+             xmlns:lmorph="clr-namespace:Leiter.Algorithms.Morphology;assembly=Leiter"
+             xmlns:lsaliency="clr-namespace:Leiter.Algorithms.Saliency;assembly=Leiter"
+             x:Class="LeiterWatercolorStudio.App.Views.Inspectors.SaliencyInspectorView"
+             x:DataType="stages:SaliencyStageViewModel">
+
+    <UserControl.Styles>
+        <Style Selector="Border.inspector-card">
+            <Setter Property="Background" Value="#1264748B" />
+            <Setter Property="BorderBrush" Value="#3064748B" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="Padding" Value="10,9" />
+        </Style>
+        <Style Selector="TextBlock.section-title">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Opacity" Value="0.7" />
+        </Style>
+    </UserControl.Styles>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto"
+                  HorizontalScrollBarVisibility="Disabled">
+        <StackPanel Spacing="12" Margin="12">
+            <!-- Stage Header -->
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                <StackPanel Grid.Column="0" Spacing="1" VerticalAlignment="Center">
+                    <TextBlock Text="2. Saliency &amp; Distance Field"
+                               FontSize="14"
+                               FontWeight="SemiBold" />
+                    <TextBlock Text="Regional contrast, SaliencyCut, and foreground focus field"
+                               FontSize="11.5"
+                               Opacity="0.68"
+                               TextWrapping="Wrap" />
+                </StackPanel>
+
+                <Button x:Name="PART_ResetButton"
+                        Grid.Column="1"
+                        x:DataType="local:SaliencyInspectorView"
+                        Content="↺"
+                        Width="28"
+                        Height="28"
+                        Padding="0"
+                        FontSize="13"
+                        HorizontalContentAlignment="Center"
+                        VerticalContentAlignment="Center"
+                        VerticalAlignment="Center"
+                        Command="{Binding ResetStageCommand, RelativeSource={RelativeSource AncestorType=local:SaliencyInspectorView}}"
+                        CommandParameter="{x:Static models:PrimaryStageId.Saliency}"
+                        ToolTip.Tip="Reset Stage 2 Saliency to baseline" />
+            </Grid>
+
+            <!-- Basic Controls -->
+            <StackPanel Spacing="8">
+                <controls:NumericSlider Label="Pre-Blur Sigma"
+                                        Description="Gaussian pre-blur applied before Stage 2 EGBI segmentation (0 disables pre-blur)."
+                                        Minimum="0"
+                                        Maximum="5"
+                                        Step="0.05"
+                                        FormatString="F2"
+                                        Unit="px"
+                                        BaselineValue="0.8"
+                                        Value="{Binding EgbiBlurSigma, Mode=TwoWay}" />
+
+                <controls:NumericSlider Label="EGBI K-Factor"
+                                        Description="Scale factor controlling preference for larger initial EGBI regions."
+                                        Minimum="1"
+                                        Maximum="500"
+                                        Step="1"
+                                        FormatString="F1"
+                                        BaselineValue="50"
+                                        Value="{Binding Egbi.KFactor, Mode=TwoWay}" />
+
+                <controls:NumericSlider Label="EGBI Min Region Size"
+                                        Description="Minimum pixel count per region after small-component merging."
+                                        Minimum="0"
+                                        Maximum="2000"
+                                        Step="10"
+                                        IsInteger="True"
+                                        FormatString="F0"
+                                        Unit="px"
+                                        BaselineValue="200"
+                                        Value="{Binding Egbi.MinRegionSize, Mode=TwoWay, Converter={x:Static converters:IntToDoubleConverter.Instance}}" />
+
+                <controls:NumericSlider Label="Center Prior Weight"
+                                        Description="Exponential center-bias weight emphasizing centrally located subjects."
+                                        Minimum="0"
+                                        Maximum="25"
+                                        Step="0.25"
+                                        FormatString="F2"
+                                        BaselineValue="9"
+                                        Value="{Binding RegionalContrastSaliency.CenterPriorWeight, Mode=TwoWay}" />
+
+                <controls:NumericSlider Label="SaliencyCut Iterations"
+                                        Description="Maximum outer trimap refinement iterations for foreground extraction."
+                                        Minimum="1"
+                                        Maximum="12"
+                                        Step="1"
+                                        IsInteger="True"
+                                        FormatString="F0"
+                                        BaselineValue="4"
+                                        Value="{Binding SaliencyCut.MaxOuterIterations, Mode=TwoWay, Converter={x:Static converters:IntToDoubleConverter.Instance}}" />
+
+                <controls:NumericSlider Label="Distance Sigma Scale"
+                                        Description="Default smoothing sigma expressed as a fraction of min(Width, Height)."
+                                        Minimum="0"
+                                        Maximum="0.2"
+                                        Step="0.005"
+                                        FormatString="F3"
+                                        BaselineValue="0.03"
+                                        Value="{Binding SaliencyDistanceField.DefaultSigmaScale, Mode=TwoWay}" />
+
+                <CheckBox x:Name="PART_UseExplicitSmoothingSigmaCheckBox"
+                          Content="Use Explicit Smoothing Sigma"
+                          FontSize="12"
+                          IsChecked="{Binding SaliencyDistanceField.UseExplicitSmoothingSigma, Mode=TwoWay}" />
+
+                <controls:NumericSlider x:Name="PART_ExplicitSmoothingSigmaSlider"
+                                        Label="Explicit Smoothing Sigma"
+                                        Description="Explicit Gaussian smoothing standard deviation overriding Default Sigma Scale."
+                                        Minimum="0"
+                                        Maximum="100"
+                                        Step="0.5"
+                                        FormatString="F1"
+                                        Unit="px"
+                                        BaselineValue="12"
+                                        IsVisible="{Binding SaliencyDistanceField.UseExplicitSmoothingSigma}"
+                                        IsEnabled="{Binding SaliencyDistanceField.UseExplicitSmoothingSigma}"
+                                        Value="{Binding SaliencyDistanceField.SmoothingSigma, Mode=TwoWay}" />
+            </StackPanel>
+
+            <!-- Advanced Expander -->
+            <Expander x:Name="PART_AdvancedExpander"
+                      Header="Advanced"
+                      HorizontalAlignment="Stretch"
+                      IsExpanded="False">
+                <StackPanel Spacing="10" Margin="0,6,0,0">
+                    <!-- EGBI Advanced -->
+                    <Border Classes="inspector-card">
+                        <StackPanel Spacing="6">
+                            <TextBlock Classes="section-title" Text="EGBI OVER-SEGMENTATION" />
+
+                            <controls:NumericSlider Label="Epsilon"
+                                                    Description="Minimum color merge threshold below which adjacent pixels always merge."
+                                                    Minimum="0"
+                                                    Maximum="10"
+                                                    Step="0.1"
+                                                    FormatString="F2"
+                                                    BaselineValue="1"
+                                                    Value="{Binding Egbi.Epsilon, Mode=TwoWay}" />
+
+                            <StackPanel Spacing="3">
+                                <TextBlock Text="Connectivity" FontSize="12" />
+                                <ComboBox HorizontalAlignment="Stretch"
+                                          ItemsSource="{x:Static local:SaliencyInspectorView.GridConnectivities}"
+                                          SelectedItem="{Binding Egbi.Connectivity, Mode=TwoWay}">
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate x:DataType="ldata:GridConnectivity">
+                                            <TextBlock Text="{Binding Converter={x:Static converters:EnumDisplayNameConverter.Instance}}" />
+                                        </DataTemplate>
+                                    </ComboBox.ItemTemplate>
+                                </ComboBox>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Regional Contrast Saliency Advanced -->
+                    <Border Classes="inspector-card">
+                        <StackPanel Spacing="6">
+                            <TextBlock Classes="section-title" Text="REGIONAL CONTRAST" />
+
+                            <CheckBox Content="Enable Feature Smoothing"
+                                      FontSize="12"
+                                      IsChecked="{Binding RegionalContrastSaliency.EnableSmoothing, Mode=TwoWay}" />
+
+                            <CheckBox Content="Compute Border Regions"
+                                      FontSize="12"
+                                      IsChecked="{Binding RegionalContrastSaliency.ComputeBorderRegions, Mode=TwoWay}" />
+                        </StackPanel>
+                    </Border>
+
+                    <!-- SaliencyCut Advanced -->
+                    <Border Classes="inspector-card">
+                        <StackPanel Spacing="6">
+                            <TextBlock Classes="section-title" Text="SALIENCYCUT TRIMAP" />
+
+                            <controls:NumericSlider Label="Trimap Band Radius"
+                                                    Description="Dilation/erosion radius around the mask boundary for uncertain pixels."
+                                                    Minimum="1"
+                                                    Maximum="64"
+                                                    Step="1"
+                                                    IsInteger="True"
+                                                    FormatString="F0"
+                                                    Unit="px"
+                                                    BaselineValue="10"
+                                                    Value="{Binding SaliencyCut.TrimapBandRadius, Mode=TwoWay, Converter={x:Static converters:IntToDoubleConverter.Instance}}" />
+
+                            <CheckBox x:Name="PART_UseMaxWorkingDimensionCheckBox"
+                                      Content="Limit Working Dimension"
+                                      FontSize="12"
+                                      IsChecked="{Binding SaliencyCut.UseMaxWorkingDimension, Mode=TwoWay}" />
+
+                            <controls:NumericSlider x:Name="PART_MaxWorkingDimensionSlider"
+                                                    Label="Max Working Dimension"
+                                                    Description="Maximum image side length used internally by SaliencyCut."
+                                                    Minimum="64"
+                                                    Maximum="4096"
+                                                    Step="32"
+                                                    IsInteger="True"
+                                                    FormatString="F0"
+                                                    Unit="px"
+                                                    BaselineValue="1024"
+                                                    IsEnabled="{Binding SaliencyCut.UseMaxWorkingDimension}"
+                                                    Value="{Binding SaliencyCut.MaxWorkingDimension, Mode=TwoWay, Converter={x:Static converters:IntToDoubleConverter.Instance}}" />
+                        </StackPanel>
+                    </Border>
+
+                    <!-- GrabCut Advanced -->
+                    <Border Classes="inspector-card">
+                        <StackPanel Spacing="6">
+                            <TextBlock Classes="section-title" Text="GRABCUT SOLVER" />
+
+                            <controls:NumericSlider Label="GrabCut Iterations"
+                                                    Description="Alternating GMM-update and min-cut optimization iterations."
+                                                    Minimum="1"
+                                                    Maximum="15"
+                                                    Step="1"
+                                                    IsInteger="True"
+                                                    FormatString="F0"
+                                                    BaselineValue="5"
+                                                    Value="{Binding GrabCut.Iterations, Mode=TwoWay, Converter={x:Static converters:IntToDoubleConverter.Instance}}" />
+
+                            <controls:NumericSlider Label="GMM Components"
+                                                    Description="Number of Gaussian mixture components per foreground/background model."
+                                                    Minimum="1"
+                                                    Maximum="12"
+                                                    Step="1"
+                                                    IsInteger="True"
+                                                    FormatString="F0"
+                                                    BaselineValue="5"
+                                                    Value="{Binding GrabCut.MixtureComponentCount, Mode=TwoWay, Converter={x:Static converters:IntToDoubleConverter.Instance}}" />
+
+                            <controls:NumericSlider Label="Smoothness Weight"
+                                                    Description="Pairwise contrast-sensitive boundary smoothness weight (gamma)."
+                                                    Minimum="0"
+                                                    Maximum="200"
+                                                    Step="1"
+                                                    FormatString="F1"
+                                                    BaselineValue="50"
+                                                    Value="{Binding GrabCut.SmoothnessWeight, Mode=TwoWay}" />
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Saliency Mask Advanced -->
+                    <Border Classes="inspector-card">
+                        <StackPanel Spacing="6">
+                            <TextBlock Classes="section-title" Text="SALIENCY MASK" />
+
+                            <StackPanel Spacing="3">
+                                <TextBlock Text="Threshold Method" FontSize="12" />
+                                <ComboBox HorizontalAlignment="Stretch"
+                                          ItemsSource="{x:Static local:SaliencyInspectorView.ThresholdMethods}"
+                                          SelectedItem="{Binding SaliencyMask.Method, Mode=TwoWay}">
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate x:DataType="lsaliency:SaliencyThresholdMethod">
+                                            <TextBlock Text="{Binding Converter={x:Static converters:EnumDisplayNameConverter.Instance}}" />
+                                        </DataTemplate>
+                                    </ComboBox.ItemTemplate>
+                                </ComboBox>
+                            </StackPanel>
+
+                            <controls:NumericSlider Label="Fixed Threshold"
+                                                    Description="Threshold in [0, 1] used when Method is Fixed."
+                                                    Minimum="0"
+                                                    Maximum="1"
+                                                    Step="0.01"
+                                                    FormatString="F3"
+                                                    BaselineValue="{x:Static lsaliency:SaliencyMaskOptions.DefaultFixedThreshold}"
+                                                    Value="{Binding SaliencyMask.FixedThreshold, Mode=TwoWay}" />
+
+                            <StackPanel Spacing="3">
+                                <TextBlock Text="Retention Policy" FontSize="12" />
+                                <ComboBox HorizontalAlignment="Stretch"
+                                          ItemsSource="{x:Static local:SaliencyInspectorView.RetentionPolicies}"
+                                          SelectedItem="{Binding SaliencyMask.RetentionPolicy, Mode=TwoWay}">
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate x:DataType="lmorph:ComponentRetentionPolicy">
+                                            <TextBlock Text="{Binding Converter={x:Static converters:EnumDisplayNameConverter.Instance}}" />
+                                        </DataTemplate>
+                                    </ComboBox.ItemTemplate>
+                                </ComboBox>
+                            </StackPanel>
+
+                            <controls:NumericSlider Label="Min Area Fraction"
+                                                    Description="Minimum connected component area fraction retained when policy is Minimum Area Fraction."
+                                                    Minimum="0"
+                                                    Maximum="0.5"
+                                                    Step="0.005"
+                                                    FormatString="F3"
+                                                    BaselineValue="0.01"
+                                                    Value="{Binding SaliencyMask.MinAreaFraction, Mode=TwoWay}" />
+
+                            <StackPanel Spacing="3">
+                                <TextBlock Text="Mask Connectivity" FontSize="12" />
+                                <ComboBox HorizontalAlignment="Stretch"
+                                          ItemsSource="{x:Static local:SaliencyInspectorView.GridConnectivities}"
+                                          SelectedItem="{Binding SaliencyMask.Connectivity, Mode=TwoWay}">
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate x:DataType="ldata:GridConnectivity">
+                                            <TextBlock Text="{Binding Converter={x:Static converters:EnumDisplayNameConverter.Instance}}" />
+                                        </DataTemplate>
+                                    </ComboBox.ItemTemplate>
+                                </ComboBox>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </Expander>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>
