@@ -3,6 +3,7 @@ using Leiter.Core;
 using Leiter.Pixels;
 using LeiterWatercolorStudio.Core.Models;
 using LeiterWatercolorStudio.Core.Pipeline;
+using LeiterWatercolorStudio.Core.Pipeline.Events;
 using Xunit;
 
 namespace LeiterWatercolorStudio.Core.Tests.Pipeline;

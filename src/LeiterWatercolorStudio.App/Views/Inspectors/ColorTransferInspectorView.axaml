@@ -131,7 +131,7 @@
                 <!-- Built-in Palette Selector (visible when PaletteMode == BuiltIn) -->
                 <StackPanel x:Name="PART_BuiltInSection"
                             Spacing="4"
-                            IsVisible="{Binding PaletteMode, Converter={x:Static local:PaletteModeMatchConverter.BuiltIn}}">
+                            IsVisible="{Binding PaletteMode, Converter={x:Static converters:PaletteModeMatchConverter.BuiltIn}}">
                     <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
                         <TextBlock Classes="section-title"
                                    Text="BUILT-IN PALETTE"
@@ -152,7 +152,7 @@
                                                VerticalAlignment="Center"
                                                TextTrimming="CharacterEllipsis" />
                                     <ItemsControl Grid.Column="1"
-                                                  ItemsSource="{Binding Converter={x:Static local:ProfileToSwatchesConverter.Instance}}"
+                                                  ItemsSource="{Binding Converter={x:Static converters:ProfileToSwatchesConverter.Instance}}"
                                                   VerticalAlignment="Center">
                                         <ItemsControl.ItemsPanel>
                                             <ItemsPanelTemplate>
@@ -248,7 +248,7 @@
                           IsExpanded="False">
                     <StackPanel Spacing="8" Margin="0,6,0,0">
                         <Border Classes="inspector-card"
-                                IsVisible="{Binding PaletteMode, Converter={x:Static local:PaletteModeMatchConverter.NotCustom}}">
+                                IsVisible="{Binding PaletteMode, Converter={x:Static converters:PaletteModeMatchConverter.NotCustom}}">
                             <StackPanel Spacing="6">
                                 <TextBlock Text="Custom CIELAB statistics are read-only outside Custom mode."
                                            FontSize="11"
@@ -273,7 +273,7 @@
                             </StackPanel>
                             <TextBox x:Name="PART_CustomPaletteNameTextBox"
                                      Text="{Binding CustomPaletteName, Mode=TwoWay}"
-                                     IsReadOnly="{Binding PaletteMode, Converter={x:Static local:PaletteModeMatchConverter.NotCustom}}" />
+                                     IsReadOnly="{Binding PaletteMode, Converter={x:Static converters:PaletteModeMatchConverter.NotCustom}}" />
                         </StackPanel>
 
                         <StackPanel Spacing="3">
@@ -289,7 +289,7 @@
                                       HorizontalAlignment="Stretch"
                                       ItemsSource="{x:Static local:ColorTransferInspectorView.Illuminants}"
                                       SelectedItem="{Binding CustomIlluminant, Mode=TwoWay}"
-                                      IsEnabled="{Binding PaletteMode, Converter={x:Static local:PaletteModeMatchConverter.Custom}}">
+                                      IsEnabled="{Binding PaletteMode, Converter={x:Static converters:PaletteModeMatchConverter.Custom}}">
                                 <ComboBox.ItemTemplate>
                                     <DataTemplate x:DataType="lpixcs:Illuminant">
                                         <TextBlock Text="{Binding Converter={x:Static converters:EnumDisplayNameConverter.Instance}}" />
@@ -306,7 +306,7 @@
                                                 Step="0.1"
                                                 FormatString="F2"
                                                 HasBaseline="False"
-                                                IsReadOnly="{Binding PaletteMode, Converter={x:Static local:PaletteModeMatchConverter.NotCustom}}"
+                                                IsReadOnly="{Binding PaletteMode, Converter={x:Static converters:PaletteModeMatchConverter.NotCustom}}"
                                                 Value="{Binding MeanL, Mode=TwoWay}" />
 
                         <controls:NumericSlider Label="Mean a*"
@@ -317,7 +317,7 @@
                                                 Step="0.1"
                                                 FormatString="F2"
                                                 HasBaseline="False"
-                                                IsReadOnly="{Binding PaletteMode, Converter={x:Static local:PaletteModeMatchConverter.NotCustom}}"
+                                                IsReadOnly="{Binding PaletteMode, Converter={x:Static converters:PaletteModeMatchConverter.NotCustom}}"
                                                 Value="{Binding MeanA, Mode=TwoWay}" />
 
                         <controls:NumericSlider Label="Mean b*"
@@ -328,7 +328,7 @@
                                                 Step="0.1"
                                                 FormatString="F2"
                                                 HasBaseline="False"
-                                                IsReadOnly="{Binding PaletteMode, Converter={x:Static local:PaletteModeMatchConverter.NotCustom}}"
+                                                IsReadOnly="{Binding PaletteMode, Converter={x:Static converters:PaletteModeMatchConverter.NotCustom}}"
                                                 Value="{Binding MeanB, Mode=TwoWay}" />
 
                         <controls:NumericSlider Label="StdDev L*"
@@ -339,7 +339,7 @@
                                                 Step="0.1"
                                                 FormatString="F2"
                                                 HasBaseline="False"
-                                                IsReadOnly="{Binding PaletteMode, Converter={x:Static local:PaletteModeMatchConverter.NotCustom}}"
+                                                IsReadOnly="{Binding PaletteMode, Converter={x:Static converters:PaletteModeMatchConverter.NotCustom}}"
                                                 Value="{Binding StdDevL, Mode=TwoWay}" />
 
                         <controls:NumericSlider Label="StdDev a*"
@@ -350,7 +350,7 @@
                                                 Step="0.1"
                                                 FormatString="F2"
                                                 HasBaseline="False"
-                                                IsReadOnly="{Binding PaletteMode, Converter={x:Static local:PaletteModeMatchConverter.NotCustom}}"
+                                                IsReadOnly="{Binding PaletteMode, Converter={x:Static converters:PaletteModeMatchConverter.NotCustom}}"
                                                 Value="{Binding StdDevA, Mode=TwoWay}" />
 
                         <controls:NumericSlider Label="StdDev b*"
@@ -361,7 +361,7 @@
                                                 Step="0.1"
                                                 FormatString="F2"
                                                 HasBaseline="False"
-                                                IsReadOnly="{Binding PaletteMode, Converter={x:Static local:PaletteModeMatchConverter.NotCustom}}"
+                                                IsReadOnly="{Binding PaletteMode, Converter={x:Static converters:PaletteModeMatchConverter.NotCustom}}"
                                                 Value="{Binding StdDevB, Mode=TwoWay}" />
                     </StackPanel>
                 </Expander>

@@ -130,8 +130,8 @@ public sealed class ToneCurveEditor : Control
     public static readonly RoutedEvent<RoutedEventArgs> DragCompletedEvent =
         RoutedEvent.Register<ToneCurveEditor, RoutedEventArgs>(nameof(DragCompleted), RoutingStrategies.Bubble);
 
-    private CurveHandle _activeHandle;
-    private CurveHandle _hoveredHandle;
+    private ToneCurveHandle _activeHandle;
+    private ToneCurveHandle _hoveredHandle;
     private bool _isDragging;
 
     static ToneCurveEditor()
@@ -151,18 +151,6 @@ public sealed class ToneCurveEditor : Control
     {
         ClipToBounds = true;
         MinHeight = 140;
-    }
-
-    /// <summary>
-    /// Identifies the 4 interactive control handles on the tone curve.
-    /// </summary>
-    private enum CurveHandle
-    {
-        None,
-        MinTone,
-        MaxTone,
-        ShadowKnee,
-        HighlightKnee,
     }
 
     /// <summary>
@@ -333,8 +321,8 @@ public sealed class ToneCurveEditor : Control
             return;
         }
 
-        CurveHandle hit = HitTestHandle(point.Position);
-        if (hit == CurveHandle.None)
+        ToneCurveHandle hit = HitTestHandle(point.Position);
+        if (hit == ToneCurveHandle.None)
         {
             return;
         }
@@ -355,7 +343,7 @@ public sealed class ToneCurveEditor : Control
         base.OnPointerMoved(e);
 
         Point pos = e.GetPosition(this);
-        if (_isDragging && _activeHandle != CurveHandle.None)
+        if (_isDragging && _activeHandle != ToneCurveHandle.None)
         {
             ApplyHandlePosition(_activeHandle, pos);
             InvalidateVisual();
@@ -368,7 +356,7 @@ public sealed class ToneCurveEditor : Control
             return;
         }
 
-        CurveHandle hover = HitTestHandle(pos);
+        ToneCurveHandle hover = HitTestHandle(pos);
         if (hover != _hoveredHandle)
         {
             _hoveredHandle = hover;
@@ -408,9 +396,9 @@ public sealed class ToneCurveEditor : Control
     protected override void OnPointerExited(PointerEventArgs e)
     {
         base.OnPointerExited(e);
-        if (!_isDragging && _hoveredHandle != CurveHandle.None)
+        if (!_isDragging && _hoveredHandle != ToneCurveHandle.None)
         {
-            _hoveredHandle = CurveHandle.None;
+            _hoveredHandle = ToneCurveHandle.None;
             Cursor = Cursor.Default;
             InvalidateVisual();
         }
@@ -423,7 +411,7 @@ public sealed class ToneCurveEditor : Control
 
         if (change.Property == IsInteractiveProperty && !IsInteractive)
         {
-            _hoveredHandle = CurveHandle.None;
+            _hoveredHandle = ToneCurveHandle.None;
             if (_isDragging)
             {
                 FinishDrag();
@@ -447,7 +435,7 @@ public sealed class ToneCurveEditor : Control
 
     private void FinishDrag()
     {
-        _activeHandle = CurveHandle.None;
+        _activeHandle = ToneCurveHandle.None;
         EndDragSession();
         UpdateCursor(_hoveredHandle);
         InvalidateVisual();
@@ -485,12 +473,12 @@ public sealed class ToneCurveEditor : Control
         }
     }
 
-    private void UpdateCursor(CurveHandle handle)
+    private void UpdateCursor(ToneCurveHandle handle)
     {
         Cursor = handle switch
         {
-            CurveHandle.MinTone or CurveHandle.MaxTone => VerticalCursor,
-            CurveHandle.ShadowKnee or CurveHandle.HighlightKnee => HorizontalCursor,
+            ToneCurveHandle.MinTone or ToneCurveHandle.MaxTone => VerticalCursor,
+            ToneCurveHandle.ShadowKnee or ToneCurveHandle.HighlightKnee => HorizontalCursor,
             _ => Cursor.Default,
         };
     }
@@ -512,23 +500,23 @@ public sealed class ToneCurveEditor : Control
         return new PiecewiseToneCurveOptions(minTone, maxTone, shadowKnee, highlightKnee);
     }
 
-    private (CurveHandle Handle, Point Position)[] GetHandlePositions(PiecewiseToneCurveOptions options) =>
+    private (ToneCurveHandle Handle, Point Position)[] GetHandlePositions(PiecewiseToneCurveOptions options) =>
     [
-        (CurveHandle.MinTone, CurveToScreen(0.0, options.MinTone)),
-        (CurveHandle.MaxTone, CurveToScreen(1.0, options.MaxTone)),
-        (CurveHandle.ShadowKnee, CurveToScreen(options.ShadowKnee, PiecewiseToneCurve.Evaluate(options.ShadowKnee, options))),
-        (CurveHandle.HighlightKnee, CurveToScreen(options.HighlightKnee, PiecewiseToneCurve.Evaluate(options.HighlightKnee, options))),
+        (ToneCurveHandle.MinTone, CurveToScreen(0.0, options.MinTone)),
+        (ToneCurveHandle.MaxTone, CurveToScreen(1.0, options.MaxTone)),
+        (ToneCurveHandle.ShadowKnee, CurveToScreen(options.ShadowKnee, PiecewiseToneCurve.Evaluate(options.ShadowKnee, options))),
+        (ToneCurveHandle.HighlightKnee, CurveToScreen(options.HighlightKnee, PiecewiseToneCurve.Evaluate(options.HighlightKnee, options))),
     ];
 
-    private CurveHandle HitTestHandle(Point pointer)
+    private ToneCurveHandle HitTestHandle(Point pointer)
     {
         PiecewiseToneCurveOptions options = GetSanitizedCurveOptions();
-        (CurveHandle Handle, Point Position)[] handles = GetHandlePositions(options);
+        (ToneCurveHandle Handle, Point Position)[] handles = GetHandlePositions(options);
 
-        CurveHandle best = CurveHandle.None;
+        ToneCurveHandle best = ToneCurveHandle.None;
         double bestDistSq = HandleHitRadius * HandleHitRadius;
 
-        foreach ((CurveHandle handle, Point pos) in handles)
+        foreach ((ToneCurveHandle handle, Point pos) in handles)
         {
             double dx = pointer.X - pos.X;
             double dy = pointer.Y - pos.Y;
@@ -543,35 +531,35 @@ public sealed class ToneCurveEditor : Control
         return best;
     }
 
-    private void ApplyHandlePosition(CurveHandle handle, Point pointer)
+    private void ApplyHandlePosition(ToneCurveHandle handle, Point pointer)
     {
         (double nx, double ny) = ScreenToCurve(pointer);
         PiecewiseToneCurveOptions current = GetSanitizedCurveOptions();
 
         switch (handle)
         {
-            case CurveHandle.MinTone:
+            case ToneCurveHandle.MinTone:
             {
                 double maxAllowed = Math.Max(0.0, current.MaxTone - MinToneSeparation);
                 double clamped = Math.Clamp(ny, 0.0, maxAllowed);
                 SetCurrentValue(MinToneProperty, Math.Round(clamped, 4));
                 break;
             }
-            case CurveHandle.MaxTone:
+            case ToneCurveHandle.MaxTone:
             {
                 double minAllowed = Math.Min(1.0, current.MinTone + MinToneSeparation);
                 double clamped = Math.Clamp(ny, minAllowed, 1.0);
                 SetCurrentValue(MaxToneProperty, Math.Round(clamped, 4));
                 break;
             }
-            case CurveHandle.ShadowKnee:
+            case ToneCurveHandle.ShadowKnee:
             {
                 double maxAllowed = Math.Max(KneeEdgeMargin, current.HighlightKnee - MinKneeSeparation);
                 double clamped = Math.Clamp(nx, KneeEdgeMargin, maxAllowed);
                 SetCurrentValue(ShadowKneeProperty, Math.Round(clamped, 4));
                 break;
             }
-            case CurveHandle.HighlightKnee:
+            case ToneCurveHandle.HighlightKnee:
             {
                 double minAllowed = Math.Min(1.0 - KneeEdgeMargin, current.ShadowKnee + MinKneeSeparation);
                 double clamped = Math.Clamp(nx, minAllowed, 1.0 - KneeEdgeMargin);
@@ -707,13 +695,13 @@ public sealed class ToneCurveEditor : Control
 
     private void DrawHandles(DrawingContext context, Rect plot, PiecewiseToneCurveOptions options)
     {
-        (CurveHandle Handle, Point Position)[] handles = GetHandlePositions(options);
+        (ToneCurveHandle Handle, Point Position)[] handles = GetHandlePositions(options);
 
-        foreach ((CurveHandle handle, Point pos) in handles)
+        foreach ((ToneCurveHandle handle, Point pos) in handles)
         {
             bool isActive = handle == _activeHandle;
             bool isHovered = handle == _hoveredHandle;
-            bool isKnee = handle is CurveHandle.ShadowKnee or CurveHandle.HighlightKnee;
+            bool isKnee = handle is ToneCurveHandle.ShadowKnee or ToneCurveHandle.HighlightKnee;
 
             IPen ringPen = isKnee
                 ? (isActive ? KneeActiveRingPen : KneeRingPen)
@@ -735,23 +723,23 @@ public sealed class ToneCurveEditor : Control
 
     private void DrawActiveBadge(DrawingContext context, Rect plot, PiecewiseToneCurveOptions options)
     {
-        if (!_isDragging || _activeHandle == CurveHandle.None)
+        if (!_isDragging || _activeHandle == ToneCurveHandle.None)
         {
             return;
         }
 
         (string label, Point anchor) = _activeHandle switch
         {
-            CurveHandle.MinTone => (
+            ToneCurveHandle.MinTone => (
                 $"Min {options.MinTone:F2}",
                 CurveToScreen(0.0, options.MinTone)),
-            CurveHandle.MaxTone => (
+            ToneCurveHandle.MaxTone => (
                 $"Max {options.MaxTone:F2}",
                 CurveToScreen(1.0, options.MaxTone)),
-            CurveHandle.ShadowKnee => (
+            ToneCurveHandle.ShadowKnee => (
                 $"Shadow ({options.ShadowKnee:F2}, {PiecewiseToneCurve.Evaluate(options.ShadowKnee, options):F2})",
                 CurveToScreen(options.ShadowKnee, PiecewiseToneCurve.Evaluate(options.ShadowKnee, options))),
-            CurveHandle.HighlightKnee => (
+            ToneCurveHandle.HighlightKnee => (
                 $"Highlight ({options.HighlightKnee:F2}, {PiecewiseToneCurve.Evaluate(options.HighlightKnee, options):F2})",
                 CurveToScreen(options.HighlightKnee, PiecewiseToneCurve.Evaluate(options.HighlightKnee, options))),
             _ => (string.Empty, default),

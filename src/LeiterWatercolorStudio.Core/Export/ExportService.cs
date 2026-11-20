@@ -19,17 +19,6 @@ using LeiterWatercolorStudio.Core.Presets;
 public static class ExportService
 {
     /// <summary>
-    /// Describes a single diagnostic stage image file in a full-stage export bundle.
-    /// </summary>
-    /// <param name="FileName">The target PNG filename relative to the export directory.</param>
-    /// <param name="View">The logical stage view identifier.</param>
-    /// <param name="Mode">The visualization mode applied when rendering the stage view.</param>
-    public readonly record struct StageExportEntry(
-        string FileName,
-        StageViewId View,
-        VisualizationMode Mode);
-
-    /// <summary>
     /// Gets the ordered list of all 24 diagnostic stage PNG entries produced by <see cref="ExportAllStagesAsync"/>.
     /// </summary>
     public static IReadOnlyList<StageExportEntry> StageManifest { get; } =

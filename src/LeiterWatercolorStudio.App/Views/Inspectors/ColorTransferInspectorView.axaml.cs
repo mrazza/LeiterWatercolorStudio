@@ -3,8 +3,6 @@ using System.Globalization;
 using System.Windows.Input;
 using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Data;
-using Avalonia.Data.Converters;
 using Avalonia.Interactivity;
 using Avalonia.Media;
 using Leiter.Algorithms.Color;
@@ -250,76 +248,4 @@ public partial class ColorTransferInspectorView : UserControl
             return null;
         }
     }
-}
-
-/// <summary>
-/// Converts a <see cref="PaletteMode"/> value into a boolean matching a configured target mode.
-/// </summary>
-public sealed class PaletteModeMatchConverter : IValueConverter
-{
-    /// <summary>
-    /// Matches <see cref="PaletteMode.BuiltIn"/>.
-    /// </summary>
-    public static PaletteModeMatchConverter BuiltIn { get; } = new(PaletteMode.BuiltIn, invert: false);
-
-    /// <summary>
-    /// Matches <see cref="PaletteMode.Custom"/>.
-    /// </summary>
-    public static PaletteModeMatchConverter Custom { get; } = new(PaletteMode.Custom, invert: false);
-
-    /// <summary>
-    /// Matches any mode other than <see cref="PaletteMode.Custom"/>.
-    /// </summary>
-    public static PaletteModeMatchConverter NotCustom { get; } = new(PaletteMode.Custom, invert: true);
-
-    private readonly PaletteMode _target;
-    private readonly bool _invert;
-
-    private PaletteModeMatchConverter(PaletteMode target, bool invert)
-    {
-        _target = target;
-        _invert = invert;
-    }
-
-    /// <inheritdoc />
-    public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
-    {
-        if (value is PaletteMode mode)
-        {
-            bool match = mode == _target;
-            return _invert ? !match : match;
-        }
-
-        return AvaloniaProperty.UnsetValue;
-    }
-
-    /// <inheritdoc />
-    public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) =>
-        BindingOperations.DoNothing;
-}
-
-/// <summary>
-/// Converts a <see cref="ColorTransferProfile"/> into five representative sRGB swatches via <see cref="PaletteExtractor.SynthesizeSwatches"/>.
-/// </summary>
-public sealed class ProfileToSwatchesConverter : IValueConverter
-{
-    /// <summary>
-    /// Gets a shared singleton instance of <see cref="ProfileToSwatchesConverter"/>.
-    /// </summary>
-    public static ProfileToSwatchesConverter Instance { get; } = new();
-
-    /// <inheritdoc />
-    public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
-    {
-        if (value is ColorTransferProfile profile)
-        {
-            return PaletteExtractor.SynthesizeSwatches(profile, 5);
-        }
-
-        return Array.Empty<Rgb8>();
-    }
-
-    /// <inheritdoc />
-    public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) =>
-        BindingOperations.DoNothing;
 }

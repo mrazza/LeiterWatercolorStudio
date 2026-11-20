@@ -58,7 +58,7 @@ public class RealImageIntegrationTests
                 paletteMode: PaletteMode.Auto);
 
             Assert.Equal(24, ExportService.StageManifest.Count);
-            foreach (ExportService.StageExportEntry entry in ExportService.StageManifest)
+            foreach (StageExportEntry entry in ExportService.StageManifest)
             {
                 string filePath = Path.Combine(tempDir, entry.FileName);
                 Assert.True(File.Exists(filePath), $"Missing exported stage image: {entry.FileName}");

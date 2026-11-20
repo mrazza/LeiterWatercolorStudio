@@ -5,50 +5,9 @@ using Leiter.Algorithms.Stylization.Watercolor;
 using Leiter.Core;
 using Leiter.Pixels;
 using LeiterWatercolorStudio.Core.Models;
+using LeiterWatercolorStudio.Core.Pipeline.Events;
 
 namespace LeiterWatercolorStudio.Core.Pipeline;
-
-/// <summary>
-/// Event payload raised when a preview pipeline execution starts.
-/// </summary>
-public sealed record RenderStartedEventArgs(
-    long RequestId,
-    WatercolorOptions CanonicalOptions,
-    WatercolorOptions EffectiveOptions,
-    Size PreviewSize);
-
-/// <summary>
-/// Event payload raised when a preview pipeline execution completes successfully.
-/// </summary>
-public sealed record RenderCompletedEventArgs(
-    long RequestId,
-    WatercolorResult Result,
-    WatercolorOptions CanonicalOptions,
-    WatercolorOptions EffectiveOptions,
-    TimeSpan TotalElapsed);
-
-/// <summary>
-/// Event payload raised when a pending or active preview pipeline execution is cancelled.
-/// </summary>
-public sealed record RenderCancelledEventArgs(
-    long RequestId,
-    WatercolorOptions CanonicalOptions,
-    bool WasStarted);
-
-/// <summary>
-/// Event payload raised when a preview pipeline execution fails with an unhandled exception.
-/// </summary>
-public sealed record RenderFailedEventArgs(
-    long RequestId,
-    WatercolorOptions CanonicalOptions,
-    Exception Exception);
-
-/// <summary>
-/// Event payload raised when DAG staleness changes relative to the last rendered options.
-/// </summary>
-public sealed record StalenessChangedEventArgs(
-    IReadOnlySet<WatercolorStep> StaleSteps,
-    IReadOnlySet<PrimaryStageId> StaleStages);
 
 /// <summary>
 /// Manages debounced, cancellable interactive preview rendering and isolated full-resolution exports

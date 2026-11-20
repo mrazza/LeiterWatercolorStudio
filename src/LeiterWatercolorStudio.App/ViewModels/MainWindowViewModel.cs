@@ -16,6 +16,7 @@ using LeiterWatercolorStudio.Core.Export;
 using LeiterWatercolorStudio.Core.Models;
 using LeiterWatercolorStudio.Core.Parameters;
 using LeiterWatercolorStudio.Core.Pipeline;
+using LeiterWatercolorStudio.Core.Pipeline.Events;
 using LeiterWatercolorStudio.Core.Presets;
 using LeiterSize = Leiter.Core.Size;
 

@@ -11,6 +11,7 @@ using Leiter.Pixels;
 using Leiter.Platform.ImageSharp;
 using LeiterWatercolorStudio.App.Controls;
 using LeiterWatercolorStudio.App.Services;
+using LeiterWatercolorStudio.App.Tests.TestDoubles;
 using LeiterWatercolorStudio.App.ViewModels;
 using LeiterWatercolorStudio.App.Views;
 using LeiterWatercolorStudio.App.Views.Inspectors;
@@ -214,7 +215,7 @@ public class MainWindowIntegrationTests
             await vm.ExportAllStagesCommand.ExecuteAsync(null);
             TestAppHelpers.PumpUi();
             Assert.Equal(24, ExportService.StageManifest.Count);
-            foreach (ExportService.StageExportEntry entry in ExportService.StageManifest)
+            foreach (StageExportEntry entry in ExportService.StageManifest)
             {
                 string stageFile = Path.Combine(exportAllDir, entry.FileName);
                 Assert.True(File.Exists(stageFile), $"Missing exported stage PNG: {entry.FileName}");
@@ -343,35 +344,5 @@ public class MainWindowIntegrationTests
         TestAppHelpers.PumpUi();
         Assert.Equal(expectedVisible, vm.ShowSubStageDrawer);
         Assert.Equal(expectedCount, vm.SubStages.Count);
-    }
-
-    private sealed class MockFileDialogService : IFileDialogService
-    {
-        public string? OpenImagePath { get; set; }
-        public string? SaveFinalImagePath { get; set; }
-        public string? ExportFolderPath { get; set; }
-        public string? SavePresetPath { get; set; }
-        public string? OpenPresetPath { get; set; }
-        public bool ConfirmResult { get; set; }
-        public List<(string Title, string Message)> ConfirmCalls { get; } = [];
-        public List<(string Title, string Message)> ErrorCalls { get; } = [];
-
-        public Task<string?> PickOpenImageAsync() => Task.FromResult(OpenImagePath);
-        public Task<string?> PickSaveFinalImageAsync(string suggestedFileName) => Task.FromResult(SaveFinalImagePath);
-        public Task<string?> PickExportFolderAsync() => Task.FromResult(ExportFolderPath);
-        public Task<string?> PickSavePresetAsync(string suggestedFileName) => Task.FromResult(SavePresetPath);
-        public Task<string?> PickOpenPresetAsync() => Task.FromResult(OpenPresetPath);
-
-        public Task<bool> ConfirmAsync(string title, string message, string confirmText = "Yes", string cancelText = "No")
-        {
-            ConfirmCalls.Add((title, message));
-            return Task.FromResult(ConfirmResult);
-        }
-
-        public Task ShowErrorAsync(string title, string message)
-        {
-            ErrorCalls.Add((title, message));
-            return Task.CompletedTask;
-        }
     }
 }

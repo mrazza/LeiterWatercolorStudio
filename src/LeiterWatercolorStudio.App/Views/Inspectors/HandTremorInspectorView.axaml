@@ -183,7 +183,7 @@
                                                 Step="1"
                                                 IsInteger="True"
                                                 FormatString="F0"
-                                                Value="{Binding PaperColorR, Mode=TwoWay, Converter={x:Static local:ByteToDoubleConverter.Instance}}"
+                                                Value="{Binding PaperColorR, Mode=TwoWay, Converter={x:Static converters:ByteToDoubleConverter.Instance}}"
                                                 BaselineValue="250" />
 
                         <controls:NumericSlider Label="Green (G)"
@@ -194,7 +194,7 @@
                                                 Step="1"
                                                 IsInteger="True"
                                                 FormatString="F0"
-                                                Value="{Binding PaperColorG, Mode=TwoWay, Converter={x:Static local:ByteToDoubleConverter.Instance}}"
+                                                Value="{Binding PaperColorG, Mode=TwoWay, Converter={x:Static converters:ByteToDoubleConverter.Instance}}"
                                                 BaselineValue="248" />
 
                         <controls:NumericSlider Label="Blue (B)"
@@ -205,7 +205,7 @@
                                                 Step="1"
                                                 IsInteger="True"
                                                 FormatString="F0"
-                                                Value="{Binding PaperColorB, Mode=TwoWay, Converter={x:Static local:ByteToDoubleConverter.Instance}}"
+                                                Value="{Binding PaperColorB, Mode=TwoWay, Converter={x:Static converters:ByteToDoubleConverter.Instance}}"
                                                 BaselineValue="242" />
                     </StackPanel>
                 </Border>

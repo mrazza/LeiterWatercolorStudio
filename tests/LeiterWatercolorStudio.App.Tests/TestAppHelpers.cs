@@ -1,6 +1,7 @@
 using Avalonia.Threading;
 using LeiterWatercolorStudio.App.ViewModels;
 using LeiterWatercolorStudio.Core.Pipeline;
+using LeiterWatercolorStudio.Core.Pipeline.Events;
 
 namespace LeiterWatercolorStudio.App.Tests;
 

@@ -195,19 +195,5 @@ public abstract class StageViewModelBase : ObservableObject
         return next;
     }
 
-    private sealed class SuppressionScope(StageViewModelBase owner) : IDisposable
-    {
-        private bool _disposed;
-
-        public void Dispose()
-        {
-            if (_disposed)
-            {
-                return;
-            }
-
-            _disposed = true;
-            owner._suppressionDepth--;
-        }
-    }
+    internal void ReleaseSuppression() => _suppressionDepth--;
 }
