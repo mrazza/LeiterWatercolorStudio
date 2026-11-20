@@ -30,6 +30,12 @@ public partial class NumericSlider : UserControl
         AvaloniaProperty.Register<NumericSlider, string?>(nameof(Description), null);
 
     /// <summary>
+    /// Identifies the <see cref="InfoText"/> styled property.
+    /// </summary>
+    public static readonly StyledProperty<string?> InfoTextProperty =
+        AvaloniaProperty.Register<NumericSlider, string?>(nameof(InfoText), null);
+
+    /// <summary>
     /// Identifies the <see cref="Unit"/> styled property.
     /// </summary>
     public static readonly StyledProperty<string?> UnitProperty =
@@ -181,6 +187,15 @@ public partial class NumericSlider : UserControl
     }
 
     /// <summary>
+    /// Gets or sets a layman-digestible explanation displayed on the adjacent info icon tooltip.
+    /// </summary>
+    public string? InfoText
+    {
+        get => GetValue(InfoTextProperty);
+        set => SetValue(InfoTextProperty, value);
+    }
+
+    /// <summary>
     /// Gets or sets an optional unit suffix displayed after the numeric entry (e.g., <c>px</c>, <c>°</c>, <c>%</c>).
     /// </summary>
     public string? Unit
@@ -318,6 +333,7 @@ public partial class NumericSlider : UserControl
 
         if (change.Property == LabelProperty ||
             change.Property == DescriptionProperty ||
+            change.Property == InfoTextProperty ||
             change.Property == UnitProperty ||
             change.Property == ValueProperty ||
             change.Property == MinimumProperty ||
@@ -351,6 +367,11 @@ public partial class NumericSlider : UserControl
 
         string? tip = string.IsNullOrWhiteSpace(Description) ? null : Description;
         ToolTip.SetTip(PART_LabelArea, tip);
+
+        bool hasInfo = !string.IsNullOrWhiteSpace(InfoText);
+        PART_InfoIcon.Header = Label;
+        PART_InfoIcon.Text = hasInfo ? InfoText : null;
+        PART_InfoIcon.IsVisible = hasInfo;
 
         string? unit = Unit;
         bool hasUnit = !string.IsNullOrWhiteSpace(unit);

@@ -31,10 +31,15 @@
                 Padding="12,10">
             <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
                 <StackPanel Grid.Column="0" Spacing="1" VerticalAlignment="Center">
-                    <TextBlock Text="Hand Tremor"
-                               FontSize="14"
-                               FontWeight="SemiBold"
-                               TextTrimming="CharacterEllipsis" />
+                    <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                        <TextBlock Text="Hand Tremor"
+                                   FontSize="14"
+                                   FontWeight="SemiBold"
+                                   TextTrimming="CharacterEllipsis"
+                                   ToolTip.Tip="Dual-noise boundary displacement, brush overlap darkening, and paper gaps" />
+                        <controls:SettingInfoIcon Header="Hand Tremor"
+                                                  Text="Adds natural hand-painted edge wobble along wash borders, letting contrasting brush strokes drift apart to reveal bare paper slivers or cross over into darker overlapped pigment seams. Bypassing it keeps mechanically exact borders in Hand Tremor and the final artwork." />
+                    </StackPanel>
                     <TextBlock Text="Boundary displacement &amp; paper gaps"
                                FontSize="11"
                                Opacity="0.65"
@@ -78,6 +83,7 @@
 
                         <controls:NumericSlider Label="Amplitude"
                                                 Description="Maximum boundary displacement amplitude in pixels"
+                                                InfoText="Controls how far painted edges wobble back and forth by hand. Near 0 gives crisp, straight computer outlines; raising it creates lively wavy contours, wider paper gaps, and deeper brush overlaps in Hand Tremor and the final image (also scales Edge Darkening borders)."
                                                 Unit="px"
                                                 Minimum="0"
                                                 Maximum="20"
@@ -88,6 +94,7 @@
 
                         <controls:NumericSlider Label="Salient Amplitude Scale"
                                                 Description="Minimum displacement amplitude scale applied inside salient regions"
+                                                InfoText="Keeps your main subject drawn with steadier brushwork than the background. Lower values steady the subject outline cleanly while the background remains loose; 1.0 wobbles subject and background edges equally in Hand Tremor and final output."
                                                 Minimum="0"
                                                 Maximum="1"
                                                 Step="0.01"
@@ -97,6 +104,7 @@
 
                         <controls:NumericSlider Label="Overlap Darkening"
                                                 Description="Pigment darkening blend factor where perturbed strokes overlap"
+                                                InfoText="Sets how much darker paint layers appear where adjacent watercolor washes accidentally brush over each other at contrasting edges. At 0, overlapped areas look softly blended; higher values deepen crisp two-coat shadow seams in Hand Tremor and the final painting."
                                                 Minimum="0"
                                                 Maximum="1"
                                                 Step="0.01"
@@ -106,6 +114,7 @@
 
                         <controls:NumericSlider Label="Paper Gap Bias"
                                                 Description="Boundary-normal bias controlling paper gap width vs overlap on contrasting boundaries"
+                                                InfoText="Shifts adjacent strokes apart or closer together along contrasting edges. Positive values pull washes back to open wider strips of bare Paper Color between colors; negative values push washes over one another to hide paper gaps and favor dark overlaps."
                                                 Minimum="-1"
                                                 Maximum="1"
                                                 Step="0.01"
@@ -115,6 +124,7 @@
 
                         <controls:NumericSlider Label="Paper Gap Opacity"
                                                 Description="Opacity for blending Paper Color into contrasting boundary gaps"
+                                                InfoText="Controls how brightly raw Paper Color shows through unpainted gaps between contrasting strokes. At 0, gaps fade completely away leaving only overlaps and edges; raising toward 1 reveals crisp unpainted paper slits in Hand Tremor and the final image."
                                                 Minimum="0"
                                                 Maximum="1"
                                                 Step="0.01"
@@ -128,11 +138,18 @@
                 <Border Classes="inspector-card">
                     <StackPanel Spacing="6">
                         <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
-                            <TextBlock Grid.Column="0"
-                                       Classes="section-label"
-                                       Text="PAPER COLOR"
-                                       VerticalAlignment="Center"
-                                       Margin="0" />
+                            <StackPanel Grid.Column="0"
+                                        Orientation="Horizontal"
+                                        Spacing="4"
+                                        VerticalAlignment="Center">
+                                <TextBlock Classes="section-label"
+                                           Text="PAPER COLOR"
+                                           VerticalAlignment="Center"
+                                           Margin="0"
+                                           ToolTip.Tip="Unpainted RGB paper background color revealed in contrasting boundary gaps" />
+                                <controls:SettingInfoIcon Header="Paper Color"
+                                                          Text="Sets the color of the bare watercolor sheet peeking through unpainted gaps between contrasting brushstrokes. Warm off-white creams (#FAF8F2) look like natural cotton rag paper, while bright white, cool slate, or tinted paper changes gap contrast in Hand Tremor and Finishing." />
+                            </StackPanel>
 
                             <Border Grid.Column="1"
                                     Width="26"
@@ -160,6 +177,7 @@
 
                         <controls:NumericSlider Label="Red (R)"
                                                 Description="Paper color red channel (0..255)"
+                                                InfoText="Adjusts the red warmth of unpainted paper gaps shown by Hand Tremor. Raising Red warms bare paper toward cream or ivory; lowering it cools paper gaps toward cyan-blue."
                                                 Minimum="0"
                                                 Maximum="255"
                                                 Step="1"
@@ -170,6 +188,7 @@
 
                         <controls:NumericSlider Label="Green (G)"
                                                 Description="Paper color green channel (0..255)"
+                                                InfoText="Adjusts the green balance of unpainted paper gaps shown by Hand Tremor. Raising Green alongside Red shifts bare paper toward soft cream and sunlight; lowering it tints gaps toward rose or magenta."
                                                 Minimum="0"
                                                 Maximum="255"
                                                 Step="1"
@@ -180,6 +199,7 @@
 
                         <controls:NumericSlider Label="Blue (B)"
                                                 Description="Paper color blue channel (0..255)"
+                                                InfoText="Adjusts the coolness versus yellow warmth of unpainted paper gaps shown by Hand Tremor. Higher values match crisp cool-white bright paper; lower values give vintage warm-ivory or buff watercolor paper."
                                                 Minimum="0"
                                                 Maximum="255"
                                                 Step="1"
@@ -199,6 +219,7 @@
                         <StackPanel Spacing="4">
                             <controls:NumericSlider Label="Similar Hue Threshold"
                                                     Description="Maximum hue difference in degrees separating similar-hue from contrasting boundaries"
+                                                    InfoText="Decides how far apart two adjacent color hues must be before Hand Tremor leaves bare paper gaps and dark overlaps between them. Lower values create paper gaps along more subtle color shifts; higher values keep more neighbors seamlessly joined."
                                                     Unit="°"
                                                     Minimum="0"
                                                     Maximum="180"
@@ -209,6 +230,7 @@
 
                             <controls:NumericSlider Label="Min Contrasting Chroma"
                                                     Description="Minimum normalized RGB chroma required on both sides of contrasting boundaries"
+                                                    InfoText="Protects neutral grays, blacks, and whites from sprouting distracting paper gaps. At 0, even black-and-white shadows can show paper gaps and overlaps; higher values confine gaps to richly saturated contrasting colors."
                                                     Minimum="0"
                                                     Maximum="1"
                                                     Step="0.01"
@@ -218,10 +240,14 @@
                         </StackPanel>
 
                         <controls:PerlinNoiseEditor DataContext="{Binding PrimaryNoise}"
-                                                    Title="Primary Noise" />
+                                                    Title="Primary Noise"
+                                                    Description="Primary Perlin noise field displacing all qualifying boundaries and side A of contrasting edges."
+                                                    InfoText="Shapes the primary hand wobble across every painted border and the first side of contrasting edges. Broad low Frequency draws gentle sweeping brush curves; higher Frequency or Octaves adds sketchier hand jitter." />
 
                         <controls:PerlinNoiseEditor DataContext="{Binding SecondaryNoise}"
-                                                    Title="Secondary Noise" />
+                                                    Title="Secondary Noise"
+                                                    Description="Secondary Perlin noise field displacing side B independently on contrasting boundaries."
+                                                    InfoText="Independently wobbles the second color along contrasting borders so the two strokes naturally drift apart to show Paper Color gaps or cross over into darkened seams instead of moving in lockstep." />
                     </StackPanel>
                 </Expander>
             </StackPanel>

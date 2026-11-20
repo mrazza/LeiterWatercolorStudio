@@ -56,9 +56,14 @@
             <!-- Stage Header -->
             <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
                 <StackPanel Grid.Column="0" Spacing="1" VerticalAlignment="Center">
-                    <TextBlock Text="1. Color Transfer"
-                               FontSize="14"
-                               FontWeight="SemiBold" />
+                    <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                        <TextBlock Text="1. Color Transfer"
+                                   FontSize="14"
+                                   FontWeight="SemiBold"
+                                   ToolTip.Tip="CIELAB Reinhard statistical color palette transfer" />
+                        <controls:SettingInfoIcon Header="Color Transfer"
+                                                  Text="Shifts your photo's colors into a cohesive watercolor palette before any later painting stages run. Turn this off to paint using the original photo colors instead, which also updates region borders in Segmentation, Wet-in-Wet bleeds, and the final artwork." />
+                    </StackPanel>
                     <TextBlock Text="CIELAB Reinhard palette wash"
                                FontSize="11.5"
                                Opacity="0.68" />
@@ -95,7 +100,14 @@
                         Opacity="{Binding EnableColorTransfer, Converter={x:Static converters:BoolToOpacityConverter.Instance}}">
                 <!-- Palette Mode Selector -->
                 <StackPanel Spacing="4">
-                    <TextBlock Classes="section-title" Text="PALETTE MODE" />
+                    <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                        <TextBlock Classes="section-title"
+                                   Text="PALETTE MODE"
+                                   VerticalAlignment="Center"
+                                   ToolTip.Tip="Source strategy for CIELAB Reinhard color transfer statistics" />
+                        <controls:SettingInfoIcon Header="Palette Mode"
+                                                  Text="Chooses where the watercolor color mood comes from. Auto picks the closest built-in palette for your photo, Built-In lets you pick any preset palette, and Custom unlocks manual color tuning or sampling from a reference painting. Changing this updates Color Transfer and every stage after it." />
+                    </StackPanel>
                     <ListBox x:Name="PART_PaletteModeSelector"
                              Classes="segmented"
                              ItemsSource="{x:Static local:ColorTransferInspectorView.PaletteModes}"
@@ -120,7 +132,14 @@
                 <StackPanel x:Name="PART_BuiltInSection"
                             Spacing="4"
                             IsVisible="{Binding PaletteMode, Converter={x:Static local:PaletteModeMatchConverter.BuiltIn}}">
-                    <TextBlock Classes="section-title" Text="BUILT-IN PALETTE" />
+                    <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                        <TextBlock Classes="section-title"
+                                   Text="BUILT-IN PALETTE"
+                                   VerticalAlignment="Center"
+                                   ToolTip.Tip="Curated watercolor target CIELAB color profile" />
+                        <controls:SettingInfoIcon Header="Built-In Palette"
+                                                  Text="Remaps your photo's brightness, warmth, and color balance to match the selected 5-swatch watercolor scheme. Switching palettes immediately changes Color Transfer and shifts downstream paint washes and paper contrast." />
+                    </StackPanel>
                     <ComboBox x:Name="PART_BuiltInPaletteComboBox"
                               HorizontalAlignment="Stretch"
                               ItemsSource="{Binding BuiltInPalettes}"
@@ -169,6 +188,7 @@
                 <!-- Transfer Strength Slider -->
                 <controls:NumericSlider Label="Transfer Strength"
                                         Description="Blend weight between original colors (0) and transferred watercolor palette (1)."
+                                        InfoText="Controls how strongly the watercolor palette overrides your photo's original colors. At 0, original colors pass straight through unchanged; raising toward 1 moves deeper into the target watercolor mood in both Color Transfer and the final painting."
                                         Minimum="0"
                                         Maximum="1"
                                         Step="0.01"
@@ -243,14 +263,28 @@
                         </Border>
 
                         <StackPanel Spacing="3">
-                            <TextBlock Text="Custom Palette Name" FontSize="12" />
+                            <StackPanel Orientation="Horizontal" Spacing="3" VerticalAlignment="Center">
+                                <TextBlock Text="Custom Palette Name"
+                                           FontSize="12"
+                                           VerticalAlignment="Center"
+                                           ToolTip.Tip="Display name stored with the custom ColorTransferProfile" />
+                                <controls:SettingInfoIcon Header="Custom Palette Name"
+                                                          Text="Sets a friendly label shown in Active Palette and saved inside preset files. Renaming a palette helps organize your looks and does not change the rendered pixels." />
+                            </StackPanel>
                             <TextBox x:Name="PART_CustomPaletteNameTextBox"
                                      Text="{Binding CustomPaletteName, Mode=TwoWay}"
                                      IsReadOnly="{Binding PaletteMode, Converter={x:Static local:PaletteModeMatchConverter.NotCustom}}" />
                         </StackPanel>
 
                         <StackPanel Spacing="3">
-                            <TextBlock Text="Illuminant" FontSize="12" />
+                            <StackPanel Orientation="Horizontal" Spacing="3" VerticalAlignment="Center">
+                                <TextBlock Text="Illuminant"
+                                           FontSize="12"
+                                           VerticalAlignment="Center"
+                                           ToolTip.Tip="CIE standard reference white illuminant for XYZ to CIELAB conversion" />
+                                <controls:SettingInfoIcon Header="Illuminant"
+                                                          Text="Sets the white light reference used to interpret colors (editable in Custom mode). D65 matches standard daylight screens; E uses equal-energy white balanced for artistic color transfer, causing a subtle shift in white balance in Color Transfer and the final output." />
+                            </StackPanel>
                             <ComboBox x:Name="PART_CustomIlluminantComboBox"
                                       HorizontalAlignment="Stretch"
                                       ItemsSource="{x:Static local:ColorTransferInspectorView.Illuminants}"
@@ -265,6 +299,8 @@
                         </StackPanel>
 
                         <controls:NumericSlider Label="Mean L*"
+                                                Description="Target mean CIELAB lightness (L* in [0, 100]) for Custom palette statistics"
+                                                InfoText="Controls overall brightness of the transferred palette (editable in Custom mode). Lower values create moody, darker washes; higher values yield airy, light-filled watercolor tones in Color Transfer and the final painting."
                                                 Minimum="0"
                                                 Maximum="100"
                                                 Step="0.1"
@@ -274,6 +310,8 @@
                                                 Value="{Binding MeanL, Mode=TwoWay}" />
 
                         <controls:NumericSlider Label="Mean a*"
+                                                Description="Target mean CIELAB green-red opponent axis (a*) for Custom palette statistics"
+                                                InfoText="Shifts the overall color balance between cool greens and warm pinks/reds (editable in Custom mode). Negative values push washes cooler toward green; positive values add rosy or terracotta warmth in Color Transfer and downstream stages."
                                                 Minimum="-128"
                                                 Maximum="127"
                                                 Step="0.1"
@@ -283,6 +321,8 @@
                                                 Value="{Binding MeanA, Mode=TwoWay}" />
 
                         <controls:NumericSlider Label="Mean b*"
+                                                Description="Target mean CIELAB blue-yellow opponent axis (b*) for Custom palette statistics"
+                                                InfoText="Shifts the overall color balance between cool blues and sunny yellows (editable in Custom mode). Negative values cool the scene toward cobalt blue; positive values add golden amber warmth across Color Transfer and the final image."
                                                 Minimum="-128"
                                                 Maximum="127"
                                                 Step="0.1"
@@ -292,6 +332,8 @@
                                                 Value="{Binding MeanB, Mode=TwoWay}" />
 
                         <controls:NumericSlider Label="StdDev L*"
+                                                Description="Target standard deviation of CIELAB lightness (L*) controlling tonal spread"
+                                                InfoText="Controls light-to-dark contrast across the palette (editable in Custom mode). Lower values soften contrast into gentle, misty midtones; higher values push deep shadows and bright highlights farther apart in Color Transfer and downstream stages."
                                                 Minimum="0"
                                                 Maximum="100"
                                                 Step="0.1"
@@ -301,6 +343,8 @@
                                                 Value="{Binding StdDevL, Mode=TwoWay}" />
 
                         <controls:NumericSlider Label="StdDev a*"
+                                                Description="Target standard deviation of CIELAB a* controlling green-red chromatic spread"
+                                                InfoText="Controls how vivid greens and reds become (editable in Custom mode). Lower values mute green/red differences toward neutral grays; higher values boost rich magentas and emeralds in Color Transfer, also making boundaries stronger for later stages."
                                                 Minimum="0"
                                                 Maximum="128"
                                                 Step="0.1"
@@ -310,6 +354,8 @@
                                                 Value="{Binding StdDevA, Mode=TwoWay}" />
 
                         <controls:NumericSlider Label="StdDev b*"
+                                                Description="Target standard deviation of CIELAB b* controlling blue-yellow chromatic spread"
+                                                InfoText="Controls how vivid blues and yellows become (editable in Custom mode). Lower values tone down blue/yellow contrast; higher values amplify vivid skies and warm ochres in Color Transfer and throughout the final painting."
                                                 Minimum="0"
                                                 Maximum="128"
                                                 Step="0.1"

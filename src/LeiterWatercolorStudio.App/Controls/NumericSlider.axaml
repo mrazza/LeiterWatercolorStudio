@@ -1,28 +1,42 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="using:LeiterWatercolorStudio.App.Controls"
              x:Class="LeiterWatercolorStudio.App.Controls.NumericSlider"
              Margin="0,2">
     <StackPanel Spacing="1">
         <Grid ColumnDefinitions="*,Auto,Auto,Auto">
-            <Border x:Name="PART_LabelArea"
-                    Grid.Column="0"
-                    Background="Transparent"
-                    VerticalAlignment="Center">
-                <StackPanel Orientation="Horizontal"
-                            Spacing="6"
-                            VerticalAlignment="Center">
-                    <Ellipse x:Name="PART_ModifiedDot"
-                             Width="6"
-                             Height="6"
-                             Fill="#38BDF8"
-                             VerticalAlignment="Center"
-                             IsVisible="False" />
-                    <TextBlock x:Name="PART_LabelText"
-                               FontSize="12"
-                               VerticalAlignment="Center"
-                               TextTrimming="CharacterEllipsis" />
-                </StackPanel>
-            </Border>
+            <Grid Grid.Column="0"
+                  ColumnDefinitions="*,Auto"
+                  HorizontalAlignment="Left"
+                  VerticalAlignment="Center">
+                <Border x:Name="PART_LabelArea"
+                        Grid.Column="0"
+                        Background="Transparent"
+                        VerticalAlignment="Center">
+                    <Grid ColumnDefinitions="Auto,*"
+                          VerticalAlignment="Center">
+                        <Ellipse x:Name="PART_ModifiedDot"
+                                 Grid.Column="0"
+                                 Width="6"
+                                 Height="6"
+                                 Fill="#38BDF8"
+                                 Margin="0,0,5,0"
+                                 VerticalAlignment="Center"
+                                 IsVisible="False" />
+                        <TextBlock x:Name="PART_LabelText"
+                                   Grid.Column="1"
+                                   FontSize="12"
+                                   VerticalAlignment="Center"
+                                   TextTrimming="CharacterEllipsis" />
+                    </Grid>
+                </Border>
+
+                <controls:SettingInfoIcon x:Name="PART_InfoIcon"
+                                          Grid.Column="1"
+                                          Margin="3,0,0,0"
+                                          VerticalAlignment="Center"
+                                          IsVisible="False" />
+            </Grid>
 
             <TextBox x:Name="PART_ValueTextBox"
                      Grid.Column="1"

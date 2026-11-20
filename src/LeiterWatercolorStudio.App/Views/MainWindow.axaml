@@ -36,7 +36,14 @@
 
                     <!-- Preview Cap -->
                     <StackPanel Orientation="Horizontal" Spacing="5" VerticalAlignment="Center" Margin="0,2,8,2">
-                        <TextBlock Classes="studio-muted" Text="Preview" VerticalAlignment="Center" />
+                        <StackPanel Orientation="Horizontal" Spacing="3" VerticalAlignment="Center">
+                            <TextBlock Classes="studio-muted"
+                                       Text="Preview"
+                                       VerticalAlignment="Center"
+                                       ToolTip.Tip="Maximum dimension for interactive preview rendering" />
+                            <controls:SettingInfoIcon Header="Preview Resolution"
+                                                      Text="Sets how large the working preview renders while you drag sliders. Smaller caps update much faster, though fine details like paper tooth and thin bleeds appear crisper at larger caps. Full-Resolution renders and exports always use the full original photo size." />
+                        </StackPanel>
                         <ComboBox Classes="studio-combo"
                                   MinWidth="88"
                                   ItemsSource="{Binding PreviewCapOptions}"
@@ -52,7 +59,14 @@
 
                     <!-- Baseline Selector -->
                     <StackPanel Orientation="Horizontal" Spacing="5" VerticalAlignment="Center" Margin="0,2,8,2">
-                        <TextBlock Classes="studio-muted" Text="Baseline" VerticalAlignment="Center" />
+                        <StackPanel Orientation="Horizontal" Spacing="3" VerticalAlignment="Center">
+                            <TextBlock Classes="studio-muted"
+                                       Text="Baseline"
+                                       VerticalAlignment="Center"
+                                       ToolTip.Tip="Calibration baseline for parameter defaults and resets" />
+                            <controls:SettingInfoIcon Header="Baseline Mode"
+                                                      Text="Chooses the starting point and reset target for all painting stages. Default uses standard reference values; Size-Adapted scales radii for your image size; Auto-Adapted further tailors settings to your photo's visual clutter and contrast." />
+                        </StackPanel>
                         <ComboBox Classes="studio-combo"
                                   MinWidth="96"
                                   ItemsSource="{Binding BaselineModeOptions}"
@@ -115,7 +129,14 @@
 
                     <!-- Compare Mode / Reference / Pin -->
                     <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center" Margin="0,2,8,2">
-                        <TextBlock Classes="studio-muted" Text="Compare" VerticalAlignment="Center" />
+                        <StackPanel Orientation="Horizontal" Spacing="3" VerticalAlignment="Center">
+                            <TextBlock Classes="studio-muted"
+                                       Text="Compare"
+                                       VerticalAlignment="Center"
+                                       ToolTip.Tip="Viewport A/B comparison mode and reference source" />
+                            <controls:SettingInfoIcon Header="Compare Mode"
+                                                      Text="Controls how the main canvas lets you inspect before-and-after changes using Split Wipe, Side-by-Side, or Hold-to-Compare against the Input photo, Previous Stage, or a Pinned stage. This is purely a viewing aid and never alters the painted image." />
+                        </StackPanel>
                         <ComboBox Classes="studio-combo"
                                   MinWidth="104"
                                   ItemsSource="{Binding CompareModeOptions}"

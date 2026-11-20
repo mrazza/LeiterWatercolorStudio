@@ -13,33 +13,43 @@
         <StackPanel Spacing="6">
             <!-- Collapsible Card Header -->
             <Grid ColumnDefinitions="*,Auto">
-                <Button x:Name="PART_ExpandButton"
-                        Grid.Column="0"
-                        Background="Transparent"
-                        BorderThickness="0"
-                        Padding="2,2"
-                        HorizontalAlignment="Stretch"
-                        HorizontalContentAlignment="Left"
-                        VerticalAlignment="Center">
-                    <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-                        <TextBlock x:Name="PART_ChevronText"
-                                   Text="▾"
-                                   FontSize="11"
-                                   Opacity="0.75"
-                                   VerticalAlignment="Center" />
-                        <Ellipse x:Name="PART_ModifiedDot"
-                                 Width="6"
-                                 Height="6"
-                                 Fill="#38BDF8"
-                                 VerticalAlignment="Center"
-                                 IsVisible="False" />
-                        <TextBlock x:Name="PART_TitleText"
-                                   Text="Noise"
-                                   FontSize="12.5"
-                                   FontWeight="SemiBold"
-                                   VerticalAlignment="Center" />
-                    </StackPanel>
-                </Button>
+                <Grid Grid.Column="0"
+                      ColumnDefinitions="*,Auto"
+                      HorizontalAlignment="Left"
+                      VerticalAlignment="Center">
+                    <Button x:Name="PART_ExpandButton"
+                            Grid.Column="0"
+                            Background="Transparent"
+                            BorderThickness="0"
+                            Padding="2,2"
+                            HorizontalAlignment="Left"
+                            HorizontalContentAlignment="Left"
+                            VerticalAlignment="Center">
+                        <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                            <TextBlock x:Name="PART_ChevronText"
+                                       Text="▾"
+                                       FontSize="11"
+                                       Opacity="0.75"
+                                       VerticalAlignment="Center" />
+                            <Ellipse x:Name="PART_ModifiedDot"
+                                     Width="6"
+                                     Height="6"
+                                     Fill="#38BDF8"
+                                     VerticalAlignment="Center"
+                                     IsVisible="False" />
+                            <TextBlock x:Name="PART_TitleText"
+                                       Text="Noise"
+                                       FontSize="12.5"
+                                       FontWeight="SemiBold"
+                                       VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+
+                    <controls:SettingInfoIcon x:Name="PART_TitleInfoIcon"
+                                              Grid.Column="1"
+                                              Margin="2,0,0,0"
+                                              VerticalAlignment="Center" />
+                </Grid>
 
                 <Button x:Name="PART_ResetButton"
                         Grid.Column="1"
@@ -59,11 +69,18 @@
             <StackPanel x:Name="PART_BodyPanel" Spacing="4">
                 <!-- Seed Row -->
                 <Grid ColumnDefinitions="Auto,*,Auto" Margin="0,2,0,2">
-                    <TextBlock Grid.Column="0"
-                               Text="Seed"
-                               FontSize="12"
-                               VerticalAlignment="Center"
-                               Margin="0,0,8,0" />
+                    <StackPanel Grid.Column="0"
+                                Orientation="Horizontal"
+                                Spacing="3"
+                                VerticalAlignment="Center"
+                                Margin="0,0,8,0">
+                        <TextBlock Text="Seed"
+                                   FontSize="12"
+                                   VerticalAlignment="Center"
+                                   ToolTip.Tip="Integer pseudo-random seed initializing the Perlin noise permutation table." />
+                        <controls:SettingInfoIcon x:Name="PART_SeedInfoIcon"
+                                                  Header="Seed" />
+                    </StackPanel>
                     <NumericUpDown x:Name="PART_SeedUpDown"
                                    Grid.Column="1"
                                    Value="{Binding Seed, Mode=TwoWay, Converter={x:Static converters:IntToDecimalConverter.Instance}}"
@@ -88,7 +105,9 @@
                             ToolTip.Tip="Generate a new random seed" />
                 </Grid>
 
-                <controls:NumericSlider Label="Frequency"
+                <controls:NumericSlider x:Name="PART_FrequencySlider"
+                                        Label="Frequency"
+                                        Description="Base spatial sampling frequency (cycles per pixel) of the first Perlin noise octave."
                                         Minimum="0.001"
                                         Maximum="0.5"
                                         Step="0.001"
@@ -96,7 +115,9 @@
                                         Value="{Binding Frequency, Mode=TwoWay}"
                                         BaselineValue="{Binding Baseline.Frequency, Mode=OneWay}" />
 
-                <controls:NumericSlider Label="Octaves"
+                <controls:NumericSlider x:Name="PART_OctavesSlider"
+                                        Label="Octaves"
+                                        Description="Number of layered fractal Brownian motion (fBm) noise octaves summed together."
                                         Minimum="1"
                                         Maximum="16"
                                         Step="1"
@@ -105,7 +126,9 @@
                                         Value="{Binding Octaves, Mode=TwoWay, Converter={x:Static converters:IntToDoubleConverter.Instance}}"
                                         BaselineValue="{Binding Baseline.Octaves, Mode=OneWay, Converter={x:Static converters:IntToDoubleConverter.Instance}}" />
 
-                <controls:NumericSlider Label="Lacunarity"
+                <controls:NumericSlider x:Name="PART_LacunaritySlider"
+                                        Label="Lacunarity"
+                                        Description="Frequency multiplier between consecutive fractal noise octaves."
                                         Minimum="1.0"
                                         Maximum="4.0"
                                         Step="0.05"
@@ -113,7 +136,9 @@
                                         Value="{Binding Lacunarity, Mode=TwoWay}"
                                         BaselineValue="{Binding Baseline.Lacunarity, Mode=OneWay}" />
 
-                <controls:NumericSlider Label="Persistence"
+                <controls:NumericSlider x:Name="PART_PersistenceSlider"
+                                        Label="Persistence"
+                                        Description="Amplitude decay factor applied to each successive fractal noise octave."
                                         Minimum="0.0"
                                         Maximum="1.0"
                                         Step="0.01"

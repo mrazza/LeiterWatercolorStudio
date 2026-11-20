@@ -72,6 +72,7 @@
             <StackPanel Spacing="8">
                 <controls:NumericSlider Label="Spatial Radius"
                                         Description="Spatial search window radius in pixels for Mean-Shift filtering."
+                                        InfoText="Sets how wide a neighborhood each brushstroke considers when grouping pixels into clean color washes. Small values trace crisp small features in Mean-Shift Filtered and Mean-Shift Regions; large values simplify the scene into broad, relaxed paint blobs that shape Wet-in-Wet and Hand Tremor edges."
                                         Minimum="1"
                                         Maximum="32"
                                         Step="1"
@@ -83,6 +84,7 @@
 
                 <controls:NumericSlider Label="Range Radius"
                                         Description="CIELAB color distance window radius controlling region color similarity."
+                                        InfoText="Controls how different two colors can be before Mean-Shift splits them into separate painted shapes. Low values preserve subtle shading bands and many regions; high values merge close tones into flat, bold blocks in Mean-Shift Filtered, Mean-Shift Regions, and the final painting."
                                         Minimum="0.5"
                                         Maximum="30"
                                         Step="0.5"
@@ -92,6 +94,7 @@
 
                 <controls:NumericSlider Label="Min Region Size"
                                         Description="Minimum pixel count per segmented region before small-region merging."
+                                        InfoText="Eliminates tiny paint specks in Mean-Shift Regions by folding any region smaller than this size into its nearest neighbor. Higher values create simpler, less cluttered wash shapes with fewer noisy paper gaps or edge rings in later stages."
                                         Minimum="0"
                                         Maximum="2000"
                                         Step="10"
@@ -110,6 +113,7 @@
                 <StackPanel Spacing="8" Margin="0,6,0,0">
                     <controls:NumericSlider Label="Max Iterations"
                                             Description="Maximum Mean-Shift mode-seeking iterations per pixel."
+                                            InfoText="Caps how many steps pixels take to settle onto their region color in Mean-Shift Filtered. Very low numbers give a looser, softly blended look; raising it sharpens flat region interiors before plateauing once pixels finish settling."
                                             Minimum="1"
                                             Maximum="50"
                                             Step="1"
@@ -120,6 +124,7 @@
 
                     <controls:NumericSlider Label="Convergence Epsilon"
                                             Description="5D spatial-range convergence threshold halting iteration."
+                                            InfoText="Controls how early Mean-Shift stops refining each pixel's color. Smaller values run slightly longer for crisp, flat color plateaus in Mean-Shift Filtered; larger values stop sooner for a gently softer, faster pass."
                                             Minimum="0.001"
                                             Maximum="1.0"
                                             Step="0.005"
@@ -128,7 +133,14 @@
                                             Value="{Binding ConvergenceEpsilon, Mode=TwoWay}" />
 
                     <StackPanel Spacing="3">
-                        <TextBlock Text="Connectivity" FontSize="12" />
+                        <StackPanel Orientation="Horizontal" Spacing="3" VerticalAlignment="Center">
+                            <TextBlock Text="Connectivity"
+                                       FontSize="12"
+                                       VerticalAlignment="Center"
+                                       ToolTip.Tip="Grid pixel neighborhood connectivity (4-connected vs 8-connected) used for region clustering and merging" />
+                            <controls:SettingInfoIcon Header="Segmentation Connectivity"
+                                                      Text="Controls whether diagonally touching pixels of the same tone link into one wash shape in Mean-Shift Regions. 8-Connected connects thin diagonal strokes together; 4-Connected keeps diagonals separate, affecting where Wet-in-Wet bleeds and Hand Tremor gaps form." />
+                        </StackPanel>
                         <ComboBox HorizontalAlignment="Stretch"
                                   ItemsSource="{x:Static local:SegmentationInspectorView.GridConnectivities}"
                                   SelectedItem="{Binding Connectivity, Mode=TwoWay}">

@@ -61,6 +61,7 @@
             <StackPanel Spacing="8">
                 <controls:NumericSlider Label="Pre-Blur Sigma"
                                         Description="Gaussian pre-blur applied before Stage 2 EGBI segmentation (0 disables pre-blur)."
+                                        InfoText="Softens fine camera grain and tiny textures before building the initial saliency patches. Raising this smooths noisy grass or leaves in Pre-Blur and EGBI Regions, helping Saliency stay locked on main shapes instead of clutter."
                                         Minimum="0"
                                         Maximum="5"
                                         Step="0.05"
@@ -71,6 +72,7 @@
 
                 <controls:NumericSlider Label="EGBI K-Factor"
                                         Description="Scale factor controlling preference for larger initial EGBI regions."
+                                        InfoText="Controls how eagerly nearby colors merge into larger patches inside EGBI Regions. Lower values split the scene into many small fragments; higher values merge regions together, smoothing the RC Saliency Map and focusing focus masks on broader objects."
                                         Minimum="1"
                                         Maximum="500"
                                         Step="1"
@@ -80,6 +82,7 @@
 
                 <controls:NumericSlider Label="EGBI Min Region Size"
                                         Description="Minimum pixel count per region after small-component merging."
+                                        InfoText="Sets the smallest allowed patch size in EGBI Regions by absorbing tiny specks into neighbors. Raising it cleans up salt-and-pepper patches in EGBI Regions and RC Saliency Map so small background dots aren't treated as separate features."
                                         Minimum="0"
                                         Maximum="2000"
                                         Step="10"
@@ -91,6 +94,7 @@
 
                 <controls:NumericSlider Label="Center Prior Weight"
                                         Description="Exponential center-bias weight emphasizing centrally located subjects."
+                                        InfoText="Controls how much Saliency favors subjects near the middle of the frame. At 0, edge objects are weighed equally; higher values pull RC Saliency Map and SaliencyCut Mask toward center subjects, sharpening center detail while letting outer edges paint more loosely."
                                         Minimum="0"
                                         Maximum="25"
                                         Step="0.25"
@@ -100,6 +104,7 @@
 
                 <controls:NumericSlider Label="SaliencyCut Iterations"
                                         Description="Maximum outer trimap refinement iterations for foreground extraction."
+                                        InfoText="Sets how many refinement passes tighten the foreground subject cutout in SaliencyCut Mask. 1 to 2 passes leave a looser silhouette; higher values hug subject contours more cleanly, improving focus boundaries used by LOD Abstraction and final edge detail."
                                         Minimum="1"
                                         Maximum="12"
                                         Step="1"
@@ -110,6 +115,7 @@
 
                 <controls:NumericSlider Label="Distance Sigma Scale"
                                         Description="Default smoothing sigma expressed as a fraction of min(Width, Height)."
+                                        InfoText="Controls how gradually crisp subject detail fades into soft background washes across the Distance Field (when Explicit Smoothing Sigma is off). Larger values widen the transition halo so LOD Abstraction and Hand Tremor blend gently from subject to background."
                                         Minimum="0"
                                         Maximum="0.2"
                                         Step="0.005"
@@ -117,14 +123,20 @@
                                         BaselineValue="0.03"
                                         Value="{Binding SaliencyDistanceField.DefaultSigmaScale, Mode=TwoWay}" />
 
-                <CheckBox x:Name="PART_UseExplicitSmoothingSigmaCheckBox"
-                          Content="Use Explicit Smoothing Sigma"
-                          FontSize="12"
-                          IsChecked="{Binding SaliencyDistanceField.UseExplicitSmoothingSigma, Mode=TwoWay}" />
+                <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                    <CheckBox x:Name="PART_UseExplicitSmoothingSigmaCheckBox"
+                              Content="Use Explicit Smoothing Sigma"
+                              FontSize="12"
+                              IsChecked="{Binding SaliencyDistanceField.UseExplicitSmoothingSigma, Mode=TwoWay}"
+                              ToolTip.Tip="Override proportional DefaultSigmaScale with a fixed pixel sigma for Distance Field smoothing" />
+                    <controls:SettingInfoIcon Header="Use Explicit Smoothing Sigma"
+                                              Text="Switches the Distance Field feathering from an automatic percentage of image size to an exact pixel width. Turn this on to keep the exact same transition softness across images of different sizes." />
+                </StackPanel>
 
                 <controls:NumericSlider x:Name="PART_ExplicitSmoothingSigmaSlider"
                                         Label="Explicit Smoothing Sigma"
                                         Description="Explicit Gaussian smoothing standard deviation overriding Default Sigma Scale."
+                                        InfoText="Sets an exact pixel blur radius for the Distance Field when Use Explicit Smoothing Sigma is enabled. Low values keep a sharp transition right around the subject; higher values create a wide, dreamy fade from sharp focal areas into loose background washes."
                                         Minimum="0"
                                         Maximum="100"
                                         Step="0.5"
@@ -149,6 +161,7 @@
 
                             <controls:NumericSlider Label="Epsilon"
                                                     Description="Minimum color merge threshold below which adjacent pixels always merge."
+                                                    InfoText="Forces nearly identical neighboring pixels to join together inside EGBI Regions. Increasing Epsilon merges faint flat gradients (like clear sky or walls) into unified patches, producing a cleaner RC Saliency Map."
                                                     Minimum="0"
                                                     Maximum="10"
                                                     Step="0.1"
@@ -157,7 +170,14 @@
                                                     Value="{Binding Egbi.Epsilon, Mode=TwoWay}" />
 
                             <StackPanel Spacing="3">
-                                <TextBlock Text="Connectivity" FontSize="12" />
+                                <StackPanel Orientation="Horizontal" Spacing="3" VerticalAlignment="Center">
+                                    <TextBlock Text="Connectivity"
+                                               FontSize="12"
+                                               VerticalAlignment="Center"
+                                               ToolTip.Tip="Grid pixel neighborhood connectivity (4-connected vs 8-connected) used for EGBI graph edges" />
+                                    <controls:SettingInfoIcon Header="EGBI Connectivity"
+                                                              Text="Decides whether EGBI Regions connect diagonally or only horizontally and vertically. 8-Connected links thin diagonal elements like branches or straps into one region; 4-Connected keeps diagonals split into slightly tighter, blockier patches." />
+                                </StackPanel>
                                 <ComboBox HorizontalAlignment="Stretch"
                                           ItemsSource="{x:Static local:SaliencyInspectorView.GridConnectivities}"
                                           SelectedItem="{Binding Egbi.Connectivity, Mode=TwoWay}">
@@ -176,13 +196,23 @@
                         <StackPanel Spacing="6">
                             <TextBlock Classes="section-title" Text="REGIONAL CONTRAST" />
 
-                            <CheckBox Content="Enable Feature Smoothing"
-                                      FontSize="12"
-                                      IsChecked="{Binding RegionalContrastSaliency.EnableSmoothing, Mode=TwoWay}" />
+                            <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                                <CheckBox Content="Enable Feature Smoothing"
+                                          FontSize="12"
+                                          IsChecked="{Binding RegionalContrastSaliency.EnableSmoothing, Mode=TwoWay}"
+                                          ToolTip.Tip="Smooth regional saliency scores across similar colors in CIELAB feature space" />
+                                <controls:SettingInfoIcon Header="Enable Feature Smoothing"
+                                                          Text="Blends saliency scores across similarly colored regions in RC Saliency Map. Keeping this on helps an entire subject glow evenly instead of leaving patchy dark holes inside an object, leading to a cleaner SaliencyCut Mask." />
+                            </StackPanel>
 
-                            <CheckBox Content="Compute Border Regions"
-                                      FontSize="12"
-                                      IsChecked="{Binding RegionalContrastSaliency.ComputeBorderRegions, Mode=TwoWay}" />
+                            <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                                <CheckBox Content="Compute Border Regions"
+                                          FontSize="12"
+                                          IsChecked="{Binding RegionalContrastSaliency.ComputeBorderRegions, Mode=TwoWay}"
+                                          ToolTip.Tip="Suppress saliency to 0 for regions touching the outer 2.5% image border" />
+                                <controls:SettingInfoIcon Header="Compute Border Regions"
+                                                          Text="Assumes shapes touching the outer edge of the photo are background and pushes their RC Saliency Map score down. Keep on to focus on framed subjects; turn off for close-ups or portraits where your subject touches the frame border." />
+                            </StackPanel>
                         </StackPanel>
                     </Border>
 
@@ -193,6 +223,7 @@
 
                             <controls:NumericSlider Label="Trimap Band Radius"
                                                     Description="Dilation/erosion radius around the mask boundary for uncertain pixels."
+                                                    InfoText="Sets how wide the uncertain transition strip is around the initial mask while refining SaliencyCut Mask. Smaller values hug the rough starting mask closely; larger values give the solver room to discover missed limbs, petals, or hair in the cutout."
                                                     Minimum="1"
                                                     Maximum="64"
                                                     Step="1"
@@ -202,14 +233,20 @@
                                                     BaselineValue="10"
                                                     Value="{Binding SaliencyCut.TrimapBandRadius, Mode=TwoWay, Converter={x:Static converters:IntToDoubleConverter.Instance}}" />
 
-                            <CheckBox x:Name="PART_UseMaxWorkingDimensionCheckBox"
-                                      Content="Limit Working Dimension"
-                                      FontSize="12"
-                                      IsChecked="{Binding SaliencyCut.UseMaxWorkingDimension, Mode=TwoWay}" />
+                            <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                                <CheckBox x:Name="PART_UseMaxWorkingDimensionCheckBox"
+                                          Content="Limit Working Dimension"
+                                          FontSize="12"
+                                          IsChecked="{Binding SaliencyCut.UseMaxWorkingDimension, Mode=TwoWay}"
+                                          ToolTip.Tip="Cap SaliencyCut solver resolution to MaxWorkingDimension for faster processing" />
+                                <controls:SettingInfoIcon Header="Limit Working Dimension"
+                                                          Text="Caps the internal image size used while carving out SaliencyCut Mask. Keeping this on speeds up renders dramatically on large photos; turning it off solves at full pixel resolution for crisper mask edges at a speed cost." />
+                            </StackPanel>
 
                             <controls:NumericSlider x:Name="PART_MaxWorkingDimensionSlider"
                                                     Label="Max Working Dimension"
                                                     Description="Maximum image side length used internally by SaliencyCut."
+                                                    InfoText="Sets the maximum width or height used internally to refine SaliencyCut Mask when Limit Working Dimension is checked. Lower values compute faster with slightly softer cutouts; higher values preserve finer edge detail on high-resolution images."
                                                     Minimum="64"
                                                     Maximum="4096"
                                                     Step="32"
@@ -229,6 +266,7 @@
 
                             <controls:NumericSlider Label="GrabCut Iterations"
                                                     Description="Alternating GMM-update and min-cut optimization iterations."
+                                                    InfoText="Controls how many color-learning and edge-cutting cycles refine each SaliencyCut Mask pass. More iterations can settle ambiguous edges between subject and background, though usually with diminishing visual changes after 5 iterations."
                                                     Minimum="1"
                                                     Maximum="15"
                                                     Step="1"
@@ -239,6 +277,7 @@
 
                             <controls:NumericSlider Label="GMM Components"
                                                     Description="Number of Gaussian mixture components per foreground/background model."
+                                                    InfoText="Sets how many distinct color clusters represent the subject and background in SaliencyCut Mask. Lower values work well for simple solid subjects; higher values better separate multi-colored clothes, fur, or busy patterned backgrounds."
                                                     Minimum="1"
                                                     Maximum="12"
                                                     Step="1"
@@ -249,6 +288,7 @@
 
                             <controls:NumericSlider Label="Smoothness Weight"
                                                     Description="Pairwise contrast-sensitive boundary smoothness weight (gamma)."
+                                                    InfoText="Controls how smooth versus jagged the cutout outline is in SaliencyCut Mask. Lower values allow detailed, intricate boundaries into small crevices; higher values pull the silhouette straighter and drop tiny stray pixels along edges."
                                                     Minimum="0"
                                                     Maximum="200"
                                                     Step="1"
@@ -264,7 +304,14 @@
                             <TextBlock Classes="section-title" Text="SALIENCY MASK" />
 
                             <StackPanel Spacing="3">
-                                <TextBlock Text="Threshold Method" FontSize="12" />
+                                <StackPanel Orientation="Horizontal" Spacing="3" VerticalAlignment="Center">
+                                    <TextBlock Text="Threshold Method"
+                                               FontSize="12"
+                                               VerticalAlignment="Center"
+                                               ToolTip.Tip="Binarization method converting continuous RC saliency scores into the initial foreground mask" />
+                                    <controls:SettingInfoIcon Header="Threshold Method"
+                                                              Text="Chooses how the glowing RC Saliency Map turns into the initial subject cutout for SaliencyCut Mask. Otsu automatically finds the best split, Adaptive Mean picks regions well above average saliency, and Fixed uses the exact Fixed Threshold slider." />
+                                </StackPanel>
                                 <ComboBox HorizontalAlignment="Stretch"
                                           ItemsSource="{x:Static local:SaliencyInspectorView.ThresholdMethods}"
                                           SelectedItem="{Binding SaliencyMask.Method, Mode=TwoWay}">
@@ -278,6 +325,7 @@
 
                             <controls:NumericSlider Label="Fixed Threshold"
                                                     Description="Threshold in [0, 1] used when Method is Fixed."
+                                                    InfoText="Sets the exact cutoff brightness (0 to 1) in RC Saliency Map when Threshold Method is set to Fixed. Lower values include larger parts of the scene in SaliencyCut Mask; higher values isolate only the highest-contrast focal hotspot."
                                                     Minimum="0"
                                                     Maximum="1"
                                                     Step="0.01"
@@ -286,7 +334,14 @@
                                                     Value="{Binding SaliencyMask.FixedThreshold, Mode=TwoWay}" />
 
                             <StackPanel Spacing="3">
-                                <TextBlock Text="Retention Policy" FontSize="12" />
+                                <StackPanel Orientation="Horizontal" Spacing="3" VerticalAlignment="Center">
+                                    <TextBlock Text="Retention Policy"
+                                               FontSize="12"
+                                               VerticalAlignment="Center"
+                                               ToolTip.Tip="Connected component filtering rule applied to the binarized saliency mask" />
+                                    <controls:SettingInfoIcon Header="Retention Policy"
+                                                              Text="Decides which separate foreground islands survive cleanup in SaliencyCut Mask. Minimum Area Fraction drops tiny specks, Largest Component Only focuses strictly on one single main object, and Keep All preserves every isolated detail." />
+                                </StackPanel>
                                 <ComboBox HorizontalAlignment="Stretch"
                                           ItemsSource="{x:Static local:SaliencyInspectorView.RetentionPolicies}"
                                           SelectedItem="{Binding SaliencyMask.RetentionPolicy, Mode=TwoWay}">
@@ -300,6 +355,7 @@
 
                             <controls:NumericSlider Label="Min Area Fraction"
                                                     Description="Minimum connected component area fraction retained when policy is Minimum Area Fraction."
+                                                    InfoText="Sets the smallest island size (as a fraction of total image area) kept in SaliencyCut Mask under Minimum Area Fraction. Raising it removes stray background dots so only major objects keep crisp detail in the final painting."
                                                     Minimum="0"
                                                     Maximum="0.5"
                                                     Step="0.005"
@@ -308,7 +364,14 @@
                                                     Value="{Binding SaliencyMask.MinAreaFraction, Mode=TwoWay}" />
 
                             <StackPanel Spacing="3">
-                                <TextBlock Text="Mask Connectivity" FontSize="12" />
+                                <StackPanel Orientation="Horizontal" Spacing="3" VerticalAlignment="Center">
+                                    <TextBlock Text="Mask Connectivity"
+                                               FontSize="12"
+                                               VerticalAlignment="Center"
+                                               ToolTip.Tip="Grid pixel neighborhood connectivity used when filtering connected components in the saliency mask" />
+                                    <controls:SettingInfoIcon Header="Mask Connectivity"
+                                                              Text="Determines whether diagonally touching pixels count as one connected island during SaliencyCut Mask cleanup. 8-Connected keeps thin diagonal features attached to the main subject; 4-Connected splits diagonally touching parts separately." />
+                                </StackPanel>
                                 <ComboBox HorizontalAlignment="Stretch"
                                           ItemsSource="{x:Static local:SaliencyInspectorView.GridConnectivities}"
                                           SelectedItem="{Binding SaliencyMask.Connectivity, Mode=TwoWay}">
