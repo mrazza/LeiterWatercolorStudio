@@ -6,6 +6,8 @@
 
 An interactive cross-platform desktop watercolor studio for [Leiter](https://github.com/mrazza/Leiter)'s multi-stage photo watercolorization pipeline, built with **.NET 10** and **Avalonia UI**.
 
+![Leiter Watercolor Studio](screenshot.png)
+
 ---
 
 ## Features
