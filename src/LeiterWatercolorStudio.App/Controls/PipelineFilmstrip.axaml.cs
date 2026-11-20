@@ -6,7 +6,9 @@ using Avalonia.Data;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.VisualTree;
+using CommunityToolkit.Mvvm.Input;
 using LeiterWatercolorStudio.App.ViewModels;
+using LeiterWatercolorStudio.Core.Models;
 
 namespace LeiterWatercolorStudio.App.Controls;
 
@@ -333,37 +335,57 @@ public partial class PipelineFilmstrip : UserControl
         }
     }
 
-    private static void ExecuteStageCommand(ICommand? command, StageCardViewModel card)
+    private static void ExecuteStageCommand(ICommand? command, StageCardViewModel card) =>
+        ExecuteTypedCommand(command, card.StageId, card);
+
+    private static void ExecuteSubStageCommand(ICommand? command, SubStageItemViewModel subStage) =>
+        ExecuteTypedCommand(command, subStage.ViewId, subStage);
+
+    private static void ExecuteTypedCommand<TId, TItem>(ICommand? command, TId id, TItem item)
+        where TId : struct
     {
         if (command is null)
         {
             return;
         }
 
-        if (command.CanExecute(card))
+        if (command is IRelayCommand<TId> idCommand)
         {
-            command.Execute(card);
-        }
-        else if (command.CanExecute(card.StageId))
-        {
-            command.Execute(card.StageId);
-        }
-    }
+            if (idCommand.CanExecute(id))
+            {
+                idCommand.Execute(id);
+            }
 
-    private static void ExecuteSubStageCommand(ICommand? command, SubStageItemViewModel subStage)
-    {
-        if (command is null)
-        {
             return;
         }
 
-        if (command.CanExecute(subStage))
+        if (command is IRelayCommand<TId?> nullableIdCommand)
         {
-            command.Execute(subStage);
+            if (nullableIdCommand.CanExecute(id))
+            {
+                nullableIdCommand.Execute(id);
+            }
+
+            return;
         }
-        else if (command.CanExecute(subStage.ViewId))
+
+        if (command is IRelayCommand<TItem> itemCommand)
         {
-            command.Execute(subStage.ViewId);
+            if (itemCommand.CanExecute(item))
+            {
+                itemCommand.Execute(item);
+            }
+
+            return;
+        }
+
+        if (command.CanExecute(item))
+        {
+            command.Execute(item);
+        }
+        else if (command.CanExecute(id))
+        {
+            command.Execute(id);
         }
     }
 }

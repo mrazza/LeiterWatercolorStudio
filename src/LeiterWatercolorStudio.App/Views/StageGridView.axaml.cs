@@ -9,6 +9,7 @@ using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
+using CommunityToolkit.Mvvm.Input;
 using LeiterWatercolorStudio.App.ViewModels;
 using LeiterWatercolorStudio.Core.Models;
 
@@ -431,6 +432,36 @@ public partial class StageGridView : UserControl
         ICommand? command = ActivateStageCommand;
         if (command is null)
         {
+            return;
+        }
+
+        if (command is IRelayCommand<PrimaryStageId> stageIdCommand)
+        {
+            if (stageIdCommand.CanExecute(card.StageId))
+            {
+                stageIdCommand.Execute(card.StageId);
+            }
+
+            return;
+        }
+
+        if (command is IRelayCommand<PrimaryStageId?> nullableStageIdCommand)
+        {
+            if (nullableStageIdCommand.CanExecute(card.StageId))
+            {
+                nullableStageIdCommand.Execute(card.StageId);
+            }
+
+            return;
+        }
+
+        if (command is IRelayCommand<StageCardViewModel> cardCommand)
+        {
+            if (cardCommand.CanExecute(card))
+            {
+                cardCommand.Execute(card);
+            }
+
             return;
         }
 
