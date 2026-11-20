@@ -1,0 +1,160 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="using:LeiterWatercolorStudio.App.Controls"
+             xmlns:converters="using:LeiterWatercolorStudio.App.Converters"
+             xmlns:local="using:LeiterWatercolorStudio.App.Views.Inspectors"
+             xmlns:models="clr-namespace:LeiterWatercolorStudio.Core.Models;assembly=LeiterWatercolorStudio.Core"
+             xmlns:stages="clr-namespace:LeiterWatercolorStudio.Core.Parameters.Stages;assembly=LeiterWatercolorStudio.Core"
+             x:Class="LeiterWatercolorStudio.App.Views.Inspectors.LodAbstractionInspectorView"
+             x:DataType="stages:LodAbstractionStageViewModel">
+    <UserControl.Styles>
+        <Style Selector="Border.inspector-card">
+            <Setter Property="Background" Value="#1064748B" />
+            <Setter Property="BorderBrush" Value="#3864748B" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="Padding" Value="10,8" />
+        </Style>
+        <Style Selector="TextBlock.section-label">
+            <Setter Property="FontSize" Value="10.5" />
+            <Setter Property="FontWeight" Value="Bold" />
+            <Setter Property="Opacity" Value="0.68" />
+            <Setter Property="Margin" Value="0,0,0,2" />
+        </Style>
+    </UserControl.Styles>
+
+    <Grid RowDefinitions="Auto,*">
+        <!-- Stage Header -->
+        <Border Grid.Row="0"
+                BorderBrush="#3364748B"
+                BorderThickness="0,0,0,1"
+                Padding="12,10">
+            <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+                <StackPanel Grid.Column="0" Spacing="1" VerticalAlignment="Center">
+                    <TextBlock Text="LOD Abstraction"
+                               FontSize="14"
+                               FontWeight="SemiBold"
+                               TextTrimming="CharacterEllipsis" />
+                    <TextBlock Text="Saliency-guided bilateral filtering"
+                               FontSize="11"
+                               Opacity="0.65"
+                               TextTrimming="CharacterEllipsis" />
+                </StackPanel>
+
+                <ToggleSwitch Grid.Column="1"
+                              IsChecked="{Binding EnableLodAbstraction, Mode=TwoWay}"
+                              OnContent=""
+                              OffContent=""
+                              MinWidth="0"
+                              Padding="0"
+                              VerticalAlignment="Center"
+                              ToolTip.Tip="Enable or bypass Stage 5 LOD abstraction" />
+
+                <Button Grid.Column="2"
+                        Content="↺"
+                        Width="26"
+                        Height="26"
+                        Padding="0"
+                        FontSize="13"
+                        HorizontalContentAlignment="Center"
+                        VerticalContentAlignment="Center"
+                        Command="{Binding ResetStageCommand, RelativeSource={RelativeSource AncestorType=local:LodAbstractionInspectorView}}"
+                        CommandParameter="{x:Static models:PrimaryStageId.LodAbstraction}"
+                        ToolTip.Tip="Reset LOD Abstraction parameters to active baseline" />
+            </Grid>
+        </Border>
+
+        <!-- Parameters -->
+        <ScrollViewer Grid.Row="1"
+                      VerticalScrollBarVisibility="Auto"
+                      HorizontalScrollBarVisibility="Disabled">
+            <StackPanel Margin="12"
+                        Spacing="10"
+                        Opacity="{Binding EnableLodAbstraction, Converter={x:Static converters:BoolToOpacityConverter.Instance}}">
+                <!-- Basic Tier -->
+                <Border Classes="inspector-card">
+                    <StackPanel Spacing="4">
+                        <TextBlock Classes="section-label" Text="BASIC" />
+
+                        <controls:NumericSlider Label="Salient Kernel Size"
+                                                Description="Fixed bilateral filter kernel size inside salient regions"
+                                                Unit="px"
+                                                Minimum="1"
+                                                Maximum="25"
+                                                Step="1"
+                                                IsInteger="True"
+                                                FormatString="F0"
+                                                Value="{Binding SalientKernelSize, Mode=TwoWay, Converter={x:Static converters:IntToDoubleConverter.Instance}}"
+                                                BaselineValue="5" />
+
+                        <controls:NumericSlider Label="Min Non-Salient Kernel"
+                                                Description="Minimum kernel size in non-salient regions near salient boundaries (clamped &lt;= Max)"
+                                                Unit="px"
+                                                Minimum="1"
+                                                Maximum="35"
+                                                Step="1"
+                                                IsInteger="True"
+                                                FormatString="F0"
+                                                Value="{Binding MinNonSalientKernelSize, Mode=TwoWay, Converter={x:Static converters:IntToDoubleConverter.Instance}}"
+                                                BaselineValue="4" />
+
+                        <controls:NumericSlider Label="Max Non-Salient Kernel"
+                                                Description="Maximum kernel size in non-salient background regions (clamped &gt;= Min)"
+                                                Unit="px"
+                                                Minimum="1"
+                                                Maximum="45"
+                                                Step="1"
+                                                IsInteger="True"
+                                                FormatString="F0"
+                                                Value="{Binding MaxNonSalientKernelSize, Mode=TwoWay, Converter={x:Static converters:IntToDoubleConverter.Instance}}"
+                                                BaselineValue="9" />
+
+                        <controls:NumericSlider Label="Distance Kernel Scale"
+                                                Description="Multiplier mapping normalized saliency distance to kernel size"
+                                                Minimum="0"
+                                                Maximum="30"
+                                                Step="0.25"
+                                                FormatString="F2"
+                                                Value="{Binding DistanceKernelScale, Mode=TwoWay}"
+                                                BaselineValue="10.0" />
+                    </StackPanel>
+                </Border>
+
+                <!-- Advanced Tier -->
+                <Expander Header="Advanced"
+                          IsExpanded="False"
+                          HorizontalAlignment="Stretch"
+                          Padding="10,8">
+                    <StackPanel Spacing="4">
+                        <controls:NumericSlider Label="Distance Kernel Bias"
+                                                Description="Additive bias offset applied to distance-based kernel sizing"
+                                                Minimum="-5"
+                                                Maximum="5"
+                                                Step="0.05"
+                                                FormatString="F2"
+                                                Value="{Binding DistanceKernelBias, Mode=TwoWay}"
+                                                BaselineValue="0.3" />
+
+                        <controls:NumericSlider Label="Cross-Segment Color Scale"
+                                                Description="Color difference threshold multiplier for cross-segment bilateral filtering"
+                                                Minimum="0"
+                                                Maximum="2"
+                                                Step="0.01"
+                                                FormatString="F2"
+                                                Value="{Binding CrossSegmentColorScale, Mode=TwoWay}"
+                                                BaselineValue="0.3" />
+
+                        <controls:NumericSlider Label="Salient Overlap Threshold"
+                                                Description="Minimum salient pixel fraction required for a region to be classified as salient"
+                                                Minimum="0"
+                                                Maximum="1"
+                                                Step="0.01"
+                                                FormatString="F2"
+                                                Value="{Binding SalientOverlapThreshold, Mode=TwoWay}"
+                                                BaselineValue="0.5" />
+                    </StackPanel>
+                </Expander>
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</UserControl>

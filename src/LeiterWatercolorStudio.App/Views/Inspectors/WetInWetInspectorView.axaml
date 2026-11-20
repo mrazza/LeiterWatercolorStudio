@@ -1,0 +1,257 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="using:LeiterWatercolorStudio.App.Controls"
+             xmlns:converters="using:LeiterWatercolorStudio.App.Converters"
+             xmlns:local="using:LeiterWatercolorStudio.App.Views.Inspectors"
+             xmlns:models="clr-namespace:LeiterWatercolorStudio.Core.Models;assembly=LeiterWatercolorStudio.Core"
+             xmlns:stages="clr-namespace:LeiterWatercolorStudio.Core.Parameters.Stages;assembly=LeiterWatercolorStudio.Core"
+             xmlns:watercolor="clr-namespace:Leiter.Algorithms.Stylization.Watercolor;assembly=Leiter"
+             x:Class="LeiterWatercolorStudio.App.Views.Inspectors.WetInWetInspectorView"
+             x:DataType="stages:WetInWetStageViewModel">
+    <UserControl.Styles>
+        <Style Selector="Border.inspector-card">
+            <Setter Property="Background" Value="#1064748B" />
+            <Setter Property="BorderBrush" Value="#3864748B" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="Padding" Value="10,8" />
+        </Style>
+        <Style Selector="Border.stats-pill">
+            <Setter Property="Background" Value="#1838BDF8" />
+            <Setter Property="BorderBrush" Value="#5038BDF8" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="5" />
+            <Setter Property="Padding" Value="8,5" />
+        </Style>
+        <Style Selector="TextBlock.section-label">
+            <Setter Property="FontSize" Value="10.5" />
+            <Setter Property="FontWeight" Value="Bold" />
+            <Setter Property="Opacity" Value="0.68" />
+            <Setter Property="Margin" Value="0,0,0,2" />
+        </Style>
+    </UserControl.Styles>
+
+    <Grid RowDefinitions="Auto,*">
+        <!-- Stage Header -->
+        <Border Grid.Row="0"
+                BorderBrush="#3364748B"
+                BorderThickness="0,0,0,1"
+                Padding="12,10">
+            <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+                <StackPanel Grid.Column="0" Spacing="1" VerticalAlignment="Center">
+                    <TextBlock Text="Wet-in-Wet"
+                               FontSize="14"
+                               FontWeight="SemiBold"
+                               TextTrimming="CharacterEllipsis" />
+                    <TextBlock Text="Capillary boundary pigment bleeding"
+                               FontSize="11"
+                               Opacity="0.65"
+                               TextTrimming="CharacterEllipsis" />
+                </StackPanel>
+
+                <ToggleSwitch Grid.Column="1"
+                              IsChecked="{Binding EnableWetInWet, Mode=TwoWay}"
+                              OnContent=""
+                              OffContent=""
+                              MinWidth="0"
+                              Padding="0"
+                              VerticalAlignment="Center"
+                              ToolTip.Tip="Enable or bypass Stage 6 wet-in-wet bleeding" />
+
+                <Button Grid.Column="2"
+                        Content="↺"
+                        Width="26"
+                        Height="26"
+                        Padding="0"
+                        FontSize="13"
+                        HorizontalContentAlignment="Center"
+                        VerticalContentAlignment="Center"
+                        Command="{Binding ResetStageCommand, RelativeSource={RelativeSource AncestorType=local:WetInWetInspectorView}}"
+                        CommandParameter="{x:Static models:PrimaryStageId.WetInWet}"
+                        ToolTip.Tip="Reset Wet-in-Wet parameters to active baseline" />
+            </Grid>
+        </Border>
+
+        <!-- Parameters -->
+        <ScrollViewer Grid.Row="1"
+                      VerticalScrollBarVisibility="Auto"
+                      HorizontalScrollBarVisibility="Disabled">
+            <StackPanel Margin="12"
+                        Spacing="10"
+                        Opacity="{Binding EnableWetInWet, Converter={x:Static converters:BoolToOpacityConverter.Instance}}">
+                <!-- Basic Tier -->
+                <Border Classes="inspector-card">
+                    <StackPanel Spacing="6">
+                        <TextBlock Classes="section-label" Text="BASIC" />
+
+                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
+                            <TextBlock Grid.Column="0"
+                                       Text="Mode"
+                                       FontSize="12"
+                                       VerticalAlignment="Center" />
+                            <ComboBox Grid.Column="1"
+                                      HorizontalAlignment="Stretch"
+                                      ItemsSource="{x:Static local:WetInWetInspectorView.AvailableModes}"
+                                      SelectedItem="{Binding Mode, Mode=TwoWay}">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate x:DataType="watercolor:WetInWetMode">
+                                        <TextBlock Text="{Binding Converter={x:Static converters:EnumDisplayNameConverter.Instance}}"
+                                                   TextTrimming="CharacterEllipsis" />
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                            </ComboBox>
+                        </Grid>
+
+                        <controls:NumericSlider Label="Color Gradient Threshold"
+                                                Description="Minimum region-averaged color gradient magnitude required to qualify a boundary"
+                                                Minimum="0"
+                                                Maximum="1"
+                                                Step="0.01"
+                                                FormatString="F2"
+                                                Value="{Binding ColorGradientThreshold, Mode=TwoWay}"
+                                                BaselineValue="0.1" />
+
+                        <controls:NumericSlider Label="Scatter Radius"
+                                                Description="Maximum pixel distance from qualifying boundaries for pigment seed scattering"
+                                                Unit="px"
+                                                Minimum="1"
+                                                Maximum="20"
+                                                Step="1"
+                                                IsInteger="True"
+                                                FormatString="F0"
+                                                Value="{Binding ScatterRadius, Mode=TwoWay, Converter={x:Static converters:IntToDoubleConverter.Instance}}"
+                                                BaselineValue="4" />
+
+                        <controls:NumericSlider Label="Seed Probability"
+                                                Description="Probability of depositing a pigment bleed seed at a candidate boundary pixel"
+                                                Minimum="0"
+                                                Maximum="1"
+                                                Step="0.01"
+                                                FormatString="F2"
+                                                Value="{Binding SeedProbability, Mode=TwoWay}"
+                                                BaselineValue="0.45" />
+
+                        <Border Classes="stats-pill"
+                                Margin="0,2,0,0"
+                                IsVisible="{Binding StatsText, RelativeSource={RelativeSource AncestorType=local:WetInWetInspectorView}, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                            <TextBlock Text="{Binding StatsText, RelativeSource={RelativeSource AncestorType=local:WetInWetInspectorView}}"
+                                       FontSize="11.5"
+                                       FontWeight="Medium"
+                                       TextWrapping="Wrap" />
+                        </Border>
+                    </StackPanel>
+                </Border>
+
+                <!-- Advanced Tier -->
+                <Expander Header="Advanced"
+                          IsExpanded="False"
+                          HorizontalAlignment="Stretch"
+                          Padding="10,8">
+                    <StackPanel Spacing="6">
+                        <TextBlock Classes="section-label" Text="BOUNDARY FILTERING" />
+
+                        <controls:NumericSlider Label="Salient Hue Threshold"
+                                                Description="Maximum hue difference in degrees for qualifying boundaries incident to salient regions"
+                                                Unit="°"
+                                                Minimum="0"
+                                                Maximum="180"
+                                                Step="1"
+                                                FormatString="F1"
+                                                Value="{Binding SalientHueThresholdDegrees, Mode=TwoWay}"
+                                                BaselineValue="20.0" />
+
+                        <controls:NumericSlider Label="Non-Salient Hue Threshold"
+                                                Description="Maximum hue difference in degrees for qualifying boundaries between non-salient regions"
+                                                Unit="°"
+                                                Minimum="0"
+                                                Maximum="180"
+                                                Step="1"
+                                                FormatString="F1"
+                                                Value="{Binding NonSalientHueThresholdDegrees, Mode=TwoWay}"
+                                                BaselineValue="90.0" />
+
+                        <controls:NumericSlider Label="Min Intensity Difference"
+                                                Description="Minimum HSI intensity difference between adjacent regions required for bleeding"
+                                                Minimum="0"
+                                                Maximum="1"
+                                                Step="0.005"
+                                                FormatString="F3"
+                                                Value="{Binding MinIntensityDifference, Mode=TwoWay}"
+                                                BaselineValue="0.02" />
+
+                        <controls:NumericSlider Label="Salient Overlap Threshold"
+                                                Description="Minimum salient pixel fraction required to classify a segmented region as salient"
+                                                Minimum="0"
+                                                Maximum="1"
+                                                Step="0.01"
+                                                FormatString="F2"
+                                                Value="{Binding SalientOverlapThreshold, Mode=TwoWay}"
+                                                BaselineValue="0.5" />
+
+                        <!-- Seed Row -->
+                        <Grid ColumnDefinitions="Auto,*,Auto" Margin="0,4,0,2">
+                            <TextBlock Grid.Column="0"
+                                       Text="Seed"
+                                       FontSize="12"
+                                       VerticalAlignment="Center"
+                                       Margin="0,0,8,0" />
+                            <NumericUpDown Grid.Column="1"
+                                           Value="{Binding Seed, Mode=TwoWay, Converter={x:Static converters:IntToDecimalConverter.Instance}}"
+                                           Minimum="-2147483648"
+                                           Maximum="2147483647"
+                                           Increment="1"
+                                           FormatString="F0"
+                                           ShowButtonSpinner="False"
+                                           MinHeight="26"
+                                           Height="26"
+                                           Padding="6,2"
+                                           FontSize="12"
+                                           VerticalContentAlignment="Center" />
+                            <Button Grid.Column="2"
+                                    Content="🎲 Random"
+                                    Height="26"
+                                    Padding="8,2"
+                                    FontSize="11.5"
+                                    Margin="6,0,0,0"
+                                    VerticalContentAlignment="Center"
+                                    Click="OnRandomizeSeedClick"
+                                    ToolTip.Tip="Generate a new random seed" />
+                        </Grid>
+
+                        <Border Height="1" Background="#2864748B" Margin="0,4,0,2" />
+                        <TextBlock Classes="section-label" Text="ORIENTED ELLIPTICAL FILTER" />
+
+                        <controls:NumericSlider Label="Major Radius"
+                                                Description="Semi-major radius of the oriented elliptical Gaussian feathering filter"
+                                                Unit="px"
+                                                Minimum="0.25"
+                                                Maximum="24"
+                                                Step="0.25"
+                                                FormatString="F2"
+                                                Value="{Binding EllipticalMajorRadius, Mode=TwoWay}"
+                                                BaselineValue="6.0" />
+
+                        <controls:NumericSlider Label="Minor Radius"
+                                                Description="Semi-minor radius perpendicular to the local boundary tangent"
+                                                Unit="px"
+                                                Minimum="0.25"
+                                                Maximum="16"
+                                                Step="0.25"
+                                                FormatString="F2"
+                                                Value="{Binding EllipticalMinorRadius, Mode=TwoWay}"
+                                                BaselineValue="2.5" />
+
+                        <controls:NumericSlider Label="Sigma Scale"
+                                                Description="Gaussian standard deviation scale factor relative to the elliptical radii"
+                                                Minimum="0.1"
+                                                Maximum="2.0"
+                                                Step="0.05"
+                                                FormatString="F2"
+                                                Value="{Binding EllipticalSigmaScale, Mode=TwoWay}"
+                                                BaselineValue="0.55" />
+                    </StackPanel>
+                </Expander>
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</UserControl>

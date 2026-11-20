@@ -1,0 +1,230 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="using:LeiterWatercolorStudio.App.Controls"
+             xmlns:converters="using:LeiterWatercolorStudio.App.Converters"
+             xmlns:local="using:LeiterWatercolorStudio.App.Views.Inspectors"
+             xmlns:models="clr-namespace:LeiterWatercolorStudio.Core.Models;assembly=LeiterWatercolorStudio.Core"
+             xmlns:stages="clr-namespace:LeiterWatercolorStudio.Core.Parameters.Stages;assembly=LeiterWatercolorStudio.Core"
+             x:Class="LeiterWatercolorStudio.App.Views.Inspectors.HandTremorInspectorView"
+             x:DataType="stages:HandTremorStageViewModel">
+    <UserControl.Styles>
+        <Style Selector="Border.inspector-card">
+            <Setter Property="Background" Value="#1064748B" />
+            <Setter Property="BorderBrush" Value="#3864748B" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="Padding" Value="10,8" />
+        </Style>
+        <Style Selector="TextBlock.section-label">
+            <Setter Property="FontSize" Value="10.5" />
+            <Setter Property="FontWeight" Value="Bold" />
+            <Setter Property="Opacity" Value="0.68" />
+            <Setter Property="Margin" Value="0,0,0,2" />
+        </Style>
+    </UserControl.Styles>
+
+    <Grid RowDefinitions="Auto,*">
+        <!-- Stage Header -->
+        <Border Grid.Row="0"
+                BorderBrush="#3364748B"
+                BorderThickness="0,0,0,1"
+                Padding="12,10">
+            <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+                <StackPanel Grid.Column="0" Spacing="1" VerticalAlignment="Center">
+                    <TextBlock Text="Hand Tremor"
+                               FontSize="14"
+                               FontWeight="SemiBold"
+                               TextTrimming="CharacterEllipsis" />
+                    <TextBlock Text="Boundary displacement &amp; paper gaps"
+                               FontSize="11"
+                               Opacity="0.65"
+                               TextTrimming="CharacterEllipsis" />
+                </StackPanel>
+
+                <ToggleSwitch Grid.Column="1"
+                              IsChecked="{Binding EnableHandTremor, Mode=TwoWay}"
+                              OnContent=""
+                              OffContent=""
+                              MinWidth="0"
+                              Padding="0"
+                              VerticalAlignment="Center"
+                              ToolTip.Tip="Enable or bypass Stage 7 hand tremor perturbation" />
+
+                <Button Grid.Column="2"
+                        Content="↺"
+                        Width="26"
+                        Height="26"
+                        Padding="0"
+                        FontSize="13"
+                        HorizontalContentAlignment="Center"
+                        VerticalContentAlignment="Center"
+                        Command="{Binding ResetStageCommand, RelativeSource={RelativeSource AncestorType=local:HandTremorInspectorView}}"
+                        CommandParameter="{x:Static models:PrimaryStageId.HandTremor}"
+                        ToolTip.Tip="Reset Hand Tremor parameters to active baseline" />
+            </Grid>
+        </Border>
+
+        <!-- Parameters -->
+        <ScrollViewer Grid.Row="1"
+                      VerticalScrollBarVisibility="Auto"
+                      HorizontalScrollBarVisibility="Disabled">
+            <StackPanel Margin="12"
+                        Spacing="10"
+                        Opacity="{Binding EnableHandTremor, Converter={x:Static converters:BoolToOpacityConverter.Instance}}">
+                <!-- Basic Tier -->
+                <Border Classes="inspector-card">
+                    <StackPanel Spacing="4">
+                        <TextBlock Classes="section-label" Text="BASIC" />
+
+                        <controls:NumericSlider Label="Amplitude"
+                                                Description="Maximum boundary displacement amplitude in pixels"
+                                                Unit="px"
+                                                Minimum="0"
+                                                Maximum="20"
+                                                Step="0.1"
+                                                FormatString="F2"
+                                                Value="{Binding Amplitude, Mode=TwoWay}"
+                                                BaselineValue="3.0" />
+
+                        <controls:NumericSlider Label="Salient Amplitude Scale"
+                                                Description="Minimum displacement amplitude scale applied inside salient regions"
+                                                Minimum="0"
+                                                Maximum="1"
+                                                Step="0.01"
+                                                FormatString="F2"
+                                                Value="{Binding SalientAmplitudeScale, Mode=TwoWay}"
+                                                BaselineValue="0.65" />
+
+                        <controls:NumericSlider Label="Overlap Darkening"
+                                                Description="Pigment darkening blend factor where perturbed strokes overlap"
+                                                Minimum="0"
+                                                Maximum="1"
+                                                Step="0.01"
+                                                FormatString="F2"
+                                                Value="{Binding OverlapDarkening, Mode=TwoWay}"
+                                                BaselineValue="0.5" />
+
+                        <controls:NumericSlider Label="Paper Gap Bias"
+                                                Description="Boundary-normal bias controlling paper gap width vs overlap on contrasting boundaries"
+                                                Minimum="-1"
+                                                Maximum="1"
+                                                Step="0.01"
+                                                FormatString="F2"
+                                                Value="{Binding PaperGapBias, Mode=TwoWay}"
+                                                BaselineValue="0.0" />
+
+                        <controls:NumericSlider Label="Paper Gap Opacity"
+                                                Description="Opacity for blending Paper Color into contrasting boundary gaps"
+                                                Minimum="0"
+                                                Maximum="1"
+                                                Step="0.01"
+                                                FormatString="F2"
+                                                Value="{Binding PaperGapOpacity, Mode=TwoWay}"
+                                                BaselineValue="1.0" />
+                    </StackPanel>
+                </Border>
+
+                <!-- Paper Color Editor -->
+                <Border Classes="inspector-card">
+                    <StackPanel Spacing="6">
+                        <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+                            <TextBlock Grid.Column="0"
+                                       Classes="section-label"
+                                       Text="PAPER COLOR"
+                                       VerticalAlignment="Center"
+                                       Margin="0" />
+
+                            <Border Grid.Column="1"
+                                    Width="26"
+                                    Height="24"
+                                    CornerRadius="4"
+                                    BorderBrush="#6094A3B8"
+                                    BorderThickness="1"
+                                    Background="{Binding PaperColor, Converter={x:Static converters:Rgb8ToBrushConverter.Instance}}"
+                                    VerticalAlignment="Center"
+                                    ToolTip.Tip="Live paper background color preview" />
+
+                            <TextBox x:Name="PART_PaperColorHexTextBox"
+                                     Grid.Column="2"
+                                     Width="84"
+                                     Height="24"
+                                     MinHeight="24"
+                                     Padding="6,2"
+                                     FontFamily="Consolas, Menlo, Monaco, monospace"
+                                     FontSize="11.5"
+                                     VerticalContentAlignment="Center"
+                                     Text="{Binding PaperColorHex, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
+                                     KeyDown="OnPaperColorHexKeyDown"
+                                     ToolTip.Tip="Hexadecimal #RRGGBB paper color (press Enter to apply)" />
+                        </Grid>
+
+                        <controls:NumericSlider Label="Red (R)"
+                                                Description="Paper color red channel (0..255)"
+                                                Minimum="0"
+                                                Maximum="255"
+                                                Step="1"
+                                                IsInteger="True"
+                                                FormatString="F0"
+                                                Value="{Binding PaperColorR, Mode=TwoWay, Converter={x:Static local:ByteToDoubleConverter.Instance}}"
+                                                BaselineValue="250" />
+
+                        <controls:NumericSlider Label="Green (G)"
+                                                Description="Paper color green channel (0..255)"
+                                                Minimum="0"
+                                                Maximum="255"
+                                                Step="1"
+                                                IsInteger="True"
+                                                FormatString="F0"
+                                                Value="{Binding PaperColorG, Mode=TwoWay, Converter={x:Static local:ByteToDoubleConverter.Instance}}"
+                                                BaselineValue="248" />
+
+                        <controls:NumericSlider Label="Blue (B)"
+                                                Description="Paper color blue channel (0..255)"
+                                                Minimum="0"
+                                                Maximum="255"
+                                                Step="1"
+                                                IsInteger="True"
+                                                FormatString="F0"
+                                                Value="{Binding PaperColorB, Mode=TwoWay, Converter={x:Static local:ByteToDoubleConverter.Instance}}"
+                                                BaselineValue="242" />
+                    </StackPanel>
+                </Border>
+
+                <!-- Advanced Tier -->
+                <Expander Header="Advanced"
+                          IsExpanded="False"
+                          HorizontalAlignment="Stretch"
+                          Padding="10,8">
+                    <StackPanel Spacing="8">
+                        <StackPanel Spacing="4">
+                            <controls:NumericSlider Label="Similar Hue Threshold"
+                                                    Description="Maximum hue difference in degrees separating similar-hue from contrasting boundaries"
+                                                    Unit="°"
+                                                    Minimum="0"
+                                                    Maximum="180"
+                                                    Step="1"
+                                                    FormatString="F1"
+                                                    Value="{Binding SimilarHueThresholdDegrees, Mode=TwoWay}"
+                                                    BaselineValue="30.0" />
+
+                            <controls:NumericSlider Label="Min Contrasting Chroma"
+                                                    Description="Minimum normalized RGB chroma required on both sides of contrasting boundaries"
+                                                    Minimum="0"
+                                                    Maximum="1"
+                                                    Step="0.01"
+                                                    FormatString="F2"
+                                                    Value="{Binding MinContrastingChroma, Mode=TwoWay}"
+                                                    BaselineValue="0.08" />
+                        </StackPanel>
+
+                        <controls:PerlinNoiseEditor DataContext="{Binding PrimaryNoise}"
+                                                    Title="Primary Noise" />
+
+                        <controls:PerlinNoiseEditor DataContext="{Binding SecondaryNoise}"
+                                                    Title="Secondary Noise" />
+                    </StackPanel>
+                </Expander>
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</UserControl>
