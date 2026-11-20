@@ -1,8 +1,399 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:LeiterWatercolorStudio.App.ViewModels"
+        xmlns:views="using:LeiterWatercolorStudio.App.Views"
+        xmlns:controls="using:LeiterWatercolorStudio.App.Controls"
+        xmlns:conv="using:LeiterWatercolorStudio.App.Converters"
+        xmlns:models="using:LeiterWatercolorStudio.Core.Models"
         x:Class="LeiterWatercolorStudio.App.Views.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
         Title="Leiter Watercolor Studio"
-        Width="1280"
-        Height="800">
-    <Grid />
+        Width="1440"
+        Height="900"
+        MinWidth="960"
+        MinHeight="640"
+        DragDrop.AllowDrop="True"
+        Background="{DynamicResource StudioCanvasBrush}"
+        Foreground="{DynamicResource StudioForegroundBrush}">
+
+    <Grid RowDefinitions="Auto,*,Auto,Auto">
+        <!-- Top Studio Toolbar -->
+        <Border Grid.Row="0" Classes="studio-toolbar">
+            <Grid ColumnDefinitions="*,Auto">
+                <WrapPanel Grid.Column="0"
+                           Orientation="Horizontal"
+                           VerticalAlignment="Center">
+                    <!-- File Open -->
+                    <Button Classes="studio-accent"
+                            Content="Open Image..."
+                            Command="{Binding OpenImageCommand}"
+                            ToolTip.Tip="Open a source image (Ctrl+O)"
+                            Margin="0,2,6,2" />
+
+                    <Border Classes="toolbar-sep" Height="22" Margin="2,2,8,2" />
+
+                    <!-- Preview Cap -->
+                    <StackPanel Orientation="Horizontal" Spacing="5" VerticalAlignment="Center" Margin="0,2,8,2">
+                        <TextBlock Classes="studio-muted" Text="Preview" VerticalAlignment="Center" />
+                        <ComboBox Classes="studio-combo"
+                                  MinWidth="88"
+                                  ItemsSource="{Binding PreviewCapOptions}"
+                                  SelectedItem="{Binding PreviewCap, Mode=TwoWay}"
+                                  ToolTip.Tip="Maximum dimension for interactive preview rendering">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate x:DataType="models:PreviewResolutionCap">
+                                    <TextBlock Text="{Binding ., Converter={x:Static conv:EnumDisplayNameConverter.Instance}}" />
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                    </StackPanel>
+
+                    <!-- Baseline Selector -->
+                    <StackPanel Orientation="Horizontal" Spacing="5" VerticalAlignment="Center" Margin="0,2,8,2">
+                        <TextBlock Classes="studio-muted" Text="Baseline" VerticalAlignment="Center" />
+                        <ComboBox Classes="studio-combo"
+                                  MinWidth="96"
+                                  ItemsSource="{Binding BaselineModeOptions}"
+                                  SelectedItem="{Binding ActiveBaselineMode, Mode=TwoWay}"
+                                  ToolTip.Tip="Calibration baseline for parameter defaults and resets">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate x:DataType="models:BaselineMode">
+                                    <TextBlock Text="{Binding ., Converter={x:Static conv:EnumDisplayNameConverter.Instance}}" />
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                    </StackPanel>
+
+                    <Border Classes="toolbar-sep" Height="22" Margin="2,2,8,2" />
+
+                    <!-- Auto-Run / Run / Cancel -->
+                    <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center" Margin="0,2,8,2">
+                        <ToggleButton Classes="studio-toggle"
+                                      IsChecked="{Binding IsAutoRunEnabled, Mode=TwoWay}"
+                                      ToolTip.Tip="Toggle automatic debounced re-rendering on edits">
+                            <Panel>
+                                <StackPanel Orientation="Horizontal" Spacing="5" IsVisible="{Binding IsAutoRunEnabled}">
+                                    <Ellipse Width="7" Height="7" Fill="{DynamicResource StudioCachedBrush}" VerticalAlignment="Center" />
+                                    <TextBlock Text="Auto-Run" VerticalAlignment="Center" />
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal" Spacing="5" IsVisible="{Binding !IsAutoRunEnabled}">
+                                    <TextBlock Text="⏸" VerticalAlignment="Center" />
+                                    <TextBlock Text="Paused" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </Panel>
+                        </ToggleButton>
+
+                        <Button Classes="studio-accent"
+                                Content="▶ Run"
+                                Command="{Binding RunNowCommand}"
+                                ToolTip.Tip="Run pipeline now (Ctrl+Enter)" />
+
+                        <Button Classes="studio-danger"
+                                Content="Cancel"
+                                IsVisible="{Binding IsBusy}"
+                                Command="{Binding CancelRenderCommand}"
+                                ToolTip.Tip="Cancel active render (Escape)" />
+                    </StackPanel>
+
+                    <Border Classes="toolbar-sep" Height="22" Margin="2,2,8,2" />
+
+                    <!-- Undo / Redo -->
+                    <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center" Margin="0,2,8,2">
+                        <Button Classes="studio-btn"
+                                Content="↶ Undo"
+                                Command="{Binding UndoCommand}"
+                                ToolTip.Tip="Undo last parameter edit (Ctrl+Z)" />
+                        <Button Classes="studio-btn"
+                                Content="↷ Redo"
+                                Command="{Binding RedoCommand}"
+                                ToolTip.Tip="Redo parameter edit (Ctrl+Y / Ctrl+Shift+Z)" />
+                    </StackPanel>
+
+                    <Border Classes="toolbar-sep" Height="22" Margin="2,2,8,2" />
+
+                    <!-- Compare Mode / Reference / Pin -->
+                    <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center" Margin="0,2,8,2">
+                        <TextBlock Classes="studio-muted" Text="Compare" VerticalAlignment="Center" />
+                        <ComboBox Classes="studio-combo"
+                                  MinWidth="104"
+                                  ItemsSource="{Binding CompareModeOptions}"
+                                  SelectedItem="{Binding CompareMode, Mode=TwoWay}"
+                                  ToolTip.Tip="Viewport comparison mode">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate x:DataType="models:CompareMode">
+                                    <TextBlock Text="{Binding ., Converter={x:Static conv:EnumDisplayNameConverter.Instance}}" />
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                        <ComboBox Classes="studio-combo"
+                                  MinWidth="112"
+                                  ItemsSource="{Binding CompareReferenceOptions}"
+                                  SelectedItem="{Binding CompareReferenceKind, Mode=TwoWay}"
+                                  ToolTip.Tip="Comparison reference source">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate x:DataType="models:CompareReferenceKind">
+                                    <TextBlock Text="{Binding ., Converter={x:Static conv:EnumDisplayNameConverter.Instance}}" />
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                        <ToggleButton Classes="studio-toggle"
+                                      IsChecked="{Binding IsCurrentStagePinned, Mode=OneWay}"
+                                      Command="{Binding PinCurrentStageCommand}"
+                                      ToolTip.Tip="Pin or unpin the active stage as A/B comparison reference">
+                            <TextBlock Text="📌 Pin" />
+                        </ToggleButton>
+                    </StackPanel>
+
+                    <Border Classes="toolbar-sep" Height="22" Margin="2,2,8,2" />
+
+                    <!-- Single | Grid View Mode -->
+                    <StackPanel Orientation="Horizontal" Spacing="2" VerticalAlignment="Center" Margin="0,2,8,2">
+                        <ToggleButton Classes="studio-toggle"
+                                      Content="Single"
+                                      IsChecked="{Binding !IsGridView, Mode=OneWay}"
+                                      Click="OnSingleViewClick"
+                                      ToolTip.Tip="Single-stage interactive viewport (G)" />
+                        <ToggleButton Classes="studio-toggle"
+                                      Content="Grid 4×2"
+                                      IsChecked="{Binding IsGridView, Mode=OneWay}"
+                                      Click="OnGridViewClick"
+                                      ToolTip.Tip="Synchronized 4×2 all-stages grid view (G)" />
+                    </StackPanel>
+
+                    <Border Classes="toolbar-sep" Height="22" Margin="2,2,8,2" />
+
+                    <!-- Preset & Export Menus -->
+                    <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center" Margin="0,2,4,2">
+                        <Button Classes="studio-btn"
+                                Content="Preset ▾"
+                                ToolTip.Tip="Save or load JSON presets">
+                            <Button.Flyout>
+                                <MenuFlyout>
+                                    <MenuItem Header="Save Preset..."
+                                              InputGesture="Ctrl+S"
+                                              Command="{Binding SavePresetCommand}" />
+                                    <MenuItem Header="Load Preset..."
+                                              InputGesture="Ctrl+Shift+O"
+                                              Command="{Binding LoadPresetCommand}" />
+                                    <Separator />
+                                    <MenuItem Header="Reset All to Baseline"
+                                              Command="{Binding ResetAllCommand}" />
+                                </MenuFlyout>
+                            </Button.Flyout>
+                        </Button>
+
+                        <Button Classes="studio-btn"
+                                Content="Export ▾"
+                                ToolTip.Tip="Render full resolution and export outputs">
+                            <Button.Flyout>
+                                <MenuFlyout>
+                                    <MenuItem Header="Render Full Resolution"
+                                              Command="{Binding RenderFullResolutionCommand}" />
+                                    <Separator />
+                                    <MenuItem Header="Export Final Image (Full Res)..."
+                                              InputGesture="Ctrl+E"
+                                              Command="{Binding ExportFinalFullResCommand}" />
+                                    <MenuItem Header="Export Final Image (Preview Res)..."
+                                              Command="{Binding ExportFinalPreviewResCommand}" />
+                                    <Separator />
+                                    <MenuItem Header="Export All 24 Stages + Preset..."
+                                              InputGesture="Ctrl+Shift+E"
+                                              Command="{Binding ExportAllStagesCommand}" />
+                                </MenuFlyout>
+                            </Button.Flyout>
+                        </Button>
+                    </StackPanel>
+                </WrapPanel>
+
+                <!-- Right-aligned Inspector & Theme Toggles -->
+                <StackPanel Grid.Column="1"
+                            Orientation="Horizontal"
+                            Spacing="4"
+                            VerticalAlignment="Center"
+                            Margin="8,2,0,2">
+                    <ToggleButton Classes="studio-toggle"
+                                  Content="Inspector"
+                                  IsChecked="{Binding IsInspectorOpen, Mode=TwoWay}"
+                                  ToolTip.Tip="Show or hide the stage parameter inspector" />
+                    <Button Classes="studio-btn"
+                            Command="{Binding ToggleThemeCommand}"
+                            ToolTip.Tip="Switch between Dark and Light studio themes">
+                        <Panel>
+                            <TextBlock Text="☀" IsVisible="{Binding IsDarkTheme}" />
+                            <TextBlock Text="☾" IsVisible="{Binding !IsDarkTheme}" />
+                        </Panel>
+                    </Button>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Center Workspace: Viewport / Grid + Collapsible Stage Inspector -->
+        <Grid Grid.Row="1" ColumnDefinitions="*,Auto">
+            <!-- Viewport or 4x2 Stage Grid -->
+            <Panel Grid.Column="0">
+                <controls:ZoomPanViewport x:Name="Viewport"
+                                          IsVisible="{Binding !IsGridView}"
+                                          PrimaryBitmap="{Binding PrimaryBitmap}"
+                                          CompareBitmap="{Binding CompareBitmap}"
+                                          PrimaryLabel="{Binding PrimaryLabel}"
+                                          CompareLabel="{Binding CompareLabel}"
+                                          CompareMode="{Binding CompareMode}"
+                                          WipePosition="{Binding WipePosition, Mode=TwoWay}"
+                                          Zoom="{Binding Zoom, Mode=TwoWay}"
+                                          PanX="{Binding PanX, Mode=TwoWay}"
+                                          PanY="{Binding PanY, Mode=TwoWay}"
+                                          HoverHudText="{Binding HoverHudText}"
+                                          HoverSwatchColor="{Binding HoverSwatchColor}"
+                                          AvailableVisualizationModes="{Binding AvailableVisualizationModes}"
+                                          SelectedVisualizationMode="{Binding SelectedVisualizationMode, Mode=TwoWay}"
+                                          ShowReseedButton="{Binding ShowReseedButton}"
+                                          IsEmpty="{Binding !HasImage}"
+                                          IsProcessing="{Binding IsBusy}"
+                                          ProcessingStatusText="{Binding ProgressText}"
+                                          OpenImageCommand="{Binding OpenImageCommand}"
+                                          ReseedCommand="{Binding ReseedRandomColorsCommand}"
+                                          HoverPixelChanged="OnViewportHoverPixelChanged"
+                                          HoverExited="OnViewportHoverExited"
+                                          FileDropped="OnViewportFileDropped" />
+
+                <views:StageGridView x:Name="StageGrid"
+                                     IsVisible="{Binding IsGridView}"
+                                     Stages="{Binding Stages}"
+                                     SelectedStage="{Binding SelectedStage, Mode=TwoWay}"
+                                     Zoom="{Binding Zoom, Mode=TwoWay}"
+                                     PanX="{Binding PanX, Mode=TwoWay}"
+                                     PanY="{Binding PanY, Mode=TwoWay}"
+                                     StageDoubleClicked="OnStageGridDoubleClicked" />
+            </Panel>
+
+            <!-- Right Collapsible Stage Inspector Sidebar -->
+            <Border Grid.Column="1"
+                    Width="340"
+                    Classes="studio-panel"
+                    BorderThickness="1,0,0,0"
+                    IsVisible="{Binding IsInspectorOpen}">
+                <Grid RowDefinitions="Auto,*">
+                    <!-- Inspector Header -->
+                    <Border Grid.Row="0"
+                            Background="{DynamicResource StudioSurfaceAltBrush}"
+                            BorderBrush="{DynamicResource StudioBorderBrush}"
+                            BorderThickness="0,0,0,1"
+                            Padding="12,9">
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                            <StackPanel Grid.Column="0" VerticalAlignment="Center" Spacing="2">
+                                <TextBlock Classes="studio-muted"
+                                           Text="STAGE INSPECTOR"
+                                           FontSize="10"
+                                           FontWeight="Bold" />
+                                <TextBlock Classes="studio-heading"
+                                           Text="{Binding ActiveStageTitle}"
+                                           TextTrimming="CharacterEllipsis" />
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="1"
+                                        Orientation="Horizontal"
+                                        Spacing="4"
+                                        VerticalAlignment="Center">
+                                <Button Classes="studio-btn"
+                                        Content="↺ Reset"
+                                        Padding="8,4"
+                                        FontSize="11"
+                                        IsVisible="{Binding CanResetActiveStage}"
+                                        Command="{Binding ResetStageCommand}"
+                                        CommandParameter="{Binding ActiveStageId}"
+                                        ToolTip.Tip="Reset active stage parameters to baseline" />
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <!-- Scrollable Inspector Host -->
+                    <ScrollViewer Grid.Row="1"
+                                  VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollBarVisibility="Disabled">
+                        <Border x:Name="InspectorHost" Padding="12">
+                            <StackPanel Spacing="10">
+                                <Border Classes="studio-card">
+                                    <StackPanel Spacing="6">
+                                        <TextBlock Classes="studio-heading" Text="{Binding ActiveStageTitle}" />
+                                        <TextBlock Classes="studio-muted"
+                                                   Text="Stage inspector controls will mount here."
+                                                   TextWrapping="Wrap" />
+                                    </StackPanel>
+                                </Border>
+
+                                <Border Classes="studio-card">
+                                    <StackPanel Spacing="5">
+                                        <TextBlock Classes="studio-label" Text="Session Diagnostics" />
+                                        <TextBlock Classes="studio-muted" Text="{Binding SourceFileDisplayText}" TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Classes="studio-muted" Text="{Binding BaselineSummaryText}" />
+                                        <TextBlock Classes="studio-muted" Text="{Binding PaletteSummaryText}" />
+                                        <TextBlock Classes="studio-muted" Text="{Binding SegmentationStatsText}" />
+                                        <TextBlock Classes="studio-muted" Text="{Binding WetInWetStatsText}" />
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+                        </Border>
+                    </ScrollViewer>
+                </Grid>
+            </Border>
+        </Grid>
+
+        <!-- Bottom Pipeline Filmstrip -->
+        <controls:PipelineFilmstrip Grid.Row="2"
+                                    x:Name="Filmstrip"
+                                    Stages="{Binding Stages}"
+                                    SelectedStage="{Binding SelectedStage, Mode=TwoWay}"
+                                    SubStages="{Binding SubStages}"
+                                    SelectedSubStage="{Binding SelectedSubStage, Mode=TwoWay}"
+                                    ShowSubStageDrawer="{Binding ShowSubStageDrawer}"
+                                    SelectStageCommand="{Binding SelectPrimaryStageCommand}"
+                                    SelectSubStageCommand="{Binding SelectSubStageCommand}"
+                                    TogglePinStageCommand="{Binding TogglePinStageCommand}" />
+
+        <!-- Compact Bottom Status Bar -->
+        <Border Grid.Row="3" Classes="studio-statusbar">
+            <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto" ColumnSpacing="14">
+                <!-- Status & Active Progress -->
+                <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                    <Ellipse Width="7"
+                             Height="7"
+                             Fill="{DynamicResource StudioAccentBrush}"
+                             IsVisible="{Binding IsBusy}"
+                             VerticalAlignment="Center" />
+                    <TextBlock Classes="studio-label"
+                               Text="{Binding StatusText}"
+                               TextTrimming="CharacterEllipsis"
+                               VerticalAlignment="Center" />
+                    <TextBlock Classes="studio-muted"
+                               Text="{Binding ProgressText}"
+                               IsVisible="{Binding IsBusy}"
+                               VerticalAlignment="Center" />
+                </StackPanel>
+
+                <!-- Palette Summary -->
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                    <TextBlock Classes="studio-muted" Text="Palette:" />
+                    <TextBlock Classes="studio-label" Text="{Binding PaletteSummaryText}" />
+                </StackPanel>
+
+                <!-- Native Dimensions -->
+                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                    <TextBlock Classes="studio-muted" Text="Native:" />
+                    <TextBlock Classes="studio-mono" Text="{Binding NativeResolutionText}" />
+                </StackPanel>
+
+                <!-- Preview Dimensions -->
+                <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                    <TextBlock Classes="studio-muted" Text="Preview:" />
+                    <TextBlock Classes="studio-mono" Text="{Binding PreviewResolutionText}" />
+                </StackPanel>
+
+                <!-- Cache / Timing Summary -->
+                <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                    <TextBlock Classes="studio-muted" Text="Pipeline:" />
+                    <TextBlock Classes="studio-mono" Text="{Binding StageTimingSummaryText}" />
+                </StackPanel>
+            </Grid>
+        </Border>
+    </Grid>
 </Window>

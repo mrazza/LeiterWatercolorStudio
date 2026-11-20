@@ -1,0 +1,2351 @@
+using System.Collections.ObjectModel;
+using Avalonia.Media;
+using Avalonia.Media.Imaging;
+using Avalonia.Threading;
+using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
+using Leiter.Algorithms.Color;
+using Leiter.Algorithms.Stylization.Watercolor;
+using Leiter.Core;
+using Leiter.Pixels;
+using Leiter.Platform.ImageSharp;
+using LeiterWatercolorStudio.App.Rendering;
+using LeiterWatercolorStudio.App.Services;
+using LeiterWatercolorStudio.Core.Color;
+using LeiterWatercolorStudio.Core.Export;
+using LeiterWatercolorStudio.Core.Models;
+using LeiterWatercolorStudio.Core.Parameters;
+using LeiterWatercolorStudio.Core.Pipeline;
+using LeiterWatercolorStudio.Core.Presets;
+using LeiterSize = Leiter.Core.Size;
+
+namespace LeiterWatercolorStudio.App.ViewModels;
+
+/// <summary>
+/// Primary view model orchestrating image loading, parameter editing, debounced pipeline execution,
+/// A/B comparison, stage/sub-stage inspection, preset I/O, and full-resolution exports.
+/// </summary>
+public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
+{
+    private const double PresetScalePromptThreshold = 0.05;
+
+    private readonly IFileDialogService _fileDialogs;
+    private readonly Action<Action> _uiDispatcher;
+    private readonly Dictionary<StageViewId, VisualizationMode> _viewModes = new();
+
+    private StageCardViewModel? _selectedStage;
+    private SubStageItemViewModel? _selectedSubStage;
+    private bool _showSubStageDrawer;
+    private IReadOnlyList<VisualizationMode> _availableVisualizationModes = Array.Empty<VisualizationMode>();
+    private VisualizationMode _selectedVisualizationMode = VisualizationMode.Rgb;
+    private bool _showReseedButton;
+
+    private WriteableBitmap? _primaryBitmap;
+    private WriteableBitmap? _compareBitmap;
+    private string _primaryLabel = string.Empty;
+    private string _compareLabel = string.Empty;
+    private CompareMode _compareMode = CompareMode.Off;
+    private CompareReferenceKind _compareReferenceKind = CompareReferenceKind.Input;
+    private PrimaryStageId? _pinnedStageId;
+    private double _wipePosition = 0.5;
+    private double _zoom = 1.0;
+    private double _panX;
+    private double _panY;
+
+    private bool _isGridView;
+    private bool _isDarkTheme = true;
+    private bool _isInspectorOpen = true;
+    private PreviewResolutionCap _previewCap = PreviewResolutionCap.Px1024;
+    private BaselineMode _activeBaselineMode = BaselineMode.ForImage;
+    private bool _isAutoRunEnabled = true;
+
+    private bool _isBusy;
+    private string _progressText = string.Empty;
+    private string _statusText = "Ready — Open an image to begin.";
+    private string? _hoverHudText;
+    private Color? _hoverSwatchColor;
+    private bool _hasImage;
+    private string _sourceFileDisplayText = "No image loaded";
+    private string _nativeResolutionText = "—";
+    private string _previewResolutionText = "—";
+    private string _baselineSummaryText = "For Image (Auto-analyzed)";
+    private string _paletteSummaryText = "—";
+    private string _segmentationStatsText = "Regions: — • Boundaries: —";
+    private string _wetInWetStatsText = "Qualifying Boundaries: —";
+    private string _stageTimingSummaryText = "—";
+
+    private IReadOnlyMatrix<Rgb8>? _currentDisplayedMatrix;
+    private CancellationTokenSource? _exportCts;
+    private WatercolorResult? _cachedFullResResult;
+    private WatercolorOptions? _cachedFullResOptions;
+    private int _regionRandomSeed = 42;
+    private bool _isSyncingStageState;
+    private bool _isSyncingVisualizationMode;
+    private bool _isApplyingBaseline;
+    private bool _isLoadingImage;
+    private bool _disposed;
+
+    /// <summary>
+    /// Initializes a new <see cref="MainWindowViewModel"/> using default Avalonia UI services.
+    /// </summary>
+    public MainWindowViewModel()
+        : this(null, null, null)
+    {
+    }
+
+    /// <summary>
+    /// Initializes a new <see cref="MainWindowViewModel"/> with injectable dialog, dispatch, and debounce dependencies.
+    /// </summary>
+    public MainWindowViewModel(
+        IFileDialogService? fileDialogs,
+        Action<Action>? uiDispatcher = null,
+        TimeSpan? debounceInterval = null)
+    {
+        _fileDialogs = fileDialogs ?? new AvaloniaFileDialogService();
+        _uiDispatcher = uiDispatcher ?? (action => Dispatcher.UIThread.Post(action));
+
+        Engine = new PipelineEngine(debounceInterval, _previewCap);
+        Parameters = new PipelineParametersViewModel(WatercolorOptions.Default, _activeBaselineMode);
+
+        Stages = new ObservableCollection<StageCardViewModel>();
+        foreach (PipelineStageDescriptor descriptor in PipelineStageRegistry.Stages)
+        {
+            Stages.Add(new StageCardViewModel(descriptor));
+        }
+
+        foreach (StageViewDescriptor view in PipelineStageRegistry.Views)
+        {
+            _viewModes[view.ViewId] = view.DefaultMode;
+        }
+
+        SubStages = new ObservableCollection<SubStageItemViewModel>();
+
+        Engine.RenderStarted += OnEngineRenderStarted;
+        Engine.StepProgress += OnEngineStepProgress;
+        Engine.RenderCompleted += OnEngineRenderCompleted;
+        Engine.RenderCancelled += OnEngineRenderCancelled;
+        Engine.RenderFailed += OnEngineRenderFailed;
+        Engine.StalenessChanged += OnEngineStalenessChanged;
+
+        Parameters.OptionsChanged += OnParametersOptionsChanged;
+        Parameters.PropertyChanged += OnParametersPropertyChanged;
+
+        SelectedStage = Stages[^1];
+        UpdateBaselineSummaryText();
+    }
+
+    /// <summary>
+    /// Raised when an underlying <see cref="WriteableBitmap"/> buffer was mutated in place
+    /// so visual hosts invalidate their surface.
+    /// </summary>
+    public event EventHandler? ViewportRefreshRequested;
+
+    /// <summary>
+    /// Raised after a new image has been loaded so the viewport can fit it comfortably in view.
+    /// </summary>
+    public event EventHandler? ImageLoaded;
+
+    /// <summary>
+    /// Gets the underlying pipeline execution engine.
+    /// </summary>
+    public PipelineEngine Engine { get; }
+
+    /// <summary>
+    /// Gets the editable parameter view model tree for Stages 1–6.
+    /// </summary>
+    public PipelineParametersViewModel Parameters { get; }
+
+    /// <summary>
+    /// Gets the 8 primary stage card view models displayed in the filmstrip and grid view.
+    /// </summary>
+    public ObservableCollection<StageCardViewModel> Stages { get; }
+
+    /// <summary>
+    /// Gets the sub-stage items belonging to <see cref="SelectedStage"/>.
+    /// </summary>
+    public ObservableCollection<SubStageItemViewModel> SubStages { get; }
+
+    /// <summary>
+    /// Gets the ordered preview resolution cap choices for toolbar selection.
+    /// </summary>
+    public IReadOnlyList<PreviewResolutionCap> PreviewCapOptions { get; } =
+    [
+        PreviewResolutionCap.Px512,
+        PreviewResolutionCap.Px768,
+        PreviewResolutionCap.Px1024,
+        PreviewResolutionCap.Px1536,
+        PreviewResolutionCap.Native,
+    ];
+
+    /// <summary>
+    /// Gets the ordered baseline calibration modes for toolbar selection.
+    /// </summary>
+    public IReadOnlyList<BaselineMode> BaselineModeOptions { get; } =
+    [
+        BaselineMode.ForImage,
+        BaselineMode.ForSize,
+        BaselineMode.Default,
+    ];
+
+    /// <summary>
+    /// Gets the ordered viewport comparison modes for toolbar selection.
+    /// </summary>
+    public IReadOnlyList<CompareMode> CompareModeOptions { get; } =
+    [
+        CompareMode.Off,
+        CompareMode.SplitWipe,
+        CompareMode.SideBySide,
+    ];
+
+    /// <summary>
+    /// Gets the ordered A/B comparison reference sources for toolbar selection.
+    /// </summary>
+    public IReadOnlyList<CompareReferenceKind> CompareReferenceOptions { get; } =
+    [
+        CompareReferenceKind.Input,
+        CompareReferenceKind.PreviousStage,
+        CompareReferenceKind.PinnedStage,
+    ];
+
+    /// <summary>
+    /// Gets or sets the currently selected primary stage card.
+    /// </summary>
+    public StageCardViewModel? SelectedStage
+    {
+        get => _selectedStage;
+        set
+        {
+            if (SetProperty(ref _selectedStage, value))
+            {
+                HandleSelectedStageChanged(value);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Gets or sets the currently selected sub-stage pill.
+    /// </summary>
+    public SubStageItemViewModel? SelectedSubStage
+    {
+        get => _selectedSubStage;
+        set
+        {
+            if (SetProperty(ref _selectedSubStage, value))
+            {
+                HandleSelectedSubStageChanged(value);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Gets whether the collapsible sub-stage drawer should be displayed above the filmstrip.
+    /// </summary>
+    public bool ShowSubStageDrawer
+    {
+        get => _showSubStageDrawer;
+        private set => SetProperty(ref _showSubStageDrawer, value);
+    }
+
+    /// <summary>
+    /// Gets the display title of the active primary stage.
+    /// </summary>
+    public string ActiveStageTitle => _selectedStage?.Title ?? "Input";
+
+    /// <summary>
+    /// Gets the active <see cref="PrimaryStageId"/>.
+    /// </summary>
+    public PrimaryStageId ActiveStageId => _selectedStage?.StageId ?? PrimaryStageId.Input;
+
+    /// <summary>
+    /// Gets whether the active stage supports per-stage parameter reset.
+    /// </summary>
+    public bool CanResetActiveStage => ActiveStageId != PrimaryStageId.Input;
+
+    /// <summary>
+    /// Gets whether the active stage is currently pinned for A/B comparison.
+    /// </summary>
+    public bool IsCurrentStagePinned => _pinnedStageId.HasValue && _pinnedStageId.Value == ActiveStageId;
+
+    /// <summary>
+    /// Gets the visualization modes valid for the active stage view.
+    /// </summary>
+    public IReadOnlyList<VisualizationMode> AvailableVisualizationModes
+    {
+        get => _availableVisualizationModes;
+        private set => SetProperty(ref _availableVisualizationModes, value);
+    }
+
+    /// <summary>
+    /// Gets or sets the active visualization mode for the current stage view.
+    /// </summary>
+    public VisualizationMode SelectedVisualizationMode
+    {
+        get => _selectedVisualizationMode;
+        set
+        {
+            if (SetProperty(ref _selectedVisualizationMode, value) && !_isSyncingVisualizationMode)
+            {
+                HandleVisualizationModeChanged(value);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Gets whether the viewport should show the random-region color reseed button.
+    /// </summary>
+    public bool ShowReseedButton
+    {
+        get => _showReseedButton;
+        private set => SetProperty(ref _showReseedButton, value);
+    }
+
+    /// <summary>
+    /// Gets the primary rendered bitmap displayed in the viewport.
+    /// </summary>
+    public WriteableBitmap? PrimaryBitmap
+    {
+        get => _primaryBitmap;
+        private set => SetProperty(ref _primaryBitmap, value);
+    }
+
+    /// <summary>
+    /// Gets the reference bitmap displayed in split-wipe or side-by-side comparison mode.
+    /// </summary>
+    public WriteableBitmap? CompareBitmap
+    {
+        get => _compareBitmap;
+        private set => SetProperty(ref _compareBitmap, value);
+    }
+
+    /// <summary>
+    /// Gets the overlay label for the primary viewport pane.
+    /// </summary>
+    public string PrimaryLabel
+    {
+        get => _primaryLabel;
+        private set => SetProperty(ref _primaryLabel, value);
+    }
+
+    /// <summary>
+    /// Gets the overlay label for the comparison reference pane.
+    /// </summary>
+    public string CompareLabel
+    {
+        get => _compareLabel;
+        private set => SetProperty(ref _compareLabel, value);
+    }
+
+    /// <summary>
+    /// Gets or sets the active viewport A/B comparison mode.
+    /// </summary>
+    public CompareMode CompareMode
+    {
+        get => _compareMode;
+        set
+        {
+            if (SetProperty(ref _compareMode, value))
+            {
+                RefreshCompareBitmapOnly();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Gets or sets which reference image is displayed in comparison mode.
+    /// </summary>
+    public CompareReferenceKind CompareReferenceKind
+    {
+        get => _compareReferenceKind;
+        set
+        {
+            if (SetProperty(ref _compareReferenceKind, value))
+            {
+                RefreshCompareBitmapOnly();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Gets or sets the stage pinned as an A/B comparison reference.
+    /// </summary>
+    public PrimaryStageId? PinnedStageId
+    {
+        get => _pinnedStageId;
+        set
+        {
+            if (SetProperty(ref _pinnedStageId, value))
+            {
+                SyncPinnedCardStates();
+                OnPropertyChanged(nameof(IsCurrentStagePinned));
+                if (CompareReferenceKind == CompareReferenceKind.PinnedStage && CompareMode != CompareMode.Off)
+                {
+                    RefreshCompareBitmapOnly();
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Gets or sets the normalized split-wipe divider position in <c>[0, 1]</c>.
+    /// </summary>
+    public double WipePosition
+    {
+        get => _wipePosition;
+        set => SetProperty(ref _wipePosition, Math.Clamp(value, 0.0, 1.0));
+    }
+
+    /// <summary>
+    /// Gets or sets the synchronized viewport zoom factor.
+    /// </summary>
+    public double Zoom
+    {
+        get => _zoom;
+        set => SetProperty(ref _zoom, double.IsFinite(value) ? Math.Clamp(value, 0.1, 16.0) : 1.0);
+    }
+
+    /// <summary>
+    /// Gets or sets the synchronized horizontal pan offset.
+    /// </summary>
+    public double PanX
+    {
+        get => _panX;
+        set => SetProperty(ref _panX, double.IsFinite(value) ? value : 0.0);
+    }
+
+    /// <summary>
+    /// Gets or sets the synchronized vertical pan offset.
+    /// </summary>
+    public double PanY
+    {
+        get => _panY;
+        set => SetProperty(ref _panY, double.IsFinite(value) ? value : 0.0);
+    }
+
+    /// <summary>
+    /// Gets or sets whether the 4×2 multi-up stage grid view is active instead of the single viewport.
+    /// </summary>
+    public bool IsGridView
+    {
+        get => _isGridView;
+        set => SetProperty(ref _isGridView, value);
+    }
+
+    /// <summary>
+    /// Gets or sets whether the Fluent Dark studio theme is active (<see langword="false"/> for Light).
+    /// </summary>
+    public bool IsDarkTheme
+    {
+        get => _isDarkTheme;
+        set => SetProperty(ref _isDarkTheme, value);
+    }
+
+    /// <summary>
+    /// Gets or sets whether the right-hand parameter inspector sidebar is expanded.
+    /// </summary>
+    public bool IsInspectorOpen
+    {
+        get => _isInspectorOpen;
+        set => SetProperty(ref _isInspectorOpen, value);
+    }
+
+    /// <summary>
+    /// Gets or sets the interactive preview maximum dimension cap.
+    /// </summary>
+    public PreviewResolutionCap PreviewCap
+    {
+        get => _previewCap;
+        set
+        {
+            if (SetProperty(ref _previewCap, value))
+            {
+                ApplyPreviewCapChange(value);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Gets or sets the active baseline calibration mode.
+    /// </summary>
+    public BaselineMode ActiveBaselineMode
+    {
+        get => _activeBaselineMode;
+        set
+        {
+            if (SetProperty(ref _activeBaselineMode, value) && !_isApplyingBaseline)
+            {
+                ApplyBaselineSwitch(value);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Gets or sets whether parameter edits automatically queue debounced preview renders.
+    /// </summary>
+    public bool IsAutoRunEnabled
+    {
+        get => _isAutoRunEnabled;
+        set
+        {
+            if (SetProperty(ref _isAutoRunEnabled, value))
+            {
+                Engine.IsAutoRunEnabled = value;
+                if (value && Engine.HasImage && Engine.StaleStages.Count > 0)
+                {
+                    _ = Engine.RunNowAsync();
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Gets whether a preview render, full-res render, or export task is currently executing.
+    /// </summary>
+    public bool IsBusy
+    {
+        get => _isBusy;
+        private set
+        {
+            if (SetProperty(ref _isBusy, value))
+            {
+                NotifyActionCanExecuteChanged();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Gets the current active step or export progress readout.
+    /// </summary>
+    public string ProgressText
+    {
+        get => _progressText;
+        private set => SetProperty(ref _progressText, value);
+    }
+
+    /// <summary>
+    /// Gets the status bar message describing the most recent operation.
+    /// </summary>
+    public string StatusText
+    {
+        get => _statusText;
+        private set => SetProperty(ref _statusText, value);
+    }
+
+    /// <summary>
+    /// Gets the formatted hover pixel diagnostic HUD text.
+    /// </summary>
+    public string? HoverHudText
+    {
+        get => _hoverHudText;
+        private set => SetProperty(ref _hoverHudText, value);
+    }
+
+    /// <summary>
+    /// Gets the RGB color swatch under the hovered pixel.
+    /// </summary>
+    public Color? HoverSwatchColor
+    {
+        get => _hoverSwatchColor;
+        private set => SetProperty(ref _hoverSwatchColor, value);
+    }
+
+    /// <summary>
+    /// Gets whether an image is currently loaded in the studio.
+    /// </summary>
+    public bool HasImage
+    {
+        get => _hasImage;
+        private set
+        {
+            if (SetProperty(ref _hasImage, value))
+            {
+                NotifyActionCanExecuteChanged();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Gets the display filename or path summary of the loaded source image.
+    /// </summary>
+    public string SourceFileDisplayText
+    {
+        get => _sourceFileDisplayText;
+        private set => SetProperty(ref _sourceFileDisplayText, value);
+    }
+
+    /// <summary>
+    /// Gets the formatted native image dimensions (e.g., <c>"1920 × 1080"</c>).
+    /// </summary>
+    public string NativeResolutionText
+    {
+        get => _nativeResolutionText;
+        private set => SetProperty(ref _nativeResolutionText, value);
+    }
+
+    /// <summary>
+    /// Gets the formatted preview image dimensions (e.g., <c>"1024 × 576"</c>).
+    /// </summary>
+    public string PreviewResolutionText
+    {
+        get => _previewResolutionText;
+        private set => SetProperty(ref _previewResolutionText, value);
+    }
+
+    /// <summary>
+    /// Gets a concise description of the active baseline calibration mode.
+    /// </summary>
+    public string BaselineSummaryText
+    {
+        get => _baselineSummaryText;
+        private set => SetProperty(ref _baselineSummaryText, value);
+    }
+
+    /// <summary>
+    /// Gets a concise summary of the active or matched Stage 1 palette.
+    /// </summary>
+    public string PaletteSummaryText
+    {
+        get => _paletteSummaryText;
+        private set => SetProperty(ref _paletteSummaryText, value);
+    }
+
+    /// <summary>
+    /// Gets live segmentation region and boundary counts from the last render.
+    /// </summary>
+    public string SegmentationStatsText
+    {
+        get => _segmentationStatsText;
+        private set => SetProperty(ref _segmentationStatsText, value);
+    }
+
+    /// <summary>
+    /// Gets live qualifying wet-in-wet boundary statistics from the last render.
+    /// </summary>
+    public string WetInWetStatsText
+    {
+        get => _wetInWetStatsText;
+        private set => SetProperty(ref _wetInWetStatsText, value);
+    }
+
+    /// <summary>
+    /// Gets a compact cache and timing summary for the bottom status bar.
+    /// </summary>
+    public string StageTimingSummaryText
+    {
+        get => _stageTimingSummaryText;
+        private set => SetProperty(ref _stageTimingSummaryText, value);
+    }
+
+    /// <summary>
+    /// Loads a source image from disk, computes image analysis, calibrates the active baseline,
+    /// and initiates a preview render.
+    /// </summary>
+    public async Task LoadImageFromPathAsync(string path)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        try
+        {
+            StatusText = $"Loading {Path.GetFileName(path)}...";
+            SequentialMatrix<Rgb8> matrix = await Task.Run(() => ImageExtensions.LoadRgb8(path));
+            if (_disposed)
+            {
+                return;
+            }
+
+            LoadLoadedImage(matrix, path, Path.GetFileName(path));
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            StatusText = $"Failed to open image: {ex.Message}";
+            await _fileDialogs.ShowErrorAsync("Failed to Open Image", $"Could not open '{path}':\n{ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Loads an in-memory source matrix into the studio and initiates a preview render.
+    /// </summary>
+    public void LoadImageFromMatrix(SequentialMatrix<Rgb8> matrix, string? displayName = null)
+    {
+        ArgumentNullException.ThrowIfNull(matrix);
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        LoadLoadedImage(matrix, sourcePath: null, displayName ?? "In-Memory Image");
+    }
+
+    /// <summary>
+    /// Samples full diagnostic pixel readouts at (<paramref name="x"/>, <paramref name="y"/>) and updates the hover HUD.
+    /// </summary>
+    public void UpdateHoverPixel(int x, int y)
+    {
+        if (!Engine.HasImage || Engine.PreviewSource is null)
+        {
+            ClearHoverPixel();
+            return;
+        }
+
+        StageViewId activeView = GetActiveStageViewId();
+        if (!PixelInspectorReadout.TrySample(
+                x,
+                y,
+                activeView,
+                Engine.PreviewSource,
+                Engine.LastResult,
+                out PixelInspectorReadout readout,
+                _currentDisplayedMatrix))
+        {
+            ClearHoverPixel();
+            return;
+        }
+
+        HoverHudText = readout.FormatHudText();
+        HoverSwatchColor = Color.FromRgb(readout.Rgb.R, readout.Rgb.G, readout.Rgb.B);
+    }
+
+    /// <summary>
+    /// Clears the hover pixel diagnostic readout.
+    /// </summary>
+    public void ClearHoverPixel()
+    {
+        HoverHudText = null;
+        HoverSwatchColor = null;
+    }
+
+    /// <summary>
+    /// Begins a coalesced parameter drag transaction on the undo stack.
+    /// </summary>
+    public void BeginParameterDrag() => Parameters.BeginDrag();
+
+    /// <summary>
+    /// Commits the active parameter drag transaction onto the undo stack.
+    /// </summary>
+    public void EndParameterDrag() => Parameters.EndDrag();
+
+    [RelayCommand]
+    private async Task OpenImageAsync()
+    {
+        string? path = await _fileDialogs.PickOpenImageAsync();
+        if (!string.IsNullOrWhiteSpace(path))
+        {
+            await LoadImageFromPathAsync(path);
+        }
+    }
+
+    [RelayCommand]
+    private async Task ExtractReferencePaletteAsync()
+    {
+        string? path = await _fileDialogs.PickOpenImageAsync();
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return;
+        }
+
+        try
+        {
+            StatusText = $"Extracting palette from {Path.GetFileName(path)}...";
+            ColorTransferProfile profile = await Task.Run(() => PaletteExtractor.ExtractFromFile(path));
+            if (_disposed)
+            {
+                return;
+            }
+
+            Parameters.ColorTransfer.SetCustomProfile(profile);
+            PaletteSummaryText = $"{profile.Name} ({profile.Illuminant})";
+            StatusText = $"Extracted custom palette '{profile.Name}'.";
+        }
+        catch (Exception ex)
+        {
+            StatusText = $"Palette extraction failed: {ex.Message}";
+            await _fileDialogs.ShowErrorAsync("Palette Extraction Failed", $"Could not extract palette from '{path}':\n{ex.Message}");
+        }
+    }
+
+    [RelayCommand]
+    private void SetPreviewCap(PreviewResolutionCap cap)
+    {
+        PreviewCap = cap;
+    }
+
+    [RelayCommand]
+    private void SwitchBaseline(BaselineMode mode)
+    {
+        if (ActiveBaselineMode != mode)
+        {
+            ActiveBaselineMode = mode;
+        }
+        else
+        {
+            ApplyBaselineSwitch(mode);
+        }
+    }
+
+    [RelayCommand]
+    private void ResetAll()
+    {
+        Parameters.ResetAllToBaseline();
+        StatusText = "Reset all parameters to active baseline.";
+    }
+
+    [RelayCommand(CanExecute = nameof(CanResetStage))]
+    private void ResetStage(PrimaryStageId stageId)
+    {
+        Parameters.ResetStage(stageId);
+        StatusText = $"Reset {PipelineStageRegistry.GetStage(stageId).DisplayName} parameters.";
+    }
+
+    private static bool CanResetStage(PrimaryStageId stageId) => stageId != PrimaryStageId.Input;
+
+    [RelayCommand]
+    private void ToggleAutoRun()
+    {
+        IsAutoRunEnabled = !IsAutoRunEnabled;
+        StatusText = IsAutoRunEnabled ? "Auto-Run enabled." : "Auto-Run paused — use Run to update.";
+    }
+
+    [RelayCommand(CanExecute = nameof(CanRunNow))]
+    private async Task RunNowAsync()
+    {
+        if (!Engine.HasImage)
+        {
+            return;
+        }
+
+        if (Engine.PendingCanonicalOptions is null && Engine.LastRenderedCanonicalOptions is null)
+        {
+            bool previous = Engine.IsAutoRunEnabled;
+            Engine.IsAutoRunEnabled = true;
+            try
+            {
+                await Engine.RequestRender(Parameters.BuildOptions(), immediate: true);
+            }
+            finally
+            {
+                Engine.IsAutoRunEnabled = previous;
+            }
+
+            return;
+        }
+
+        await Engine.RunNowAsync();
+    }
+
+    private bool CanRunNow() => HasImage && !IsBusy;
+
+    [RelayCommand(CanExecute = nameof(CanCancelRender))]
+    private void CancelRender()
+    {
+        Engine.CancelActiveRender();
+        CancelActiveExport();
+    }
+
+    private bool CanCancelRender() => IsBusy;
+
+    [RelayCommand(CanExecute = nameof(CanExecuteUndo))]
+    private void Undo()
+    {
+        Parameters.Undo();
+        StatusText = "Undid parameter change.";
+    }
+
+    private bool CanExecuteUndo() => Parameters.CanUndo;
+
+    [RelayCommand(CanExecute = nameof(CanExecuteRedo))]
+    private void Redo()
+    {
+        Parameters.Redo();
+        StatusText = "Redid parameter change.";
+    }
+
+    private bool CanExecuteRedo() => Parameters.CanRedo;
+
+    [RelayCommand]
+    private void PinCurrentStage()
+    {
+        if (SelectedStage is null)
+        {
+            return;
+        }
+
+        PinnedStageId = PinnedStageId == SelectedStage.StageId ? null : SelectedStage.StageId;
+    }
+
+    [RelayCommand]
+    private void TogglePinStage(StageCardViewModel? card)
+    {
+        if (card is null)
+        {
+            return;
+        }
+
+        PinnedStageId = PinnedStageId == card.StageId ? null : card.StageId;
+    }
+
+    [RelayCommand]
+    private void ToggleGridView()
+    {
+        IsGridView = !IsGridView;
+    }
+
+    [RelayCommand]
+    private void ToggleTheme()
+    {
+        IsDarkTheme = !IsDarkTheme;
+    }
+
+    [RelayCommand]
+    private void ToggleInspector()
+    {
+        IsInspectorOpen = !IsInspectorOpen;
+    }
+
+    [RelayCommand]
+    private async Task SavePresetAsync()
+    {
+        string stem = Engine.SourcePath is not null
+            ? $"{Path.GetFileNameWithoutExtension(Engine.SourcePath)}_preset"
+            : "watercolor_preset";
+
+        string? path = await _fileDialogs.PickSavePresetAsync(stem);
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return;
+        }
+
+        try
+        {
+            Dictionary<WatercolorStep, double>? timingsMs = null;
+            if (Engine.LastResult is { StepTimings.Count: > 0 } lastResult)
+            {
+                timingsMs = new Dictionary<WatercolorStep, double>(lastResult.StepTimings.Count);
+                foreach ((WatercolorStep step, WatercolorStepTiming timing) in lastResult.StepTimings)
+                {
+                    timingsMs[step] = timing.Elapsed.TotalMilliseconds;
+                }
+            }
+
+            var preset = new PresetDocument
+            {
+                SchemaVersion = PresetDocument.CurrentSchemaVersion,
+                Name = Path.GetFileNameWithoutExtension(path) is { Length: > 0 } name ? name : "Watercolor Preset",
+                CalibrationReferenceDimension = Engine.HasImage
+                    ? Engine.NativeSize.LinearDimension
+                    : WatercolorOptions.DefaultReferenceDimension,
+                PaletteMode = Parameters.ColorTransfer.PaletteMode,
+                Options = Parameters.BuildOptions(),
+                StepTimingsMs = timingsMs,
+            };
+
+            await PresetSerializer.SaveToFileAsync(preset, path);
+            StatusText = $"Saved preset '{Path.GetFileName(path)}'.";
+        }
+        catch (Exception ex)
+        {
+            StatusText = $"Failed to save preset: {ex.Message}";
+            await _fileDialogs.ShowErrorAsync("Failed to Save Preset", $"Could not save preset to '{path}':\n{ex.Message}");
+        }
+    }
+
+    [RelayCommand]
+    private async Task LoadPresetAsync()
+    {
+        string? path = await _fileDialogs.PickOpenPresetAsync();
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return;
+        }
+
+        try
+        {
+            PresetDocument preset = await PresetSerializer.LoadFromFileAsync(path);
+            if (_disposed)
+            {
+                return;
+            }
+
+            WatercolorOptions optionsToLoad = preset.Options;
+            if (Engine.HasImage &&
+                double.IsFinite(preset.CalibrationReferenceDimension) &&
+                preset.CalibrationReferenceDimension > 0.0)
+            {
+                double currentDim = Engine.NativeSize.LinearDimension;
+                double relativeDiff = Math.Abs(currentDim - preset.CalibrationReferenceDimension) /
+                                      Math.Max(1.0, preset.CalibrationReferenceDimension);
+
+                if (relativeDiff > PresetScalePromptThreshold)
+                {
+                    bool scaleToSize = await _fileDialogs.ConfirmAsync(
+                        "Scale Preset Parameters?",
+                        $"This preset was calibrated at reference dimension {preset.CalibrationReferenceDimension:0} px, while the active image is {Engine.NativeSize.Width}×{Engine.NativeSize.Height} ({currentDim:0} px).\n\nScale spatial parameters to match the current image?",
+                        "Scale to Image",
+                        "Keep Exact Values");
+
+                    optionsToLoad = PresetSerializer.AdaptForImageSize(preset, Engine.NativeSize, scaleToSize);
+                }
+            }
+
+            Parameters.LoadFromOptions(optionsToLoad, recordUndo: true, paletteModeHint: preset.PaletteMode);
+            StatusText = $"Loaded preset '{preset.Name}'.";
+        }
+        catch (Exception ex)
+        {
+            StatusText = $"Failed to load preset: {ex.Message}";
+            await _fileDialogs.ShowErrorAsync("Failed to Load Preset", $"Could not load preset from '{path}':\n{ex.Message}");
+        }
+    }
+
+    [RelayCommand(CanExecute = nameof(CanRunExport))]
+    private async Task RenderFullResolutionAsync()
+    {
+        if (!Engine.HasImage)
+        {
+            return;
+        }
+
+        CancellationTokenSource cts = ReplaceExportCts();
+        IsBusy = true;
+        ProgressText = "Rendering full resolution...";
+        StatusText = $"Rendering full resolution ({Engine.NativeSize.Width}×{Engine.NativeSize.Height})...";
+
+        try
+        {
+            WatercolorOptions canonical = Parameters.BuildOptions();
+            WatercolorResult result = await RunFullResolutionInternalAsync(canonical, cts.Token);
+            _cachedFullResOptions = canonical;
+            _cachedFullResResult = result;
+
+            double totalMs = result.StepTimings.Values.Sum(static t => t.Elapsed.TotalMilliseconds);
+            ProgressText = $"Full-res done ({totalMs:0} ms)";
+            StatusText = $"Full-resolution render complete ({Engine.NativeSize.Width}×{Engine.NativeSize.Height}).";
+        }
+        catch (OperationCanceledException)
+        {
+            ProgressText = "Cancelled";
+            StatusText = "Full-resolution render cancelled.";
+        }
+        catch (Exception ex)
+        {
+            ProgressText = "Error";
+            StatusText = $"Full-resolution render failed: {ex.Message}";
+            await _fileDialogs.ShowErrorAsync("Full-Resolution Render Failed", ex.Message);
+        }
+        finally
+        {
+            FinishExportCts(cts);
+            IsBusy = false;
+        }
+    }
+
+    [RelayCommand(CanExecute = nameof(CanRunExport))]
+    private async Task ExportFinalFullResAsync()
+    {
+        if (!Engine.HasImage)
+        {
+            return;
+        }
+
+        string suggested = BuildSuggestedExportFileName("watercolor");
+        string? path = await _fileDialogs.PickSaveFinalImageAsync(suggested);
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return;
+        }
+
+        CancellationTokenSource cts = ReplaceExportCts();
+        IsBusy = true;
+        ProgressText = "Rendering full resolution for export...";
+        StatusText = $"Exporting full-res watercolor to {Path.GetFileName(path)}...";
+
+        try
+        {
+            WatercolorOptions canonical = Parameters.BuildOptions();
+            WatercolorResult result = await GetOrRenderFullResolutionAsync(canonical, cts.Token);
+
+            ProgressText = $"Saving {Path.GetFileName(path)}...";
+            await ExportService.ExportFinalImageAsync(result.Image, path, cts.Token);
+
+            ProgressText = "Export complete";
+            StatusText = $"Exported full-resolution image ({result.Image.Width}×{result.Image.Height}) to {Path.GetFileName(path)}.";
+        }
+        catch (OperationCanceledException)
+        {
+            ProgressText = "Cancelled";
+            StatusText = "Full-resolution export cancelled.";
+        }
+        catch (Exception ex)
+        {
+            ProgressText = "Error";
+            StatusText = $"Export failed: {ex.Message}";
+            await _fileDialogs.ShowErrorAsync("Export Failed", $"Could not export '{path}':\n{ex.Message}");
+        }
+        finally
+        {
+            FinishExportCts(cts);
+            IsBusy = false;
+        }
+    }
+
+    [RelayCommand(CanExecute = nameof(CanRunExport))]
+    private async Task ExportFinalPreviewResAsync()
+    {
+        if (!Engine.HasImage)
+        {
+            return;
+        }
+
+        string suggested = BuildSuggestedExportFileName("watercolor_preview");
+        string? path = await _fileDialogs.PickSaveFinalImageAsync(suggested);
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return;
+        }
+
+        CancellationTokenSource cts = ReplaceExportCts();
+        IsBusy = true;
+        ProgressText = "Preparing preview export...";
+        StatusText = $"Exporting preview image to {Path.GetFileName(path)}...";
+
+        try
+        {
+            WatercolorResult? result = Engine.LastResult;
+            if (result is null || Engine.StaleStages.Count > 0)
+            {
+                result = await Engine.RunNowAsync();
+            }
+
+            cts.Token.ThrowIfCancellationRequested();
+            if (result is null)
+            {
+                StatusText = "Preview export aborted — no rendered result available.";
+                return;
+            }
+
+            await ExportService.ExportFinalImageAsync(result.Image, path, cts.Token);
+            ProgressText = "Preview exported";
+            StatusText = $"Exported preview image ({result.Image.Width}×{result.Image.Height}) to {Path.GetFileName(path)}.";
+        }
+        catch (OperationCanceledException)
+        {
+            ProgressText = "Cancelled";
+            StatusText = "Preview export cancelled.";
+        }
+        catch (Exception ex)
+        {
+            ProgressText = "Error";
+            StatusText = $"Export failed: {ex.Message}";
+            await _fileDialogs.ShowErrorAsync("Preview Export Failed", $"Could not export '{path}':\n{ex.Message}");
+        }
+        finally
+        {
+            FinishExportCts(cts);
+            IsBusy = false;
+        }
+    }
+
+    [RelayCommand(CanExecute = nameof(CanRunExport))]
+    private async Task ExportAllStagesAsync()
+    {
+        if (!Engine.HasImage || Engine.NativeSource is null)
+        {
+            return;
+        }
+
+        string? folder = await _fileDialogs.PickExportFolderAsync();
+        if (string.IsNullOrWhiteSpace(folder))
+        {
+            return;
+        }
+
+        CancellationTokenSource cts = ReplaceExportCts();
+        IsBusy = true;
+        ProgressText = "Rendering full resolution for all-stage export...";
+        StatusText = $"Exporting all 24 stages + preset.json to {folder}...";
+
+        try
+        {
+            WatercolorOptions canonical = Parameters.BuildOptions();
+            WatercolorResult result = await GetOrRenderFullResolutionAsync(canonical, cts.Token);
+
+            var progress = new Progress<(int Completed, int Total, string FileName)>(report =>
+            {
+                if (!_disposed)
+                {
+                    ProgressText = $"Exporting {report.Completed}/{report.Total}: {report.FileName}";
+                }
+            });
+
+            await ExportService.ExportAllStagesAsync(
+                Engine.NativeSource,
+                result,
+                canonical,
+                folder,
+                includePresetSidecar: true,
+                calibrationReferenceDimension: Engine.NativeSize.LinearDimension,
+                paletteMode: Parameters.ColorTransfer.PaletteMode,
+                progress: progress,
+                ct: cts.Token);
+
+            ProgressText = "All stages exported";
+            StatusText = $"Exported 24 stage PNGs + preset.json to {folder}.";
+        }
+        catch (OperationCanceledException)
+        {
+            ProgressText = "Cancelled";
+            StatusText = "All-stages export cancelled.";
+        }
+        catch (Exception ex)
+        {
+            ProgressText = "Error";
+            StatusText = $"Export all stages failed: {ex.Message}";
+            await _fileDialogs.ShowErrorAsync("All-Stages Export Failed", $"Could not export stages to '{folder}':\n{ex.Message}");
+        }
+        finally
+        {
+            FinishExportCts(cts);
+            IsBusy = false;
+        }
+    }
+
+    private bool CanRunExport() => HasImage && !IsBusy;
+
+    [RelayCommand]
+    private void SelectPrimaryStage(PrimaryStageId stageId)
+    {
+        StageCardViewModel? match = FindStageCard(stageId);
+        if (match is not null)
+        {
+            SelectedStage = match;
+        }
+    }
+
+    [RelayCommand]
+    private void SelectSubStage(StageViewId viewId)
+    {
+        StageViewDescriptor descriptor = PipelineStageRegistry.GetView(viewId);
+        if (SelectedStage is null || SelectedStage.StageId != descriptor.ParentStage)
+        {
+            SelectPrimaryStage(descriptor.ParentStage);
+        }
+
+        foreach (SubStageItemViewModel sub in SubStages)
+        {
+            if (sub.ViewId == viewId)
+            {
+                SelectedSubStage = sub;
+                return;
+            }
+        }
+
+        if (SelectedStage is not null)
+        {
+            SelectedStage.ActiveViewId = viewId;
+            SyncVisualizationModesForActiveView();
+            RefreshSelectedStageCardBitmap();
+            RefreshViewportDisplay();
+        }
+    }
+
+    [RelayCommand]
+    private void ReseedRandomColors()
+    {
+        _regionRandomSeed = unchecked(_regionRandomSeed + 1);
+        RefreshAllStageCardBitmaps();
+        RefreshViewportDisplay();
+        StatusText = $"Reseeded region color map (seed {_regionRandomSeed}).";
+    }
+
+    [RelayCommand]
+    private void SetCompareMode(CompareMode mode)
+    {
+        CompareMode = mode;
+    }
+
+    [RelayCommand]
+    private void SetCompareReference(CompareReferenceKind kind)
+    {
+        CompareReferenceKind = kind;
+    }
+
+    /// <summary>
+    /// Releases managed pipeline resources and owned bitmaps cleanly.
+    /// </summary>
+    public void Dispose()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
+        CancelActiveExport();
+
+        Engine.RenderStarted -= OnEngineRenderStarted;
+        Engine.StepProgress -= OnEngineStepProgress;
+        Engine.RenderCompleted -= OnEngineRenderCompleted;
+        Engine.RenderCancelled -= OnEngineRenderCancelled;
+        Engine.RenderFailed -= OnEngineRenderFailed;
+        Engine.StalenessChanged -= OnEngineStalenessChanged;
+
+        Parameters.OptionsChanged -= OnParametersOptionsChanged;
+        Parameters.PropertyChanged -= OnParametersPropertyChanged;
+
+        ClearViewportBitmaps();
+        foreach (StageCardViewModel card in Stages)
+        {
+            card.Dispose();
+        }
+
+        Engine.Dispose();
+    }
+
+    private void LoadLoadedImage(SequentialMatrix<Rgb8> matrix, string? sourcePath, string displayName)
+    {
+        CancelActiveExport();
+        Engine.CancelActiveRender();
+        InvalidateFullResCache();
+        ClearViewportBitmaps();
+        ClearAllStageCardBitmaps();
+        ClearHoverPixel();
+
+        Engine.LoadImage(matrix, sourcePath);
+
+        HasImage = true;
+        SourceFileDisplayText = displayName;
+        NativeResolutionText = $"{Engine.NativeSize.Width} × {Engine.NativeSize.Height}";
+        PreviewResolutionText = $"{Engine.PreviewSize.Width} × {Engine.PreviewSize.Height}";
+        PaletteSummaryText = "—";
+        SegmentationStatsText = "Regions: — • Boundaries: —";
+        WetInWetStatsText = "Qualifying Boundaries: —";
+        StageTimingSummaryText = "Pending...";
+
+        _isLoadingImage = true;
+        try
+        {
+            WatercolorOptions baseline = Engine.ComputeBaseline(ActiveBaselineMode);
+            Parameters.SetBaselineOnly(ActiveBaselineMode, baseline);
+            Parameters.LoadFromOptions(baseline, recordUndo: false);
+            UpdateBaselineSummaryText();
+        }
+        finally
+        {
+            _isLoadingImage = false;
+        }
+
+        UpdateInputStageCardBitmap();
+        RefreshViewportDisplay();
+        ImageLoaded?.Invoke(this, EventArgs.Empty);
+
+        StatusText = $"Loaded {displayName} ({NativeResolutionText}).";
+        _ = Engine.RequestRender(Parameters.BuildOptions(), immediate: true);
+    }
+
+    private void ApplyPreviewCapChange(PreviewResolutionCap cap)
+    {
+        Engine.SetPreviewCap(cap);
+        PreviewResolutionText = Engine.HasImage
+            ? $"{Engine.PreviewSize.Width} × {Engine.PreviewSize.Height}"
+            : "—";
+
+        if (!Engine.HasImage)
+        {
+            return;
+        }
+
+        ClearHoverPixel();
+        UpdateInputStageCardBitmap();
+        RefreshViewportDisplay();
+        StatusText = $"Preview cap set to {EnumDisplayNameConverterLabel(cap)} ({PreviewResolutionText}).";
+        _ = Engine.RequestRender(Parameters.BuildOptions(), immediate: true);
+    }
+
+    private void ApplyBaselineSwitch(BaselineMode mode)
+    {
+        _isApplyingBaseline = true;
+        try
+        {
+            ActiveBaselineMode = mode;
+            UpdateBaselineSummaryText();
+
+            if (!Engine.HasImage && mode != BaselineMode.Default)
+            {
+                StatusText = $"Baseline mode set to {BaselineSummaryText}.";
+                return;
+            }
+
+            WatercolorOptions baseline = Engine.HasImage
+                ? Engine.ComputeBaseline(mode)
+                : WatercolorOptions.Default;
+
+            Parameters.SwitchBaseline(mode, baseline);
+            StatusText = $"Switched baseline to {BaselineSummaryText}.";
+        }
+        finally
+        {
+            _isApplyingBaseline = false;
+        }
+    }
+
+    private void HandleSelectedStageChanged(StageCardViewModel? stage)
+    {
+        if (_isSyncingStageState)
+        {
+            return;
+        }
+
+        _isSyncingStageState = true;
+        try
+        {
+            for (int i = 0; i < Stages.Count; i++)
+            {
+                Stages[i].IsSelected = ReferenceEquals(Stages[i], stage);
+            }
+
+            SubStages.Clear();
+            if (stage is not null)
+            {
+                for (int i = 0; i < stage.SubStages.Count; i++)
+                {
+                    SubStages.Add(stage.SubStages[i]);
+                }
+
+                ShowSubStageDrawer = stage.HasSubStages && SubStages.Count > 0;
+
+                SubStageItemViewModel? activeSub = null;
+                for (int i = 0; i < SubStages.Count; i++)
+                {
+                    SubStageItemViewModel sub = SubStages[i];
+                    bool isMatch = sub.ViewId == stage.ActiveViewId;
+                    sub.IsSelected = isMatch;
+                    if (isMatch)
+                    {
+                        activeSub = sub;
+                    }
+                }
+
+                if (activeSub is null && SubStages.Count > 0)
+                {
+                    activeSub = SubStages[0];
+                    activeSub.IsSelected = true;
+                    stage.ActiveViewId = activeSub.ViewId;
+                }
+
+                SelectedSubStage = activeSub;
+            }
+            else
+            {
+                ShowSubStageDrawer = false;
+                SelectedSubStage = null;
+            }
+        }
+        finally
+        {
+            _isSyncingStageState = false;
+        }
+
+        OnPropertyChanged(nameof(ActiveStageTitle));
+        OnPropertyChanged(nameof(ActiveStageId));
+        OnPropertyChanged(nameof(CanResetActiveStage));
+        OnPropertyChanged(nameof(IsCurrentStagePinned));
+
+        SyncVisualizationModesForActiveView();
+        RefreshViewportDisplay();
+    }
+
+    private void HandleSelectedSubStageChanged(SubStageItemViewModel? subStage)
+    {
+        if (_isSyncingStageState || subStage is null)
+        {
+            return;
+        }
+
+        _isSyncingStageState = true;
+        try
+        {
+            if (SelectedStage is null || SelectedStage.StageId != subStage.ParentStage)
+            {
+                StageCardViewModel? parent = FindStageCard(subStage.ParentStage);
+                if (parent is not null)
+                {
+                    _selectedStage = parent;
+                    OnPropertyChanged(nameof(SelectedStage));
+                    for (int i = 0; i < Stages.Count; i++)
+                    {
+                        Stages[i].IsSelected = ReferenceEquals(Stages[i], parent);
+                    }
+
+                    SubStages.Clear();
+                    for (int i = 0; i < parent.SubStages.Count; i++)
+                    {
+                        SubStages.Add(parent.SubStages[i]);
+                    }
+
+                    ShowSubStageDrawer = parent.HasSubStages && SubStages.Count > 0;
+                    OnPropertyChanged(nameof(ActiveStageTitle));
+                    OnPropertyChanged(nameof(ActiveStageId));
+                    OnPropertyChanged(nameof(CanResetActiveStage));
+                    OnPropertyChanged(nameof(IsCurrentStagePinned));
+                }
+            }
+
+            for (int i = 0; i < SubStages.Count; i++)
+            {
+                SubStages[i].IsSelected = ReferenceEquals(SubStages[i], subStage);
+            }
+
+            if (SelectedStage is not null)
+            {
+                SelectedStage.ActiveViewId = subStage.ViewId;
+            }
+        }
+        finally
+        {
+            _isSyncingStageState = false;
+        }
+
+        SyncVisualizationModesForActiveView();
+        RefreshSelectedStageCardBitmap();
+        RefreshViewportDisplay();
+    }
+
+    private void HandleVisualizationModeChanged(VisualizationMode mode)
+    {
+        StageViewId activeView = GetActiveStageViewId();
+        if (!PipelineStageRegistry.IsValidMode(activeView, mode))
+        {
+            VisualizationMode fallback = PipelineStageRegistry.GetView(activeView).DefaultMode;
+            _isSyncingVisualizationMode = true;
+            try
+            {
+                SelectedVisualizationMode = fallback;
+            }
+            finally
+            {
+                _isSyncingVisualizationMode = false;
+            }
+
+            mode = fallback;
+        }
+
+        _viewModes[activeView] = mode;
+        ShowReseedButton = mode == VisualizationMode.RegionRandomColor;
+
+        RefreshSelectedStageCardBitmap();
+        RefreshViewportDisplay();
+    }
+
+    private void SyncVisualizationModesForActiveView()
+    {
+        StageViewId activeView = GetActiveStageViewId();
+        StageViewDescriptor descriptor = PipelineStageRegistry.GetView(activeView);
+        VisualizationMode mode = GetVisualizationModeForView(activeView);
+
+        _isSyncingVisualizationMode = true;
+        try
+        {
+            AvailableVisualizationModes = descriptor.ValidModes;
+            SelectedVisualizationMode = mode;
+        }
+        finally
+        {
+            _isSyncingVisualizationMode = false;
+        }
+
+        ShowReseedButton = mode == VisualizationMode.RegionRandomColor;
+    }
+
+    private void OnParametersOptionsChanged(object? sender, OptionsChangedEventArgs e)
+    {
+        InvalidateFullResCache();
+
+        if (_isLoadingImage || !Engine.HasImage)
+        {
+            return;
+        }
+
+        _ = Engine.RequestRender(e.Options, immediate: e.IsImmediate);
+    }
+
+    private void OnParametersPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is nameof(PipelineParametersViewModel.CanUndo) or nameof(PipelineParametersViewModel.CanRedo))
+        {
+            OnPropertyChanged(e.PropertyName);
+            UndoCommand.NotifyCanExecuteChanged();
+            RedoCommand.NotifyCanExecuteChanged();
+        }
+    }
+
+    private void OnEngineRenderStarted(object? sender, RenderStartedEventArgs e)
+    {
+        _uiDispatcher(() =>
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            IsBusy = true;
+            ProgressText = "Rendering...";
+            StatusText = $"Rendering preview ({e.PreviewSize.Width}×{e.PreviewSize.Height})...";
+
+            for (int i = 0; i < Stages.Count; i++)
+            {
+                StageCardViewModel card = Stages[i];
+                card.IsRunning = card.StageId == PrimaryStageId.ColorTransfer;
+                for (int j = 0; j < card.SubStages.Count; j++)
+                {
+                    card.SubStages[j].IsRunning = false;
+                }
+            }
+        });
+    }
+
+    private void OnEngineStepProgress(object? sender, WatercolorStepProgress progress)
+    {
+        _uiDispatcher(() =>
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            PrimaryStageId completedStageId = PipelineStageRegistry.GetStageForStep(progress.Step);
+            PipelineStageDescriptor stageDescriptor = PipelineStageRegistry.GetStage(completedStageId);
+
+            ProgressText = progress.Bypassed
+                ? $"{stageDescriptor.DisplayName}: bypassed"
+                : progress.FromCache
+                    ? $"{stageDescriptor.DisplayName}: cached"
+                    : $"{stageDescriptor.DisplayName}: {progress.Elapsed.TotalMilliseconds:0} ms";
+
+            string stepText = FormatStepTimingText(progress.Elapsed, progress.FromCache, progress.Bypassed);
+
+            for (int i = 0; i < Stages.Count; i++)
+            {
+                StageCardViewModel card = Stages[i];
+                for (int j = 0; j < card.SubStages.Count; j++)
+                {
+                    SubStageItemViewModel sub = card.SubStages[j];
+                    if (PipelineStageRegistry.GetView(sub.ViewId).MappedStep == progress.Step)
+                    {
+                        sub.IsRunning = false;
+                        sub.IsBypassed = progress.Bypassed;
+                        sub.IsFromCache = !progress.Bypassed && progress.FromCache;
+                        sub.TimingText = stepText;
+                    }
+                }
+            }
+
+            int completedIndex = (int)completedStageId;
+            for (int i = 0; i < Stages.Count; i++)
+            {
+                Stages[i].IsRunning = i == completedIndex + 1 && i < Stages.Count;
+            }
+        });
+    }
+
+    private void OnEngineRenderCompleted(object? sender, RenderCompletedEventArgs e)
+    {
+        _uiDispatcher(() =>
+        {
+            if (_disposed || !ReferenceEquals(Engine.LastResult, e.Result))
+            {
+                return;
+            }
+
+            IsBusy = false;
+            ProgressText = $"{e.TotalElapsed.TotalMilliseconds:0} ms";
+            StatusText = $"Rendered {Engine.PreviewSize.Width}×{Engine.PreviewSize.Height} in {e.TotalElapsed.TotalMilliseconds:0} ms.";
+
+            Parameters.ColorTransfer.ActiveMatchedPalette = e.Result.SelectedPalette;
+            PaletteSummaryText = $"{e.Result.SelectedPalette.Name} ({e.Result.SelectedPalette.Illuminant})";
+
+            int regionCount = e.Result.SegmentationGraph.RegionCount;
+            int boundaryCount = e.Result.SegmentationGraph.Boundaries.Count;
+            SegmentationStatsText = $"Regions: {regionCount:N0} • Boundaries: {boundaryCount:N0}";
+
+            int qualBoundaries = 0;
+            IReadOnlyList<bool> qualFlags = e.Result.WetInWet.QualifyingBoundaries;
+            for (int i = 0; i < qualFlags.Count; i++)
+            {
+                if (qualFlags[i])
+                {
+                    qualBoundaries++;
+                }
+            }
+
+            WetInWetStatsText = $"Qualifying Boundaries: {qualBoundaries:N0} / {qualFlags.Count:N0}";
+
+            int cachedCount = 0;
+            int executedCount = 0;
+            foreach (WatercolorStepTiming timing in e.Result.StepTimings.Values)
+            {
+                if (!timing.Bypassed)
+                {
+                    if (timing.FromCache)
+                    {
+                        cachedCount++;
+                    }
+                    else
+                    {
+                        executedCount++;
+                    }
+                }
+            }
+
+            StageTimingSummaryText = $"{e.TotalElapsed.TotalMilliseconds:0} ms ({cachedCount} cached, {executedCount} run)";
+
+            ApplyResultToStageCards(e.Result, e.EffectiveOptions);
+            RefreshViewportDisplay();
+        });
+    }
+
+    private void OnEngineRenderCancelled(object? sender, RenderCancelledEventArgs e)
+    {
+        _uiDispatcher(() =>
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            IsBusy = false;
+            ProgressText = "Cancelled";
+            StatusText = "Preview render cancelled.";
+            ClearRunningStates();
+        });
+    }
+
+    private void OnEngineRenderFailed(object? sender, RenderFailedEventArgs e)
+    {
+        _uiDispatcher(() =>
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            IsBusy = false;
+            ProgressText = "Failed";
+            StatusText = $"Render failed: {e.Exception.Message}";
+            ClearRunningStates();
+        });
+    }
+
+    private void OnEngineStalenessChanged(object? sender, StalenessChangedEventArgs e)
+    {
+        _uiDispatcher(() =>
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            for (int i = 0; i < Stages.Count; i++)
+            {
+                StageCardViewModel card = Stages[i];
+                bool isStale = e.StaleStages.Contains(card.StageId);
+                card.IsStale = isStale;
+                if (isStale && !card.IsRunning && !card.IsBypassed)
+                {
+                    card.IsFromCache = false;
+                    card.StatusBadgeText = "Stale";
+                }
+                else if (!isStale && card.StatusBadgeText == "Stale")
+                {
+                    card.StatusBadgeText = card.IsBypassed ? "Bypassed" : card.IsFromCache ? "Cached" : string.Empty;
+                }
+
+                for (int j = 0; j < card.SubStages.Count; j++)
+                {
+                    SubStageItemViewModel sub = card.SubStages[j];
+                    if (PipelineStageRegistry.GetView(sub.ViewId).MappedStep is WatercolorStep step)
+                    {
+                        sub.IsStale = e.StaleSteps.Contains(step);
+                    }
+                }
+            }
+        });
+    }
+
+    private void ApplyResultToStageCards(WatercolorResult result, WatercolorOptions effectiveOptions)
+    {
+        if (Engine.PreviewSource is null)
+        {
+            return;
+        }
+
+        IReadOnlySet<PrimaryStageId> staleStages = Engine.StaleStages;
+        IReadOnlySet<WatercolorStep> staleSteps = Engine.StaleSteps;
+
+        for (int i = 0; i < Stages.Count; i++)
+        {
+            StageCardViewModel card = Stages[i];
+            PipelineStageDescriptor descriptor = PipelineStageRegistry.GetStage(card.StageId);
+
+            card.IsRunning = false;
+            card.IsPinned = _pinnedStageId == card.StageId;
+
+            if (descriptor.MappedSteps.Count == 0)
+            {
+                card.TimingText = "Input";
+                card.IsFromCache = false;
+                card.IsBypassed = false;
+                card.IsStale = false;
+                card.StatusBadgeText = string.Empty;
+            }
+            else
+            {
+                bool allBypassed = true;
+                bool allCachedOrBypassed = true;
+                bool anyCached = false;
+                double elapsedMs = 0.0;
+
+                for (int s = 0; s < descriptor.MappedSteps.Count; s++)
+                {
+                    WatercolorStep step = descriptor.MappedSteps[s];
+                    if (result.StepTimings.TryGetValue(step, out WatercolorStepTiming timing))
+                    {
+                        if (!timing.Bypassed)
+                        {
+                            allBypassed = false;
+                            if (timing.FromCache)
+                            {
+                                anyCached = true;
+                            }
+                            else
+                            {
+                                allCachedOrBypassed = false;
+                                elapsedMs += timing.Elapsed.TotalMilliseconds;
+                            }
+                        }
+                    }
+                    else
+                    {
+                        allBypassed = false;
+                        allCachedOrBypassed = false;
+                    }
+                }
+
+                bool isStale = staleStages.Contains(card.StageId);
+                card.IsStale = isStale;
+                card.IsBypassed = allBypassed;
+                card.IsFromCache = !allBypassed && allCachedOrBypassed && anyCached;
+
+                if (allBypassed)
+                {
+                    card.TimingText = "Bypassed";
+                    card.StatusBadgeText = "Bypassed";
+                }
+                else if (card.IsFromCache)
+                {
+                    card.TimingText = "Cached";
+                    card.StatusBadgeText = isStale ? "Stale" : "Cached";
+                }
+                else
+                {
+                    card.TimingText = elapsedMs < 1.0 ? "<1 ms" : $"{elapsedMs:0} ms";
+                    card.StatusBadgeText = isStale ? "Stale" : string.Empty;
+                }
+            }
+
+            for (int j = 0; j < card.SubStages.Count; j++)
+            {
+                SubStageItemViewModel sub = card.SubStages[j];
+                sub.IsRunning = false;
+                if (PipelineStageRegistry.GetView(sub.ViewId).MappedStep is WatercolorStep step &&
+                    result.StepTimings.TryGetValue(step, out WatercolorStepTiming timing))
+                {
+                    sub.IsBypassed = timing.Bypassed;
+                    sub.IsFromCache = !timing.Bypassed && timing.FromCache;
+                    sub.IsStale = staleSteps.Contains(step);
+                    sub.TimingText = FormatStepTimingText(timing.Elapsed, timing.FromCache, timing.Bypassed);
+                }
+            }
+
+            UpdateStageCardBitmaps(card, result, effectiveOptions);
+        }
+    }
+
+    private void UpdateInputStageCardBitmap()
+    {
+        if (Engine.PreviewSource is null || Stages.Count == 0)
+        {
+            return;
+        }
+
+        StageCardViewModel inputCard = Stages[0];
+        inputCard.TimingText = "Input";
+        inputCard.IsStale = false;
+        inputCard.IsBypassed = false;
+        inputCard.IsFromCache = false;
+        inputCard.StatusBadgeText = string.Empty;
+
+        UpdateStageCardBitmapsFromMatrix(inputCard, Engine.PreviewSource);
+    }
+
+    private void RefreshSelectedStageCardBitmap()
+    {
+        if (SelectedStage is null || Engine.PreviewSource is null)
+        {
+            return;
+        }
+
+        if (SelectedStage.StageId == PrimaryStageId.Input)
+        {
+            UpdateInputStageCardBitmap();
+            return;
+        }
+
+        if (Engine.LastResult is not null)
+        {
+            UpdateStageCardBitmaps(
+                SelectedStage,
+                Engine.LastResult,
+                Engine.LastRenderedEffectiveOptions ?? Parameters.BuildOptions());
+        }
+    }
+
+    private void RefreshAllStageCardBitmaps()
+    {
+        if (Engine.PreviewSource is null)
+        {
+            return;
+        }
+
+        UpdateInputStageCardBitmap();
+        if (Engine.LastResult is null)
+        {
+            return;
+        }
+
+        WatercolorOptions options = Engine.LastRenderedEffectiveOptions ?? Parameters.BuildOptions();
+        for (int i = 1; i < Stages.Count; i++)
+        {
+            UpdateStageCardBitmaps(Stages[i], Engine.LastResult, options);
+        }
+    }
+
+    private void UpdateStageCardBitmaps(
+        StageCardViewModel card,
+        WatercolorResult result,
+        WatercolorOptions effectiveOptions)
+    {
+        if (Engine.PreviewSource is null)
+        {
+            return;
+        }
+
+        if (card.StageId == PrimaryStageId.Input)
+        {
+            UpdateStageCardBitmapsFromMatrix(card, Engine.PreviewSource);
+            return;
+        }
+
+        VisualizationMode mode = GetVisualizationModeForView(card.ActiveViewId);
+        Matrix<Rgb8> matrix = StageVisualizers.RenderView(
+            card.ActiveViewId,
+            mode,
+            Engine.PreviewSource,
+            result,
+            effectiveOptions,
+            _regionRandomSeed);
+
+        UpdateStageCardBitmapsFromMatrix(card, matrix);
+    }
+
+    private static void UpdateStageCardBitmapsFromMatrix(StageCardViewModel card, IReadOnlyMatrix<Rgb8> matrix)
+    {
+        WriteableBitmap? oldThumb = card.Thumbnail;
+        WriteableBitmap nextThumb = MatrixBitmapConverter.BlitThumbnail(matrix, oldThumb);
+        card.Thumbnail = nextThumb;
+
+        WriteableBitmap? oldGrid = card.GridBitmap;
+        WriteableBitmap nextGrid = MatrixBitmapConverter.Blit(matrix, oldGrid);
+        card.GridBitmap = nextGrid;
+
+        if (ReferenceEquals(oldThumb, nextThumb) || ReferenceEquals(oldGrid, nextGrid))
+        {
+            card.NotifyBitmapsUpdated();
+        }
+    }
+
+    private void RefreshViewportDisplay()
+    {
+        if (!Engine.HasImage || Engine.PreviewSource is null)
+        {
+            ClearViewportBitmaps();
+            return;
+        }
+
+        StageViewId activeView = GetActiveStageViewId();
+        StageViewDescriptor activeDescriptor = PipelineStageRegistry.GetView(activeView);
+        WatercolorOptions effectiveOptions = Engine.LastRenderedEffectiveOptions ?? Parameters.BuildOptions();
+
+        IReadOnlyMatrix<Rgb8>? primaryMatrix;
+        if (activeView == StageViewId.Input)
+        {
+            primaryMatrix = Engine.PreviewSource;
+            PrimaryLabel = activeDescriptor.DisplayName;
+        }
+        else if (Engine.LastResult is WatercolorResult result)
+        {
+            primaryMatrix = StageVisualizers.RenderView(
+                activeView,
+                SelectedVisualizationMode,
+                Engine.PreviewSource,
+                result,
+                effectiveOptions,
+                _regionRandomSeed);
+            PrimaryLabel = activeDescriptor.DisplayName;
+        }
+        else
+        {
+            primaryMatrix = Engine.PreviewSource;
+            PrimaryLabel = $"{activeDescriptor.DisplayName} (Pending)";
+        }
+
+        _currentDisplayedMatrix = primaryMatrix;
+        ApplyPrimaryBitmap(primaryMatrix);
+        RefreshCompareBitmapOnly();
+    }
+
+    private void RefreshCompareBitmapOnly()
+    {
+        if (CompareMode == CompareMode.Off || !Engine.HasImage || Engine.PreviewSource is null)
+        {
+            CompareLabel = string.Empty;
+            DisposeCompareBitmap();
+            return;
+        }
+
+        StageViewId activeView = GetActiveStageViewId();
+        WatercolorOptions effectiveOptions = Engine.LastRenderedEffectiveOptions ?? Parameters.BuildOptions();
+        IReadOnlyMatrix<Rgb8>? compareMatrix = null;
+
+        switch (CompareReferenceKind)
+        {
+            case CompareReferenceKind.Input:
+                compareMatrix = Engine.PreviewSource;
+                CompareLabel = "Input";
+                break;
+
+            case CompareReferenceKind.PreviousStage:
+            {
+                StageViewId previousView = PipelineStageRegistry.GetPreviousView(activeView);
+                StageViewDescriptor prevDesc = PipelineStageRegistry.GetView(previousView);
+                CompareLabel = prevDesc.DisplayName;
+                compareMatrix = RenderCompareView(previousView, effectiveOptions);
+                break;
+            }
+
+            case CompareReferenceKind.PinnedStage:
+            {
+                if (_pinnedStageId is PrimaryStageId pinnedId)
+                {
+                    StageCardViewModel? pinnedCard = FindStageCard(pinnedId);
+                    StageViewId pinnedView = pinnedCard?.ActiveViewId ?? PipelineStageRegistry.GetStage(pinnedId).DefaultView;
+                    StageViewDescriptor pinnedDesc = PipelineStageRegistry.GetView(pinnedView);
+                    CompareLabel = $"Pinned: {pinnedDesc.DisplayName}";
+                    compareMatrix = RenderCompareView(pinnedView, effectiveOptions);
+                }
+                else
+                {
+                    CompareLabel = "No Stage Pinned";
+                    compareMatrix = null;
+                }
+
+                break;
+            }
+        }
+
+        if (compareMatrix is null)
+        {
+            DisposeCompareBitmap();
+            return;
+        }
+
+        WriteableBitmap? previous = _compareBitmap;
+        WriteableBitmap next = MatrixBitmapConverter.Blit(compareMatrix, previous);
+        if (ReferenceEquals(previous, next))
+        {
+            ViewportRefreshRequested?.Invoke(this, EventArgs.Empty);
+        }
+        else
+        {
+            CompareBitmap = next;
+            previous?.Dispose();
+        }
+    }
+
+    private IReadOnlyMatrix<Rgb8>? RenderCompareView(StageViewId viewId, WatercolorOptions effectiveOptions)
+    {
+        if (Engine.PreviewSource is null)
+        {
+            return null;
+        }
+
+        if (viewId == StageViewId.Input)
+        {
+            return Engine.PreviewSource;
+        }
+
+        if (Engine.LastResult is null)
+        {
+            return null;
+        }
+
+        return StageVisualizers.RenderView(
+            viewId,
+            GetVisualizationModeForView(viewId),
+            Engine.PreviewSource,
+            Engine.LastResult,
+            effectiveOptions,
+            _regionRandomSeed);
+    }
+
+    private void ApplyPrimaryBitmap(IReadOnlyMatrix<Rgb8>? matrix)
+    {
+        if (matrix is null)
+        {
+            DisposePrimaryBitmap();
+            return;
+        }
+
+        WriteableBitmap? previous = _primaryBitmap;
+        WriteableBitmap next = MatrixBitmapConverter.Blit(matrix, previous);
+        if (ReferenceEquals(previous, next))
+        {
+            ViewportRefreshRequested?.Invoke(this, EventArgs.Empty);
+        }
+        else
+        {
+            PrimaryBitmap = next;
+            previous?.Dispose();
+        }
+    }
+
+    private void ClearViewportBitmaps()
+    {
+        _currentDisplayedMatrix = null;
+        PrimaryLabel = string.Empty;
+        CompareLabel = string.Empty;
+        DisposePrimaryBitmap();
+        DisposeCompareBitmap();
+    }
+
+    private void DisposePrimaryBitmap()
+    {
+        WriteableBitmap? old = _primaryBitmap;
+        if (old is not null)
+        {
+            PrimaryBitmap = null;
+            old.Dispose();
+        }
+    }
+
+    private void DisposeCompareBitmap()
+    {
+        WriteableBitmap? old = _compareBitmap;
+        if (old is not null)
+        {
+            CompareBitmap = null;
+            old.Dispose();
+        }
+    }
+
+    private void ClearAllStageCardBitmaps()
+    {
+        for (int i = 0; i < Stages.Count; i++)
+        {
+            Stages[i].ClearBitmaps();
+        }
+    }
+
+    private void ClearRunningStates()
+    {
+        for (int i = 0; i < Stages.Count; i++)
+        {
+            StageCardViewModel card = Stages[i];
+            card.IsRunning = false;
+            for (int j = 0; j < card.SubStages.Count; j++)
+            {
+                card.SubStages[j].IsRunning = false;
+            }
+        }
+    }
+
+    private void SyncPinnedCardStates()
+    {
+        for (int i = 0; i < Stages.Count; i++)
+        {
+            Stages[i].IsPinned = _pinnedStageId.HasValue && Stages[i].StageId == _pinnedStageId.Value;
+        }
+    }
+
+    private StageViewId GetActiveStageViewId() =>
+        SelectedSubStage?.ViewId
+        ?? SelectedStage?.ActiveViewId
+        ?? StageViewId.FinishingFinalFxaa;
+
+    private VisualizationMode GetVisualizationModeForView(StageViewId viewId)
+    {
+        if (_viewModes.TryGetValue(viewId, out VisualizationMode mode) &&
+            PipelineStageRegistry.IsValidMode(viewId, mode))
+        {
+            return mode;
+        }
+
+        return PipelineStageRegistry.GetView(viewId).DefaultMode;
+    }
+
+    private StageCardViewModel? FindStageCard(PrimaryStageId stageId)
+    {
+        for (int i = 0; i < Stages.Count; i++)
+        {
+            if (Stages[i].StageId == stageId)
+            {
+                return Stages[i];
+            }
+        }
+
+        return null;
+    }
+
+    private Task<WatercolorResult> GetOrRenderFullResolutionAsync(WatercolorOptions canonical, CancellationToken ct)
+    {
+        if (_cachedFullResResult is not null && Equals(_cachedFullResOptions, canonical))
+        {
+            return Task.FromResult(_cachedFullResResult);
+        }
+
+        return RenderAndCacheFullResolutionAsync(canonical, ct);
+    }
+
+    private async Task<WatercolorResult> RenderAndCacheFullResolutionAsync(WatercolorOptions canonical, CancellationToken ct)
+    {
+        WatercolorResult result = await RunFullResolutionInternalAsync(canonical, ct);
+        _cachedFullResOptions = canonical;
+        _cachedFullResResult = result;
+        return result;
+    }
+
+    private Task<WatercolorResult> RunFullResolutionInternalAsync(WatercolorOptions canonical, CancellationToken ct)
+    {
+        return Engine.RenderFullResolutionAsync(
+            canonical,
+            stepProgress => _uiDispatcher(() =>
+            {
+                if (!_disposed && IsBusy)
+                {
+                    string stageName = PipelineStageRegistry.GetStage(PipelineStageRegistry.GetStageForStep(stepProgress.Step)).DisplayName;
+                    ProgressText = $"Full-res: {stageName} ({stepProgress.Elapsed.TotalMilliseconds:0} ms)";
+                }
+            }),
+            ct);
+    }
+
+    private void InvalidateFullResCache()
+    {
+        _cachedFullResResult = null;
+        _cachedFullResOptions = null;
+    }
+
+    private CancellationTokenSource ReplaceExportCts()
+    {
+        CancelActiveExport();
+        var cts = new CancellationTokenSource();
+        _exportCts = cts;
+        return cts;
+    }
+
+    private void FinishExportCts(CancellationTokenSource cts)
+    {
+        if (ReferenceEquals(_exportCts, cts))
+        {
+            _exportCts = null;
+        }
+
+        cts.Dispose();
+    }
+
+    private void CancelActiveExport()
+    {
+        CancellationTokenSource? cts = _exportCts;
+        if (cts is null)
+        {
+            return;
+        }
+
+        try
+        {
+            cts.Cancel();
+        }
+        catch (ObjectDisposedException)
+        {
+        }
+    }
+
+    private string BuildSuggestedExportFileName(string suffix)
+    {
+        if (Engine.SourcePath is { Length: > 0 } path)
+        {
+            string stem = Path.GetFileNameWithoutExtension(path);
+            if (!string.IsNullOrWhiteSpace(stem))
+            {
+                return $"{stem}_{suffix}";
+            }
+        }
+
+        return suffix;
+    }
+
+    private void UpdateBaselineSummaryText()
+    {
+        BaselineSummaryText = ActiveBaselineMode switch
+        {
+            BaselineMode.ForImage => Engine.HasImage
+                ? $"For Image ({Engine.NativeSize.Width}×{Engine.NativeSize.Height})"
+                : "For Image (Auto-analyzed)",
+            BaselineMode.ForSize => Engine.HasImage
+                ? $"For Size ({Engine.NativeSize.Width}×{Engine.NativeSize.Height})"
+                : "For Size (Dimension-scaled)",
+            BaselineMode.Default => "Default (Static)",
+            _ => ActiveBaselineMode.ToString(),
+        };
+    }
+
+    private void NotifyActionCanExecuteChanged()
+    {
+        RunNowCommand.NotifyCanExecuteChanged();
+        CancelRenderCommand.NotifyCanExecuteChanged();
+        RenderFullResolutionCommand.NotifyCanExecuteChanged();
+        ExportFinalFullResCommand.NotifyCanExecuteChanged();
+        ExportFinalPreviewResCommand.NotifyCanExecuteChanged();
+        ExportAllStagesCommand.NotifyCanExecuteChanged();
+    }
+
+    private static string FormatStepTimingText(TimeSpan elapsed, bool fromCache, bool bypassed)
+    {
+        if (bypassed)
+        {
+            return "Bypassed";
+        }
+
+        if (fromCache)
+        {
+            return "Cached";
+        }
+
+        return elapsed.TotalMilliseconds < 1.0 ? "<1 ms" : $"{elapsed.TotalMilliseconds:0} ms";
+    }
+
+    private static string EnumDisplayNameConverterLabel(PreviewResolutionCap cap) => cap switch
+    {
+        PreviewResolutionCap.Native => "Native",
+        PreviewResolutionCap.Px512 => "512 px",
+        PreviewResolutionCap.Px768 => "768 px",
+        PreviewResolutionCap.Px1024 => "1024 px",
+        PreviewResolutionCap.Px1536 => "1536 px",
+        _ => cap.ToString(),
+    };
+}
