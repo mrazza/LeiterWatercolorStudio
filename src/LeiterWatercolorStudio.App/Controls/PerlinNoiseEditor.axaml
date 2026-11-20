@@ -1,0 +1,126 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="using:LeiterWatercolorStudio.App.Controls"
+             xmlns:converters="using:LeiterWatercolorStudio.App.Converters"
+             xmlns:params="clr-namespace:LeiterWatercolorStudio.Core.Parameters;assembly=LeiterWatercolorStudio.Core"
+             x:Class="LeiterWatercolorStudio.App.Controls.PerlinNoiseEditor"
+             x:DataType="params:PerlinNoiseViewModel">
+    <Border BorderBrush="#334155"
+            BorderThickness="1"
+            CornerRadius="6"
+            Background="#141820"
+            Padding="10,8">
+        <StackPanel Spacing="6">
+            <!-- Collapsible Card Header -->
+            <Grid ColumnDefinitions="*,Auto">
+                <Button x:Name="PART_ExpandButton"
+                        Grid.Column="0"
+                        Background="Transparent"
+                        BorderThickness="0"
+                        Padding="2,2"
+                        HorizontalAlignment="Stretch"
+                        HorizontalContentAlignment="Left"
+                        VerticalAlignment="Center">
+                    <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                        <TextBlock x:Name="PART_ChevronText"
+                                   Text="▾"
+                                   FontSize="11"
+                                   Opacity="0.75"
+                                   VerticalAlignment="Center" />
+                        <Ellipse x:Name="PART_ModifiedDot"
+                                 Width="6"
+                                 Height="6"
+                                 Fill="#38BDF8"
+                                 VerticalAlignment="Center"
+                                 IsVisible="False" />
+                        <TextBlock x:Name="PART_TitleText"
+                                   Text="Noise"
+                                   FontSize="12.5"
+                                   FontWeight="SemiBold"
+                                   VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+
+                <Button x:Name="PART_ResetButton"
+                        Grid.Column="1"
+                        Content="↺"
+                        Width="24"
+                        Height="24"
+                        Padding="0"
+                        FontSize="12"
+                        HorizontalContentAlignment="Center"
+                        VerticalContentAlignment="Center"
+                        Background="Transparent"
+                        BorderThickness="0"
+                        ToolTip.Tip="Reset noise parameters to baseline" />
+            </Grid>
+
+            <!-- Collapsible Editor Body -->
+            <StackPanel x:Name="PART_BodyPanel" Spacing="4">
+                <!-- Seed Row -->
+                <Grid ColumnDefinitions="Auto,*,Auto" Margin="0,2,0,2">
+                    <TextBlock Grid.Column="0"
+                               Text="Seed"
+                               FontSize="12"
+                               VerticalAlignment="Center"
+                               Margin="0,0,8,0" />
+                    <NumericUpDown x:Name="PART_SeedUpDown"
+                                   Grid.Column="1"
+                                   Value="{Binding Seed, Mode=TwoWay, Converter={x:Static converters:IntToDecimalConverter.Instance}}"
+                                   Minimum="-2147483648"
+                                   Maximum="2147483647"
+                                   Increment="1"
+                                   FormatString="F0"
+                                   ShowButtonSpinner="False"
+                                   MinHeight="26"
+                                   Height="26"
+                                   Padding="6,2"
+                                   FontSize="12"
+                                   VerticalContentAlignment="Center" />
+                    <Button x:Name="PART_RandomizeSeedButton"
+                            Grid.Column="2"
+                            Content="🎲 Random"
+                            Height="26"
+                            Padding="8,2"
+                            FontSize="11.5"
+                            Margin="6,0,0,0"
+                            VerticalContentAlignment="Center"
+                            ToolTip.Tip="Generate a new random seed" />
+                </Grid>
+
+                <controls:NumericSlider Label="Frequency"
+                                        Minimum="0.001"
+                                        Maximum="0.5"
+                                        Step="0.001"
+                                        FormatString="F3"
+                                        Value="{Binding Frequency, Mode=TwoWay}"
+                                        BaselineValue="{Binding Baseline.Frequency, Mode=OneWay}" />
+
+                <controls:NumericSlider Label="Octaves"
+                                        Minimum="1"
+                                        Maximum="16"
+                                        Step="1"
+                                        IsInteger="True"
+                                        FormatString="F0"
+                                        Value="{Binding Octaves, Mode=TwoWay, Converter={x:Static converters:IntToDoubleConverter.Instance}}"
+                                        BaselineValue="{Binding Baseline.Octaves, Mode=OneWay, Converter={x:Static converters:IntToDoubleConverter.Instance}}" />
+
+                <controls:NumericSlider Label="Lacunarity"
+                                        Minimum="1.0"
+                                        Maximum="4.0"
+                                        Step="0.05"
+                                        FormatString="F2"
+                                        Value="{Binding Lacunarity, Mode=TwoWay}"
+                                        BaselineValue="{Binding Baseline.Lacunarity, Mode=OneWay}" />
+
+                <controls:NumericSlider Label="Persistence"
+                                        Minimum="0.0"
+                                        Maximum="1.0"
+                                        Step="0.01"
+                                        FormatString="F2"
+                                        Value="{Binding Persistence, Mode=TwoWay}"
+                                        BaselineValue="{Binding Baseline.Persistence, Mode=OneWay}" />
+            </StackPanel>
+        </StackPanel>
+    </Border>
+</UserControl>
