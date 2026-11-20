@@ -1,0 +1,35 @@
+# Build outputs
+bin/
+obj/
+out/
+artifacts/
+
+# IDE & Editor files
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+*.swp
+*.swo
+*~
+
+# Test & coverage results
+TestResults/
+coverage/
+*.trx
+*.coverage
+*.coveragexml
+
+# Logs & temp files
+*.log
+*.tmp
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Avalonia
+*.Avalonia.Previewer

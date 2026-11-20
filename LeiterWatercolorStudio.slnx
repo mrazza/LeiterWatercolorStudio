@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="src/LeiterWatercolorStudio.Core/LeiterWatercolorStudio.Core.csproj" />
+  <Project Path="src/LeiterWatercolorStudio.App/LeiterWatercolorStudio.App.csproj" />
+  <Project Path="tests/LeiterWatercolorStudio.Core.Tests/LeiterWatercolorStudio.Core.Tests.csproj" />
+  <Project Path="tests/LeiterWatercolorStudio.App.Tests/LeiterWatercolorStudio.App.Tests.csproj" />
+</Solution>

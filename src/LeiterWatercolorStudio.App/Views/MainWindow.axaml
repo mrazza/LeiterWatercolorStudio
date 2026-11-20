@@ -1,0 +1,8 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="LeiterWatercolorStudio.App.Views.MainWindow"
+        Title="Leiter Watercolor Studio"
+        Width="1280"
+        Height="800">
+    <Grid />
+</Window>

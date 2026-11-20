@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\extern\Leiter\Leiter\Leiter.csproj" />
+    <ProjectReference Include="..\..\extern\Leiter\Leiter.Platform.ImageSharp\Leiter.Platform.ImageSharp.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CommunityToolkit.Mvvm" />
+  </ItemGroup>
+
+</Project>
