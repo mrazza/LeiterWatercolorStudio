@@ -33,3 +33,6 @@ Thumbs.db
 
 # Avalonia
 *.Avalonia.Previewer
+
+# Swarm temporary worktrees
+.worktrees/
