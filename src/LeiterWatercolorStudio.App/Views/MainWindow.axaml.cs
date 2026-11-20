@@ -32,6 +32,7 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        UpdateActiveInspectorVisibility(PrimaryStageId.Input);
 
         DataContextChanged += OnDataContextChanged;
 
@@ -71,6 +72,11 @@ public partial class MainWindow : Window
             vm.ViewportRefreshRequested += OnViewportRefreshRequested;
             vm.ImageLoaded += OnViewModelImageLoaded;
             ApplyThemeVariant(vm.IsDarkTheme);
+            UpdateActiveInspectorVisibility(vm.ActiveStageId);
+        }
+        else
+        {
+            UpdateActiveInspectorVisibility(PrimaryStageId.Input);
         }
     }
 
@@ -89,10 +95,31 @@ public partial class MainWindow : Window
 
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (sender is MainWindowViewModel vm && e.PropertyName == nameof(MainWindowViewModel.IsDarkTheme))
+        if (sender is not MainWindowViewModel vm)
+        {
+            return;
+        }
+
+        if (e.PropertyName == nameof(MainWindowViewModel.IsDarkTheme))
         {
             ApplyThemeVariant(vm.IsDarkTheme);
         }
+        else if (e.PropertyName == nameof(MainWindowViewModel.ActiveStageId))
+        {
+            UpdateActiveInspectorVisibility(vm.ActiveStageId);
+        }
+    }
+
+    private void UpdateActiveInspectorVisibility(PrimaryStageId activeStageId)
+    {
+        InputInspector.IsVisible = activeStageId == PrimaryStageId.Input;
+        ColorTransferInspector.IsVisible = activeStageId == PrimaryStageId.ColorTransfer;
+        SaliencyInspector.IsVisible = activeStageId == PrimaryStageId.Saliency;
+        SegmentationInspector.IsVisible = activeStageId == PrimaryStageId.Segmentation;
+        LodAbstractionInspector.IsVisible = activeStageId == PrimaryStageId.LodAbstraction;
+        WetInWetInspector.IsVisible = activeStageId == PrimaryStageId.WetInWet;
+        HandTremorInspector.IsVisible = activeStageId == PrimaryStageId.HandTremor;
+        FinishingInspector.IsVisible = activeStageId == PrimaryStageId.Finishing;
     }
 
     private void OnViewportRefreshRequested(object? sender, EventArgs e)

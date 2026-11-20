@@ -2,10 +2,12 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:LeiterWatercolorStudio.App.ViewModels"
         xmlns:views="using:LeiterWatercolorStudio.App.Views"
+        xmlns:inspectors="using:LeiterWatercolorStudio.App.Views.Inspectors"
         xmlns:controls="using:LeiterWatercolorStudio.App.Controls"
         xmlns:conv="using:LeiterWatercolorStudio.App.Converters"
         xmlns:models="using:LeiterWatercolorStudio.Core.Models"
         x:Class="LeiterWatercolorStudio.App.Views.MainWindow"
+        x:Name="WindowRoot"
         x:DataType="vm:MainWindowViewModel"
         Title="Leiter Watercolor Studio"
         Width="1440"
@@ -306,34 +308,57 @@
                         </Grid>
                     </Border>
 
-                    <!-- Scrollable Inspector Host -->
-                    <ScrollViewer Grid.Row="1"
-                                  VerticalScrollBarVisibility="Auto"
-                                  HorizontalScrollBarVisibility="Disabled">
-                        <Border x:Name="InspectorHost" Padding="12">
-                            <StackPanel Spacing="10">
-                                <Border Classes="studio-card">
-                                    <StackPanel Spacing="6">
-                                        <TextBlock Classes="studio-heading" Text="{Binding ActiveStageTitle}" />
-                                        <TextBlock Classes="studio-muted"
-                                                   Text="Stage inspector controls will mount here."
-                                                   TextWrapping="Wrap" />
-                                    </StackPanel>
-                                </Border>
+                    <!-- Stage Inspector Host (each inspector manages its own ScrollViewer) -->
+                    <Panel Grid.Row="1" x:Name="InspectorHost">
+                        <inspectors:InputInspectorView x:Name="InputInspector"
+                                                       SourcePathText="{Binding SourceFileDisplayText}"
+                                                       NativeDimensionsText="{Binding NativeResolutionText}"
+                                                       PreviewDimensionsText="{Binding PreviewResolutionText}"
+                                                       BaselineSummaryText="{Binding BaselineSummaryText}"
+                                                       PaletteSummaryText="{Binding PaletteSummaryText}"
+                                                       HasImage="{Binding HasImage}"
+                                                       OpenImageCommand="{Binding OpenImageCommand}"
+                                                       RenderFullResCommand="{Binding RenderFullResolutionCommand}"
+                                                       ExportFinalCommand="{Binding ExportFinalFullResCommand}" />
 
-                                <Border Classes="studio-card">
-                                    <StackPanel Spacing="5">
-                                        <TextBlock Classes="studio-label" Text="Session Diagnostics" />
-                                        <TextBlock Classes="studio-muted" Text="{Binding SourceFileDisplayText}" TextTrimming="CharacterEllipsis" />
-                                        <TextBlock Classes="studio-muted" Text="{Binding BaselineSummaryText}" />
-                                        <TextBlock Classes="studio-muted" Text="{Binding PaletteSummaryText}" />
-                                        <TextBlock Classes="studio-muted" Text="{Binding SegmentationStatsText}" />
-                                        <TextBlock Classes="studio-muted" Text="{Binding WetInWetStatsText}" />
-                                    </StackPanel>
-                                </Border>
-                            </StackPanel>
-                        </Border>
-                    </ScrollViewer>
+                        <inspectors:ColorTransferInspectorView x:Name="ColorTransferInspector"
+                                                               IsVisible="False"
+                                                               DataContext="{Binding Parameters.ColorTransfer}"
+                                                               ResetStageCommand="{Binding #WindowRoot.((vm:MainWindowViewModel)DataContext).ResetStageCommand}"
+                                                               ExtractPaletteCommand="{Binding #WindowRoot.((vm:MainWindowViewModel)DataContext).ExtractReferencePaletteCommand}" />
+
+                        <inspectors:SaliencyInspectorView x:Name="SaliencyInspector"
+                                                          IsVisible="False"
+                                                          DataContext="{Binding Parameters.Saliency}"
+                                                          ResetStageCommand="{Binding #WindowRoot.((vm:MainWindowViewModel)DataContext).ResetStageCommand}" />
+
+                        <inspectors:SegmentationInspectorView x:Name="SegmentationInspector"
+                                                              IsVisible="False"
+                                                              DataContext="{Binding Parameters.Segmentation}"
+                                                              ResetStageCommand="{Binding #WindowRoot.((vm:MainWindowViewModel)DataContext).ResetStageCommand}"
+                                                              StatsText="{Binding #WindowRoot.((vm:MainWindowViewModel)DataContext).SegmentationStatsText}" />
+
+                        <inspectors:LodAbstractionInspectorView x:Name="LodAbstractionInspector"
+                                                                IsVisible="False"
+                                                                DataContext="{Binding Parameters.LodAbstraction}"
+                                                                ResetStageCommand="{Binding #WindowRoot.((vm:MainWindowViewModel)DataContext).ResetStageCommand}" />
+
+                        <inspectors:WetInWetInspectorView x:Name="WetInWetInspector"
+                                                          IsVisible="False"
+                                                          DataContext="{Binding Parameters.WetInWet}"
+                                                          ResetStageCommand="{Binding #WindowRoot.((vm:MainWindowViewModel)DataContext).ResetStageCommand}"
+                                                          StatsText="{Binding #WindowRoot.((vm:MainWindowViewModel)DataContext).WetInWetStatsText}" />
+
+                        <inspectors:HandTremorInspectorView x:Name="HandTremorInspector"
+                                                            IsVisible="False"
+                                                            DataContext="{Binding Parameters.HandTremor}"
+                                                            ResetStageCommand="{Binding #WindowRoot.((vm:MainWindowViewModel)DataContext).ResetStageCommand}" />
+
+                        <inspectors:FinishingInspectorView x:Name="FinishingInspector"
+                                                           IsVisible="False"
+                                                           DataContext="{Binding Parameters.Finishing}"
+                                                           ResetStageCommand="{Binding #WindowRoot.((vm:MainWindowViewModel)DataContext).ResetStageCommand}" />
+                    </Panel>
                 </Grid>
             </Border>
         </Grid>
