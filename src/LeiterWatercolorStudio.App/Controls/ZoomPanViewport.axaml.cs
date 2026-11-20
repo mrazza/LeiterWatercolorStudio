@@ -1,0 +1,1314 @@
+using System.Windows.Input;
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Input;
+using Avalonia.Interactivity;
+using Avalonia.Media;
+using Avalonia.Media.Imaging;
+using Avalonia.Platform.Storage;
+using LeiterWatercolorStudio.Core.Models;
+
+namespace LeiterWatercolorStudio.App.Controls;
+
+/// <summary>
+/// Event data for viewport pointer hover over an image pixel.
+/// </summary>
+public sealed class PixelHoverEventArgs : RoutedEventArgs
+{
+    /// <summary>
+    /// Initializes a new instance of <see cref="PixelHoverEventArgs"/>.
+    /// </summary>
+    public PixelHoverEventArgs(RoutedEvent? routedEvent, int x, int y)
+        : base(routedEvent)
+    {
+        X = x;
+        Y = y;
+    }
+
+    /// <summary>
+    /// Initializes a new instance of <see cref="PixelHoverEventArgs"/>.
+    /// </summary>
+    public PixelHoverEventArgs(int x, int y)
+        : this(null, x, y)
+    {
+    }
+
+    /// <summary>
+    /// Gets the zero-based image X coordinate.
+    /// </summary>
+    public int X { get; }
+
+    /// <summary>
+    /// Gets the zero-based image Y coordinate.
+    /// </summary>
+    public int Y { get; }
+}
+
+/// <summary>
+/// Event data for a local file dropped onto the viewport.
+/// </summary>
+public sealed class FileDroppedEventArgs : RoutedEventArgs
+{
+    /// <summary>
+    /// Initializes a new instance of <see cref="FileDroppedEventArgs"/>.
+    /// </summary>
+    public FileDroppedEventArgs(RoutedEvent? routedEvent, string path)
+        : base(routedEvent)
+    {
+        Path = path;
+    }
+
+    /// <summary>
+    /// Initializes a new instance of <see cref="FileDroppedEventArgs"/>.
+    /// </summary>
+    public FileDroppedEventArgs(string path)
+        : this(null, path)
+    {
+    }
+
+    /// <summary>
+    /// Gets the local file path dropped onto the viewport.
+    /// </summary>
+    public string Path { get; }
+}
+
+/// <summary>
+/// Interactive zoomable, pannable, split-wipe, and side-by-side image viewport with floating HUD overlays.
+/// </summary>
+public partial class ZoomPanViewport : UserControl
+{
+    /// <summary>
+    /// Minimum supported zoom factor (10%).
+    /// </summary>
+    public const double MinZoom = 0.1;
+
+    /// <summary>
+    /// Maximum supported zoom factor (1600%).
+    /// </summary>
+    public const double MaxZoom = 16.0;
+
+    private const double PixelSnapThresholdZoom = 3.0;
+    internal const double PixelGridThresholdZoom = 8.0;
+    private const double SideBySideDividerWidth = 2.0;
+    private const double WipeHitHalfWidth = 10.0;
+    private const double ZoomButtonStep = 1.25;
+    private const double WheelZoomBase = 1.15;
+
+    public static readonly StyledProperty<WriteableBitmap?> PrimaryBitmapProperty =
+        AvaloniaProperty.Register<ZoomPanViewport, WriteableBitmap?>(nameof(PrimaryBitmap));
+
+    public static readonly StyledProperty<WriteableBitmap?> CompareBitmapProperty =
+        AvaloniaProperty.Register<ZoomPanViewport, WriteableBitmap?>(nameof(CompareBitmap));
+
+    public static readonly StyledProperty<CompareMode> CompareModeProperty =
+        AvaloniaProperty.Register<ZoomPanViewport, CompareMode>(nameof(CompareMode), CompareMode.Off);
+
+    public static readonly StyledProperty<double> WipePositionProperty =
+        AvaloniaProperty.Register<ZoomPanViewport, double>(
+            nameof(WipePosition),
+            defaultValue: 0.5,
+            defaultBindingMode: Avalonia.Data.BindingMode.TwoWay,
+            coerce: CoerceWipePosition);
+
+    public static readonly StyledProperty<string?> PrimaryLabelProperty =
+        AvaloniaProperty.Register<ZoomPanViewport, string?>(nameof(PrimaryLabel));
+
+    public static readonly StyledProperty<string?> CompareLabelProperty =
+        AvaloniaProperty.Register<ZoomPanViewport, string?>(nameof(CompareLabel));
+
+    public static readonly StyledProperty<double> ZoomProperty =
+        AvaloniaProperty.Register<ZoomPanViewport, double>(
+            nameof(Zoom),
+            defaultValue: 1.0,
+            defaultBindingMode: Avalonia.Data.BindingMode.TwoWay,
+            coerce: CoerceZoom);
+
+    public static readonly StyledProperty<double> PanXProperty =
+        AvaloniaProperty.Register<ZoomPanViewport, double>(
+            nameof(PanX),
+            defaultValue: 0.0,
+            defaultBindingMode: Avalonia.Data.BindingMode.TwoWay,
+            coerce: CoerceFinite);
+
+    public static readonly StyledProperty<double> PanYProperty =
+        AvaloniaProperty.Register<ZoomPanViewport, double>(
+            nameof(PanY),
+            defaultValue: 0.0,
+            defaultBindingMode: Avalonia.Data.BindingMode.TwoWay,
+            coerce: CoerceFinite);
+
+    public static readonly StyledProperty<string?> HoverHudTextProperty =
+        AvaloniaProperty.Register<ZoomPanViewport, string?>(nameof(HoverHudText));
+
+    public static readonly StyledProperty<Color?> HoverSwatchColorProperty =
+        AvaloniaProperty.Register<ZoomPanViewport, Color?>(nameof(HoverSwatchColor));
+
+    public static readonly StyledProperty<IReadOnlyList<VisualizationMode>?> AvailableVisualizationModesProperty =
+        AvaloniaProperty.Register<ZoomPanViewport, IReadOnlyList<VisualizationMode>?>(nameof(AvailableVisualizationModes));
+
+    public static readonly StyledProperty<VisualizationMode> SelectedVisualizationModeProperty =
+        AvaloniaProperty.Register<ZoomPanViewport, VisualizationMode>(
+            nameof(SelectedVisualizationMode),
+            defaultValue: VisualizationMode.Rgb,
+            defaultBindingMode: Avalonia.Data.BindingMode.TwoWay);
+
+    public static readonly StyledProperty<bool> ShowReseedButtonProperty =
+        AvaloniaProperty.Register<ZoomPanViewport, bool>(nameof(ShowReseedButton), false);
+
+    public static readonly StyledProperty<bool> IsEmptyProperty =
+        AvaloniaProperty.Register<ZoomPanViewport, bool>(nameof(IsEmpty), true);
+
+    public static readonly StyledProperty<bool> IsProcessingProperty =
+        AvaloniaProperty.Register<ZoomPanViewport, bool>(nameof(IsProcessing), false);
+
+    public static readonly StyledProperty<string?> ProcessingStatusTextProperty =
+        AvaloniaProperty.Register<ZoomPanViewport, string?>(nameof(ProcessingStatusText));
+
+    public static readonly StyledProperty<ICommand?> OpenImageCommandProperty =
+        AvaloniaProperty.Register<ZoomPanViewport, ICommand?>(nameof(OpenImageCommand));
+
+    public static readonly StyledProperty<ICommand?> ReseedCommandProperty =
+        AvaloniaProperty.Register<ZoomPanViewport, ICommand?>(nameof(ReseedCommand));
+
+    public static readonly StyledProperty<ICommand?> FileDroppedCommandProperty =
+        AvaloniaProperty.Register<ZoomPanViewport, ICommand?>(nameof(FileDroppedCommand));
+
+    public static readonly RoutedEvent<PixelHoverEventArgs> HoverPixelChangedEvent =
+        RoutedEvent.Register<ZoomPanViewport, PixelHoverEventArgs>(
+            nameof(HoverPixelChanged),
+            RoutingStrategies.Bubble);
+
+    public static readonly RoutedEvent<RoutedEventArgs> HoverExitedEvent =
+        RoutedEvent.Register<ZoomPanViewport, RoutedEventArgs>(
+            nameof(HoverExited),
+            RoutingStrategies.Bubble);
+
+    public static readonly RoutedEvent<RoutedEventArgs> ReseedRequestedEvent =
+        RoutedEvent.Register<ZoomPanViewport, RoutedEventArgs>(
+            nameof(ReseedRequested),
+            RoutingStrategies.Bubble);
+
+    public static readonly RoutedEvent<RoutedEventArgs> OpenImageRequestedEvent =
+        RoutedEvent.Register<ZoomPanViewport, RoutedEventArgs>(
+            nameof(OpenImageRequested),
+            RoutingStrategies.Bubble);
+
+    public static readonly RoutedEvent<FileDroppedEventArgs> FileDroppedEvent =
+        RoutedEvent.Register<ZoomPanViewport, FileDroppedEventArgs>(
+            nameof(FileDropped),
+            RoutingStrategies.Bubble);
+
+    private static readonly Cursor DefaultCursor = new(StandardCursorType.Arrow);
+    private static readonly Cursor HandCursor = new(StandardCursorType.Hand);
+    private static readonly Cursor SizeWeCursor = new(StandardCursorType.SizeWestEast);
+
+    private readonly List<(Button Button, VisualizationMode Mode)> _modeButtons = [];
+    private bool _isPanning;
+    private bool _isDraggingWipe;
+    private bool _isSpaceDown;
+    private Point _lastDragPoint;
+    private PixelPoint? _lastHoverPixel;
+
+    /// <summary>
+    /// Initializes a new instance of <see cref="ZoomPanViewport"/>.
+    /// </summary>
+    public ZoomPanViewport()
+    {
+        InitializeComponent();
+
+        PART_Surface.Owner = this;
+
+        PART_OpenImageButton.Click += (_, _) => RequestOpenImage();
+        PART_ReseedButton.Click += (_, _) => RequestReseed();
+        PART_FitButton.Click += (_, _) => FitToView();
+        PART_OneToOneButton.Click += (_, _) => ZoomOneToOne();
+        PART_ZoomOutButton.Click += (_, _) => ZoomAroundCenter(Zoom / ZoomButtonStep);
+        PART_ZoomInButton.Click += (_, _) => ZoomAroundCenter(Zoom * ZoomButtonStep);
+
+        AddHandler(DragDrop.DragOverEvent, OnDragOver);
+        AddHandler(DragDrop.DragLeaveEvent, OnDragLeave);
+        AddHandler(DragDrop.DropEvent, OnDrop);
+
+        ApplyInterpolationMode();
+        UpdateAllVisualState();
+    }
+
+    public WriteableBitmap? PrimaryBitmap
+    {
+        get => GetValue(PrimaryBitmapProperty);
+        set => SetValue(PrimaryBitmapProperty, value);
+    }
+
+    public WriteableBitmap? CompareBitmap
+    {
+        get => GetValue(CompareBitmapProperty);
+        set => SetValue(CompareBitmapProperty, value);
+    }
+
+    public CompareMode CompareMode
+    {
+        get => GetValue(CompareModeProperty);
+        set => SetValue(CompareModeProperty, value);
+    }
+
+    public double WipePosition
+    {
+        get => GetValue(WipePositionProperty);
+        set => SetValue(WipePositionProperty, value);
+    }
+
+    public string? PrimaryLabel
+    {
+        get => GetValue(PrimaryLabelProperty);
+        set => SetValue(PrimaryLabelProperty, value);
+    }
+
+    public string? CompareLabel
+    {
+        get => GetValue(CompareLabelProperty);
+        set => SetValue(CompareLabelProperty, value);
+    }
+
+    public double Zoom
+    {
+        get => GetValue(ZoomProperty);
+        set => SetValue(ZoomProperty, value);
+    }
+
+    public double PanX
+    {
+        get => GetValue(PanXProperty);
+        set => SetValue(PanXProperty, value);
+    }
+
+    public double PanY
+    {
+        get => GetValue(PanYProperty);
+        set => SetValue(PanYProperty, value);
+    }
+
+    public string? HoverHudText
+    {
+        get => GetValue(HoverHudTextProperty);
+        set => SetValue(HoverHudTextProperty, value);
+    }
+
+    public Color? HoverSwatchColor
+    {
+        get => GetValue(HoverSwatchColorProperty);
+        set => SetValue(HoverSwatchColorProperty, value);
+    }
+
+    public IReadOnlyList<VisualizationMode>? AvailableVisualizationModes
+    {
+        get => GetValue(AvailableVisualizationModesProperty);
+        set => SetValue(AvailableVisualizationModesProperty, value);
+    }
+
+    public VisualizationMode SelectedVisualizationMode
+    {
+        get => GetValue(SelectedVisualizationModeProperty);
+        set => SetValue(SelectedVisualizationModeProperty, value);
+    }
+
+    public bool ShowReseedButton
+    {
+        get => GetValue(ShowReseedButtonProperty);
+        set => SetValue(ShowReseedButtonProperty, value);
+    }
+
+    public bool IsEmpty
+    {
+        get => GetValue(IsEmptyProperty);
+        set => SetValue(IsEmptyProperty, value);
+    }
+
+    public bool IsProcessing
+    {
+        get => GetValue(IsProcessingProperty);
+        set => SetValue(IsProcessingProperty, value);
+    }
+
+    public string? ProcessingStatusText
+    {
+        get => GetValue(ProcessingStatusTextProperty);
+        set => SetValue(ProcessingStatusTextProperty, value);
+    }
+
+    public ICommand? OpenImageCommand
+    {
+        get => GetValue(OpenImageCommandProperty);
+        set => SetValue(OpenImageCommandProperty, value);
+    }
+
+    public ICommand? ReseedCommand
+    {
+        get => GetValue(ReseedCommandProperty);
+        set => SetValue(ReseedCommandProperty, value);
+    }
+
+    public ICommand? FileDroppedCommand
+    {
+        get => GetValue(FileDroppedCommandProperty);
+        set => SetValue(FileDroppedCommandProperty, value);
+    }
+
+    public event EventHandler<PixelHoverEventArgs>? HoverPixelChanged
+    {
+        add => AddHandler(HoverPixelChangedEvent, value);
+        remove => RemoveHandler(HoverPixelChangedEvent, value);
+    }
+
+    public event EventHandler<RoutedEventArgs>? HoverExited
+    {
+        add => AddHandler(HoverExitedEvent, value);
+        remove => RemoveHandler(HoverExitedEvent, value);
+    }
+
+    public event EventHandler<RoutedEventArgs>? ReseedRequested
+    {
+        add => AddHandler(ReseedRequestedEvent, value);
+        remove => RemoveHandler(ReseedRequestedEvent, value);
+    }
+
+    public event EventHandler<RoutedEventArgs>? OpenImageRequested
+    {
+        add => AddHandler(OpenImageRequestedEvent, value);
+        remove => RemoveHandler(OpenImageRequestedEvent, value);
+    }
+
+    public event EventHandler<FileDroppedEventArgs>? FileDropped
+    {
+        add => AddHandler(FileDroppedEvent, value);
+        remove => RemoveHandler(FileDroppedEvent, value);
+    }
+
+    /// <summary>
+    /// Fits the active image comfortably within the viewport pane(s) and resets pan offsets to zero.
+    /// </summary>
+    public void FitToView()
+    {
+        WriteableBitmap? referenceBitmap = PrimaryBitmap ?? CompareBitmap;
+        if (referenceBitmap is null || referenceBitmap.PixelSize.Width <= 0 || referenceBitmap.PixelSize.Height <= 0)
+        {
+            Zoom = 1.0;
+            PanX = 0.0;
+            PanY = 0.0;
+            return;
+        }
+
+        Size paneSize = GetReferencePaneSize();
+        if (paneSize.Width <= 0 || paneSize.Height <= 0)
+        {
+            Zoom = 1.0;
+            PanX = 0.0;
+            PanY = 0.0;
+            return;
+        }
+
+        double padding = Math.Min(32.0, Math.Min(paneSize.Width, paneSize.Height) * 0.1);
+        double availableWidth = Math.Max(1.0, paneSize.Width - padding);
+        double availableHeight = Math.Max(1.0, paneSize.Height - padding);
+
+        double fitZoom = Math.Min(
+            availableWidth / referenceBitmap.PixelSize.Width,
+            availableHeight / referenceBitmap.PixelSize.Height);
+
+        Zoom = CoerceZoom(this, fitZoom);
+        PanX = 0.0;
+        PanY = 0.0;
+    }
+
+    /// <summary>
+    /// Resets the viewport to 100% zoom (1:1 pixels) centered in the pane.
+    /// </summary>
+    public void ZoomOneToOne()
+    {
+        Zoom = 1.0;
+        PanX = 0.0;
+        PanY = 0.0;
+    }
+
+    /// <summary>
+    /// Forces a surface redraw when an underlying <see cref="WriteableBitmap"/> is mutated in place.
+    /// </summary>
+    public void RefreshImage()
+    {
+        PART_Surface.InvalidateVisual();
+    }
+
+    /// <summary>
+    /// Maps a point in viewport coordinates to zero-based integer image pixel coordinates,
+    /// returning <see langword="null"/> when outside the rendered image bounds or when empty.
+    /// </summary>
+    public PixelPoint? ScreenToImagePixel(Point viewportPoint)
+    {
+        if (IsEmpty)
+        {
+            return null;
+        }
+
+        WriteableBitmap? referenceBitmap = PrimaryBitmap ?? CompareBitmap;
+        if (referenceBitmap is null || referenceBitmap.PixelSize.Width <= 0 || referenceBitmap.PixelSize.Height <= 0)
+        {
+            return null;
+        }
+
+        Size viewportSize = GetEffectiveViewportSize();
+        if (viewportSize.Width <= 0 || viewportSize.Height <= 0)
+        {
+            return null;
+        }
+
+        Rect paneRect = ResolvePaneAtPoint(viewportPoint, viewportSize);
+        if (paneRect.Width <= 0 || paneRect.Height <= 0 || !paneRect.Contains(viewportPoint))
+        {
+            return null;
+        }
+
+        int imageWidth = referenceBitmap.PixelSize.Width;
+        int imageHeight = referenceBitmap.PixelSize.Height;
+
+        if (CompareMode == CompareMode.SideBySide && paneRect.X == 0 && CompareBitmap is not null && PrimaryBitmap is null)
+        {
+            imageWidth = CompareBitmap.PixelSize.Width;
+            imageHeight = CompareBitmap.PixelSize.Height;
+        }
+
+        double localX = viewportPoint.X - paneRect.X;
+        double localY = viewportPoint.Y - paneRect.Y;
+
+        double imageX = (localX - paneRect.Width * 0.5 - PanX) / Zoom + imageWidth * 0.5;
+        double imageY = (localY - paneRect.Height * 0.5 - PanY) / Zoom + imageHeight * 0.5;
+
+        int pixelX = (int)Math.Floor(imageX);
+        int pixelY = (int)Math.Floor(imageY);
+
+        if (pixelX < 0 || pixelX >= imageWidth || pixelY < 0 || pixelY >= imageHeight)
+        {
+            return null;
+        }
+
+        return new PixelPoint(pixelX, pixelY);
+    }
+
+    internal Size GetEffectiveViewportSize()
+    {
+        if (Bounds.Width > 0 && Bounds.Height > 0)
+        {
+            return Bounds.Size;
+        }
+
+        double width = !double.IsNaN(Width) && Width > 0 ? Width : 0.0;
+        double height = !double.IsNaN(Height) && Height > 0 ? Height : 0.0;
+        return new Size(width, height);
+    }
+
+    internal (Rect LeftPane, Rect RightPane, double DividerX) GetSideBySidePanes(Size viewportSize)
+    {
+        double leftWidth = Math.Max(0.0, Math.Floor((viewportSize.Width - SideBySideDividerWidth) * 0.5));
+        double rightX = leftWidth + SideBySideDividerWidth;
+        double rightWidth = Math.Max(0.0, viewportSize.Width - rightX);
+
+        return (
+            new Rect(0, 0, leftWidth, viewportSize.Height),
+            new Rect(rightX, 0, rightWidth, viewportSize.Height),
+            leftWidth);
+    }
+
+    protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
+    {
+        base.OnPropertyChanged(change);
+
+        AvaloniaProperty property = change.Property;
+        if (property == ZoomProperty)
+        {
+            ApplyInterpolationMode();
+            UpdateZoomText();
+            PART_Surface.InvalidateVisual();
+        }
+        else if (property == PanXProperty ||
+                 property == PanYProperty ||
+                 property == PrimaryBitmapProperty ||
+                 property == CompareBitmapProperty)
+        {
+            if (property == PrimaryBitmapProperty && PrimaryBitmap is null)
+            {
+                ClearHoverPixel();
+            }
+
+            PART_Surface.InvalidateVisual();
+        }
+        else if (property == WipePositionProperty)
+        {
+            UpdateWipeOverlayLayout();
+            PART_Surface.InvalidateVisual();
+        }
+        else if (property == CompareModeProperty ||
+                 property == PrimaryLabelProperty ||
+                 property == CompareLabelProperty)
+        {
+            UpdateCompareVisuals();
+            PART_Surface.InvalidateVisual();
+        }
+        else if (property == IsEmptyProperty)
+        {
+            if (IsEmpty)
+            {
+                ClearHoverPixel();
+            }
+
+            UpdateVisibilityState();
+            PART_Surface.InvalidateVisual();
+        }
+        else if (property == HoverHudTextProperty || property == HoverSwatchColorProperty)
+        {
+            UpdateHoverHud();
+        }
+        else if (property == AvailableVisualizationModesProperty)
+        {
+            RebuildVisualizationModeChips();
+        }
+        else if (property == SelectedVisualizationModeProperty)
+        {
+            UpdateActiveModeChipHighlight();
+        }
+        else if (property == ShowReseedButtonProperty)
+        {
+            UpdateModeBarVisibility();
+        }
+        else if (property == IsProcessingProperty || property == ProcessingStatusTextProperty)
+        {
+            UpdateProcessingIndicator();
+        }
+        else if (property == BoundsProperty)
+        {
+            UpdateWipeOverlayLayout();
+            PART_Surface.InvalidateVisual();
+        }
+    }
+
+    protected override void OnKeyDown(KeyEventArgs e)
+    {
+        base.OnKeyDown(e);
+
+        if (e.Key == Key.Space && !IsEmpty && e.Source is not Button)
+        {
+            _isSpaceDown = true;
+            UpdateCursorForPoint(_lastDragPoint);
+        }
+    }
+
+    protected override void OnKeyUp(KeyEventArgs e)
+    {
+        base.OnKeyUp(e);
+
+        if (e.Key == Key.Space)
+        {
+            _isSpaceDown = false;
+            if (!_isPanning && !_isDraggingWipe)
+            {
+                Cursor = DefaultCursor;
+            }
+        }
+    }
+
+    protected override void OnPointerPressed(PointerPressedEventArgs e)
+    {
+        base.OnPointerPressed(e);
+
+        if (IsEmpty)
+        {
+            return;
+        }
+
+        Focus();
+        PointerPoint point = e.GetCurrentPoint(this);
+        Point pos = point.Position;
+        _lastDragPoint = pos;
+
+        bool isLeft = point.Properties.IsLeftButtonPressed;
+        bool isMiddle = point.Properties.IsMiddleButtonPressed;
+
+        if (isLeft && !_isSpaceDown && IsPointOnWipeHandle(pos))
+        {
+            _isDraggingWipe = true;
+            e.Pointer.Capture(this);
+            UpdateWipeFromPoint(pos);
+            Cursor = SizeWeCursor;
+            e.Handled = true;
+            return;
+        }
+
+        if (isMiddle || isLeft)
+        {
+            _isPanning = true;
+            e.Pointer.Capture(this);
+            Cursor = HandCursor;
+            e.Handled = true;
+        }
+    }
+
+    protected override void OnPointerMoved(PointerEventArgs e)
+    {
+        base.OnPointerMoved(e);
+
+        if (IsEmpty)
+        {
+            return;
+        }
+
+        Point pos = e.GetPosition(this);
+
+        if (_isDraggingWipe)
+        {
+            UpdateWipeFromPoint(pos);
+            e.Handled = true;
+            return;
+        }
+
+        if (_isPanning)
+        {
+            Vector delta = pos - _lastDragPoint;
+            _lastDragPoint = pos;
+            PanX += delta.X;
+            PanY += delta.Y;
+            UpdateHoverFromPoint(pos);
+            e.Handled = true;
+            return;
+        }
+
+        _lastDragPoint = pos;
+        UpdateCursorForPoint(pos);
+        UpdateHoverFromPoint(pos);
+    }
+
+    protected override void OnPointerReleased(PointerReleasedEventArgs e)
+    {
+        base.OnPointerReleased(e);
+
+        if (_isDraggingWipe || _isPanning)
+        {
+            _isDraggingWipe = false;
+            _isPanning = false;
+            if (Equals(e.Pointer.Captured, this))
+            {
+                e.Pointer.Capture(null);
+            }
+
+            UpdateCursorForPoint(e.GetPosition(this));
+            e.Handled = true;
+        }
+    }
+
+    protected override void OnPointerCaptureLost(PointerCaptureLostEventArgs e)
+    {
+        base.OnPointerCaptureLost(e);
+
+        _isDraggingWipe = false;
+        _isPanning = false;
+        Cursor = _isSpaceDown ? HandCursor : DefaultCursor;
+    }
+
+    protected override void OnPointerExited(PointerEventArgs e)
+    {
+        base.OnPointerExited(e);
+
+        if (!_isPanning && !_isDraggingWipe)
+        {
+            Cursor = DefaultCursor;
+            ClearHoverPixel();
+        }
+    }
+
+    protected override void OnPointerWheelChanged(PointerWheelEventArgs e)
+    {
+        base.OnPointerWheelChanged(e);
+
+        if (IsEmpty || (PrimaryBitmap is null && CompareBitmap is null))
+        {
+            return;
+        }
+
+        double deltaY = e.Delta.Y;
+        if (Math.Abs(deltaY) < 1e-6)
+        {
+            return;
+        }
+
+        double factor = Math.Pow(WheelZoomBase, deltaY);
+        ZoomAtViewportPoint(Zoom * factor, e.GetPosition(this));
+        e.Handled = true;
+    }
+
+    private static double CoerceZoom(AvaloniaObject _, double value)
+    {
+        if (double.IsNaN(value) || double.IsInfinity(value))
+        {
+            return 1.0;
+        }
+
+        return Math.Clamp(value, MinZoom, MaxZoom);
+    }
+
+    private static double CoerceWipePosition(AvaloniaObject _, double value)
+    {
+        if (double.IsNaN(value) || double.IsInfinity(value))
+        {
+            return 0.5;
+        }
+
+        return Math.Clamp(value, 0.0, 1.0);
+    }
+
+    private static double CoerceFinite(AvaloniaObject _, double value)
+    {
+        if (double.IsNaN(value) || double.IsInfinity(value))
+        {
+            return 0.0;
+        }
+
+        return value;
+    }
+
+    private void ZoomAroundCenter(double targetZoom)
+    {
+        Size size = GetEffectiveViewportSize();
+        Point center = CompareMode == CompareMode.SideBySide
+            ? GetSideBySidePanes(size).RightPane.Center
+            : new Point(size.Width * 0.5, size.Height * 0.5);
+
+        ZoomAtViewportPoint(targetZoom, center);
+    }
+
+    private void ZoomAtViewportPoint(double targetZoom, Point viewportPoint)
+    {
+        double oldZoom = Zoom;
+        double newZoom = CoerceZoom(this, targetZoom);
+        if (Math.Abs(newZoom - oldZoom) < 1e-9)
+        {
+            return;
+        }
+
+        Size viewportSize = GetEffectiveViewportSize();
+        Rect paneRect = ResolvePaneAtPoint(viewportPoint, viewportSize);
+        if (paneRect.Width > 0 && paneRect.Height > 0 && oldZoom > 0)
+        {
+            double offsetX = viewportPoint.X - paneRect.X - paneRect.Width * 0.5;
+            double offsetY = viewportPoint.Y - paneRect.Y - paneRect.Height * 0.5;
+            double ratio = newZoom / oldZoom;
+
+            PanX = offsetX - (offsetX - PanX) * ratio;
+            PanY = offsetY - (offsetY - PanY) * ratio;
+        }
+
+        Zoom = newZoom;
+    }
+
+    private Size GetReferencePaneSize()
+    {
+        Size viewportSize = GetEffectiveViewportSize();
+        if (CompareMode == CompareMode.SideBySide)
+        {
+            return GetSideBySidePanes(viewportSize).RightPane.Size;
+        }
+
+        return viewportSize;
+    }
+
+    private Rect ResolvePaneAtPoint(Point viewportPoint, Size viewportSize)
+    {
+        if (CompareMode == CompareMode.SideBySide)
+        {
+            (Rect leftPane, Rect rightPane, _) = GetSideBySidePanes(viewportSize);
+            return viewportPoint.X <= leftPane.Right ? leftPane : rightPane;
+        }
+
+        return new Rect(viewportSize);
+    }
+
+    private bool IsPointOnWipeHandle(Point pos)
+    {
+        if (CompareMode != CompareMode.SplitWipe || IsEmpty)
+        {
+            return false;
+        }
+
+        Size viewportSize = GetEffectiveViewportSize();
+        if (viewportSize.Width <= 0)
+        {
+            return false;
+        }
+
+        double wipeX = WipePosition * viewportSize.Width;
+        double handleCenterY = viewportSize.Height * 0.5;
+        bool nearHandleCircle = Math.Abs(pos.X - wipeX) <= 18.0 && Math.Abs(pos.Y - handleCenterY) <= 18.0;
+        bool nearWipeLine = Math.Abs(pos.X - wipeX) <= WipeHitHalfWidth;
+        return nearHandleCircle || nearWipeLine;
+    }
+
+    private void UpdateWipeFromPoint(Point pos)
+    {
+        Size viewportSize = GetEffectiveViewportSize();
+        if (viewportSize.Width <= 0)
+        {
+            return;
+        }
+
+        WipePosition = Math.Clamp(pos.X / viewportSize.Width, 0.0, 1.0);
+    }
+
+    private void UpdateCursorForPoint(Point pos)
+    {
+        if (_isDraggingWipe)
+        {
+            Cursor = SizeWeCursor;
+            return;
+        }
+
+        if (_isPanning || _isSpaceDown)
+        {
+            Cursor = HandCursor;
+            return;
+        }
+
+        Cursor = IsPointOnWipeHandle(pos) ? SizeWeCursor : DefaultCursor;
+    }
+
+    private void UpdateHoverFromPoint(Point pos)
+    {
+        PixelPoint? pixel = ScreenToImagePixel(pos);
+        if (pixel is PixelPoint px)
+        {
+            if (!_lastHoverPixel.HasValue || _lastHoverPixel.Value != px)
+            {
+                _lastHoverPixel = px;
+                RaiseEvent(new PixelHoverEventArgs(HoverPixelChangedEvent, px.X, px.Y));
+            }
+
+            return;
+        }
+
+        ClearHoverPixel();
+    }
+
+    private void ClearHoverPixel()
+    {
+        if (_lastHoverPixel.HasValue)
+        {
+            _lastHoverPixel = null;
+            RaiseEvent(new RoutedEventArgs(HoverExitedEvent));
+        }
+    }
+
+    private void ApplyInterpolationMode()
+    {
+        BitmapInterpolationMode mode = Zoom >= PixelSnapThresholdZoom
+            ? BitmapInterpolationMode.None
+            : BitmapInterpolationMode.HighQuality;
+
+        RenderOptions.SetBitmapInterpolationMode(this, mode);
+        RenderOptions.SetBitmapInterpolationMode(PART_Surface, mode);
+    }
+
+    private void UpdateAllVisualState()
+    {
+        UpdateVisibilityState();
+        UpdateZoomText();
+        UpdateCompareVisuals();
+        UpdateHoverHud();
+        UpdateProcessingIndicator();
+        RebuildVisualizationModeChips();
+        UpdateModeBarVisibility();
+    }
+
+    private void UpdateVisibilityState()
+    {
+        bool hasImage = !IsEmpty;
+        PART_EmptyState.IsVisible = IsEmpty;
+        PART_HudOverlay.IsVisible = hasImage;
+        UpdateCompareVisuals();
+        UpdateProcessingIndicator();
+        UpdateHoverHud();
+    }
+
+    private void UpdateZoomText()
+    {
+        PART_ZoomText.Text = $"{Math.Round(Zoom * 100.0):0}%";
+    }
+
+    private void UpdateCompareVisuals()
+    {
+        bool showWipe = !IsEmpty && CompareMode == CompareMode.SplitWipe;
+        bool showSide = !IsEmpty && CompareMode == CompareMode.SideBySide;
+
+        PART_WipeOverlay.IsVisible = showWipe;
+        PART_WipeLabels.IsVisible = showWipe;
+        PART_SideBySideLabels.IsVisible = showSide;
+
+        string? compareLabel = CompareLabel;
+        string? primaryLabel = PrimaryLabel;
+        bool hasCompareLabel = !string.IsNullOrWhiteSpace(compareLabel);
+        bool hasPrimaryLabel = !string.IsNullOrWhiteSpace(primaryLabel);
+
+        PART_WipeCompareLabel.Text = compareLabel ?? string.Empty;
+        PART_WipePrimaryLabel.Text = primaryLabel ?? string.Empty;
+        PART_WipeCompareBadge.IsVisible = showWipe && hasCompareLabel;
+        PART_WipePrimaryBadge.IsVisible = showWipe && hasPrimaryLabel;
+
+        PART_SideCompareLabel.Text = compareLabel ?? string.Empty;
+        PART_SidePrimaryLabel.Text = primaryLabel ?? string.Empty;
+        PART_SideCompareBadge.IsVisible = showSide && hasCompareLabel;
+        PART_SidePrimaryBadge.IsVisible = showSide && hasPrimaryLabel;
+
+        if (showWipe)
+        {
+            UpdateWipeOverlayLayout();
+        }
+    }
+
+    private void UpdateWipeOverlayLayout()
+    {
+        if (CompareMode != CompareMode.SplitWipe || IsEmpty)
+        {
+            return;
+        }
+
+        Size viewportSize = GetEffectiveViewportSize();
+        if (viewportSize.Width <= 0 || viewportSize.Height <= 0)
+        {
+            return;
+        }
+
+        double wipeX = Math.Clamp(WipePosition, 0.0, 1.0) * viewportSize.Width;
+
+        Canvas.SetLeft(PART_WipeLine, wipeX - 1.0);
+        Canvas.SetTop(PART_WipeLine, 0.0);
+        PART_WipeLine.Height = viewportSize.Height;
+
+        Canvas.SetLeft(PART_WipeHandle, wipeX - PART_WipeHandle.Width * 0.5);
+        Canvas.SetTop(PART_WipeHandle, Math.Max(0.0, viewportSize.Height * 0.5 - PART_WipeHandle.Height * 0.5));
+    }
+
+    private void UpdateHoverHud()
+    {
+        bool show = !IsEmpty && !string.IsNullOrWhiteSpace(HoverHudText);
+        PART_HoverHud.IsVisible = show;
+        PART_HoverHudText.Text = HoverHudText ?? string.Empty;
+
+        if (HoverSwatchColor is Color swatch)
+        {
+            PART_HoverSwatch.Background = new SolidColorBrush(swatch);
+            PART_HoverSwatch.IsVisible = true;
+        }
+        else
+        {
+            PART_HoverSwatch.IsVisible = false;
+        }
+    }
+
+    private void UpdateProcessingIndicator()
+    {
+        PART_ProcessingPill.IsVisible = !IsEmpty && IsProcessing;
+        PART_ProcessingText.Text = string.IsNullOrWhiteSpace(ProcessingStatusText)
+            ? "Processing..."
+            : ProcessingStatusText;
+    }
+
+    private void RebuildVisualizationModeChips()
+    {
+        PART_ModeChips.Children.Clear();
+        _modeButtons.Clear();
+
+        IReadOnlyList<VisualizationMode>? modes = AvailableVisualizationModes;
+        if (modes is not null)
+        {
+            foreach (VisualizationMode mode in modes)
+            {
+                var button = new Button
+                {
+                    Content = FormatVisualizationModeName(mode),
+                };
+                button.Classes.Add("mode-chip");
+                button.Click += (_, _) => SelectedVisualizationMode = mode;
+
+                _modeButtons.Add((button, mode));
+                PART_ModeChips.Children.Add(button);
+            }
+        }
+
+        UpdateActiveModeChipHighlight();
+        UpdateModeBarVisibility();
+    }
+
+    private void UpdateActiveModeChipHighlight()
+    {
+        VisualizationMode selected = SelectedVisualizationMode;
+        foreach ((Button button, VisualizationMode mode) in _modeButtons)
+        {
+            button.Classes.Set("active", mode == selected);
+        }
+    }
+
+    private void UpdateModeBarVisibility()
+    {
+        bool hasModes = _modeButtons.Count > 0;
+        bool showReseed = ShowReseedButton;
+
+        PART_ModeChips.IsVisible = hasModes;
+        PART_ReseedButton.IsVisible = showReseed;
+        PART_ReseedSeparator.IsVisible = hasModes && showReseed;
+        PART_ModeBar.IsVisible = hasModes || showReseed;
+    }
+
+    private void RequestOpenImage()
+    {
+        RaiseEvent(new RoutedEventArgs(OpenImageRequestedEvent));
+        if (OpenImageCommand is ICommand cmd && cmd.CanExecute(null))
+        {
+            cmd.Execute(null);
+        }
+    }
+
+    private void RequestReseed()
+    {
+        RaiseEvent(new RoutedEventArgs(ReseedRequestedEvent));
+        if (ReseedCommand is ICommand cmd && cmd.CanExecute(null))
+        {
+            cmd.Execute(null);
+        }
+    }
+
+    private void OnDragOver(object? sender, DragEventArgs e)
+    {
+        bool hasFile = e.DataTransfer.Contains(DataFormat.File);
+        e.DragEffects = hasFile ? DragDropEffects.Copy : DragDropEffects.None;
+        PART_DropOverlay.IsVisible = hasFile;
+        e.Handled = true;
+    }
+
+    private void OnDragLeave(object? sender, DragEventArgs e)
+    {
+        PART_DropOverlay.IsVisible = false;
+    }
+
+    private void OnDrop(object? sender, DragEventArgs e)
+    {
+        PART_DropOverlay.IsVisible = false;
+
+        IStorageItem[]? files = e.DataTransfer.TryGetFiles();
+        if (files is null || files.Length == 0)
+        {
+            return;
+        }
+
+        foreach (IStorageItem item in files)
+        {
+            string? localPath = item.TryGetLocalPath();
+            if (!string.IsNullOrWhiteSpace(localPath))
+            {
+                RaiseEvent(new FileDroppedEventArgs(FileDroppedEvent, localPath));
+                if (FileDroppedCommand is ICommand cmd && cmd.CanExecute(localPath))
+                {
+                    cmd.Execute(localPath);
+                }
+
+                e.Handled = true;
+                break;
+            }
+        }
+    }
+
+    private static string FormatVisualizationModeName(VisualizationMode mode) => mode switch
+    {
+        VisualizationMode.Rgb => "RGB",
+        VisualizationMode.RegionAverageColor => "Region Avg",
+        VisualizationMode.RegionRandomColor => "Region IDs",
+        VisualizationMode.RegionBoundariesOverlay => "Boundaries",
+        VisualizationMode.SalientRegionClassification => "Classification",
+        VisualizationMode.Grayscale => "Grayscale",
+        VisualizationMode.HeatmapTurbo => "Turbo",
+        VisualizationMode.HeatmapViridis => "Viridis",
+        VisualizationMode.MaskedColorOverlay => "Mask Overlay",
+        VisualizationMode.BinaryMask => "Binary Mask",
+        VisualizationMode.TranslucentTintOverlay => "Tint Overlay",
+        VisualizationMode.ContourOverlay => "Contours",
+        VisualizationMode.DistanceSmoothedGrayscale => "Smooth Gray",
+        VisualizationMode.DistanceSmoothedHeatmap => "Smooth Heat",
+        VisualizationMode.DistanceSmoothedContours => "Smooth Contour",
+        VisualizationMode.DistanceRawGrayscale => "Raw Gray",
+        VisualizationMode.DistanceRawHeatmap => "Raw Heat",
+        VisualizationMode.DistanceRawContours => "Raw Contour",
+        VisualizationMode.WetMaskBinary => "Wet Mask",
+        VisualizationMode.WetMaskOverlay => "Wet Overlay",
+        VisualizationMode.QualifyingBoundariesOverlay => "Qualifying Edges",
+        VisualizationMode.IsolatedPigmentPreview => "Pigment",
+        VisualizationMode.DensityHeatmap => "Density Heat",
+        VisualizationMode.DensityGrayscale => "Density Gray",
+        VisualizationMode.PaperHeightGrayscale => "Paper Gray",
+        VisualizationMode.PaperHeightRelief => "Paper Relief",
+        VisualizationMode.FxaaDiffMagnifier => "FXAA Diff",
+        _ => mode.ToString(),
+    };
+}
+
+/// <summary>
+/// Lightweight custom surface control that renders single, split-wipe, and synchronized side-by-side bitmaps.
+/// </summary>
+public sealed class ViewportSurface : Control
+{
+    private static readonly IBrush CanvasBackgroundBrush = new SolidColorBrush(Color.Parse("#14161B"));
+    private static readonly IBrush ImageMatBrush = new SolidColorBrush(Color.Parse("#1B1F27"));
+    private static readonly IPen ImageBorderPen = new Pen(new SolidColorBrush(Color.Parse("#33FFFFFF")), 1.0);
+    private static readonly IPen DividerPen = new Pen(new SolidColorBrush(Color.Parse("#2D3442")), 2.0);
+    private static readonly IPen PixelGridPen = new Pen(new SolidColorBrush(Color.FromArgb(30, 255, 255, 255)), 1.0);
+
+    internal ZoomPanViewport? Owner { get; set; }
+
+    public override void Render(DrawingContext context)
+    {
+        base.Render(context);
+
+        Rect bounds = new(Bounds.Size);
+        context.FillRectangle(CanvasBackgroundBrush, bounds);
+
+        if (Owner is null || Owner.IsEmpty || (Owner.PrimaryBitmap is null && Owner.CompareBitmap is null))
+        {
+            return;
+        }
+
+        double zoom = Owner.Zoom;
+        double panX = Owner.PanX;
+        double panY = Owner.PanY;
+        WriteableBitmap? primary = Owner.PrimaryBitmap;
+        WriteableBitmap? compare = Owner.CompareBitmap;
+
+        switch (Owner.CompareMode)
+        {
+            case CompareMode.SideBySide:
+            {
+                (Rect leftPane, Rect rightPane, double dividerX) = Owner.GetSideBySidePanes(Bounds.Size);
+                DrawPaneBitmap(context, leftPane, compare, primary?.PixelSize, zoom, panX, panY);
+                DrawPaneBitmap(context, rightPane, primary, primary?.PixelSize, zoom, panX, panY);
+                context.DrawLine(
+                    DividerPen,
+                    new Point(dividerX + 1.0, 0),
+                    new Point(dividerX + 1.0, Bounds.Height));
+                break;
+            }
+            case CompareMode.SplitWipe:
+            {
+                double wipeX = Math.Clamp(Owner.WipePosition, 0.0, 1.0) * Bounds.Width;
+                PixelSize? referenceSize = primary?.PixelSize ?? compare?.PixelSize;
+
+                Rect leftClip = new(0, 0, wipeX, Bounds.Height);
+                Rect rightClip = new(wipeX, 0, Math.Max(0.0, Bounds.Width - wipeX), Bounds.Height);
+
+                if (leftClip.Width > 0)
+                {
+                    using (context.PushClip(leftClip))
+                    {
+                        DrawPaneBitmap(context, bounds, compare, referenceSize, zoom, panX, panY);
+                    }
+                }
+
+                if (rightClip.Width > 0)
+                {
+                    using (context.PushClip(rightClip))
+                    {
+                        DrawPaneBitmap(context, bounds, primary, referenceSize, zoom, panX, panY);
+                    }
+                }
+
+                break;
+            }
+            default:
+            {
+                DrawPaneBitmap(context, bounds, primary, primary?.PixelSize, zoom, panX, panY);
+                break;
+            }
+        }
+    }
+
+    private static void DrawPaneBitmap(
+        DrawingContext context,
+        Rect paneRect,
+        WriteableBitmap? bitmap,
+        PixelSize? referencePixelSize,
+        double zoom,
+        double panX,
+        double panY)
+    {
+        if (paneRect.Width <= 0 || paneRect.Height <= 0)
+        {
+            return;
+        }
+
+        using (context.PushClip(paneRect))
+        {
+            PixelSize? targetPixels = referencePixelSize ?? bitmap?.PixelSize;
+            if (targetPixels is not PixelSize size || size.Width <= 0 || size.Height <= 0)
+            {
+                return;
+            }
+
+            double destWidth = size.Width * zoom;
+            double destHeight = size.Height * zoom;
+            double destX = paneRect.X + paneRect.Width * 0.5 + panX - destWidth * 0.5;
+            double destY = paneRect.Y + paneRect.Height * 0.5 + panY - destHeight * 0.5;
+            Rect destRect = new(destX, destY, destWidth, destHeight);
+
+            context.FillRectangle(ImageMatBrush, destRect);
+
+            if (bitmap is not null && bitmap.PixelSize.Width > 0 && bitmap.PixelSize.Height > 0)
+            {
+                Rect srcRect = new(0, 0, bitmap.PixelSize.Width, bitmap.PixelSize.Height);
+                context.DrawImage(bitmap, srcRect, destRect);
+            }
+
+            context.DrawRectangle(ImageBorderPen, destRect);
+
+            if (zoom >= ZoomPanViewport.PixelGridThresholdZoom && bitmap is not null)
+            {
+                DrawPixelGrid(context, paneRect, destRect, size.Width, size.Height, zoom);
+            }
+        }
+    }
+
+    private static void DrawPixelGrid(
+        DrawingContext context,
+        Rect paneRect,
+        Rect destRect,
+        int pixelWidth,
+        int pixelHeight,
+        double zoom)
+    {
+        int startX = Math.Max(1, (int)Math.Ceiling((paneRect.Left - destRect.Left) / zoom));
+        int endX = Math.Min(pixelWidth - 1, (int)Math.Floor((paneRect.Right - destRect.Left) / zoom));
+        double top = Math.Max(paneRect.Top, destRect.Top);
+        double bottom = Math.Min(paneRect.Bottom, destRect.Bottom);
+
+        if (bottom > top)
+        {
+            for (int x = startX; x <= endX; x++)
+            {
+                double sx = destRect.Left + x * zoom;
+                context.DrawLine(PixelGridPen, new Point(sx, top), new Point(sx, bottom));
+            }
+        }
+
+        int startY = Math.Max(1, (int)Math.Ceiling((paneRect.Top - destRect.Top) / zoom));
+        int endY = Math.Min(pixelHeight - 1, (int)Math.Floor((paneRect.Bottom - destRect.Top) / zoom));
+        double left = Math.Max(paneRect.Left, destRect.Left);
+        double right = Math.Min(paneRect.Right, destRect.Right);
+
+        if (right > left)
+        {
+            for (int y = startY; y <= endY; y++)
+            {
+                double sy = destRect.Top + y * zoom;
+                context.DrawLine(PixelGridPen, new Point(left, sy), new Point(right, sy));
+            }
+        }
+    }
+}
