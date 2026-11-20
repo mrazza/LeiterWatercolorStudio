@@ -150,7 +150,9 @@ public sealed class FinishingStageViewModel : StageViewModelBase
         get => _minTone;
         set
         {
-            double maxAllowed = _maxTone > ToneMinGap ? _maxTone - ToneMinGap : _maxTone * 0.5;
+            double maxAllowed = value >= 0.0 && value < _maxTone
+                ? value
+                : (_maxTone > ToneMinGap ? _maxTone - ToneMinGap : _maxTone * 0.5);
             SetFiniteDouble(ref _minTone, value, 0.0, maxAllowed);
         }
     }
@@ -163,7 +165,9 @@ public sealed class FinishingStageViewModel : StageViewModelBase
         get => _maxTone;
         set
         {
-            double minAllowed = _minTone < 1.0 - ToneMinGap ? _minTone + ToneMinGap : (_minTone + 1.0) * 0.5;
+            double minAllowed = value > _minTone && value <= 1.0
+                ? value
+                : (_minTone < 1.0 - ToneMinGap ? _minTone + ToneMinGap : (_minTone + 1.0) * 0.5);
             SetFiniteDouble(ref _maxTone, value, minAllowed, 1.0);
         }
     }
@@ -176,8 +180,11 @@ public sealed class FinishingStageViewModel : StageViewModelBase
         get => _shadowKnee;
         set
         {
-            double maxAllowed = _highlightKnee > 2.0 * ToneMinGap ? _highlightKnee - ToneMinGap : _highlightKnee * 0.5;
-            double minAllowed = Math.Min(ToneMinGap, maxAllowed);
+            double fallbackMax = _highlightKnee > 2.0 * ToneMinGap ? _highlightKnee - ToneMinGap : _highlightKnee * 0.5;
+            double fallbackMin = Math.Min(ToneMinGap, fallbackMax);
+            bool isStrictlyValid = value > 0.0 && value < _highlightKnee;
+            double minAllowed = isStrictlyValid ? value : fallbackMin;
+            double maxAllowed = isStrictlyValid ? value : fallbackMax;
             SetFiniteDouble(ref _shadowKnee, value, minAllowed, maxAllowed);
         }
     }
@@ -190,8 +197,11 @@ public sealed class FinishingStageViewModel : StageViewModelBase
         get => _highlightKnee;
         set
         {
-            double minAllowed = _shadowKnee < 1.0 - 2.0 * ToneMinGap ? _shadowKnee + ToneMinGap : (_shadowKnee + 1.0) * 0.5;
-            double maxAllowed = Math.Max(1.0 - ToneMinGap, minAllowed);
+            double fallbackMin = _shadowKnee < 1.0 - 2.0 * ToneMinGap ? _shadowKnee + ToneMinGap : (_shadowKnee + 1.0) * 0.5;
+            double fallbackMax = Math.Max(1.0 - ToneMinGap, fallbackMin);
+            bool isStrictlyValid = value > _shadowKnee && value < 1.0;
+            double minAllowed = isStrictlyValid ? value : fallbackMin;
+            double maxAllowed = isStrictlyValid ? value : fallbackMax;
             SetFiniteDouble(ref _highlightKnee, value, minAllowed, maxAllowed);
         }
     }

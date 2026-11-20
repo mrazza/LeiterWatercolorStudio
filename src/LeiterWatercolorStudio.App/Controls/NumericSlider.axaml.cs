@@ -63,6 +63,38 @@ public partial class NumericSlider : UserControl
         AvaloniaProperty.Register<NumericSlider, double>(nameof(Maximum), 1.0);
 
     /// <summary>
+    /// Identifies the <see cref="ValidMinimum"/> styled property defining the lower mathematical validity domain.
+    /// </summary>
+    public static readonly StyledProperty<double> ValidMinimumProperty =
+        AvaloniaProperty.Register<NumericSlider, double>(nameof(ValidMinimum), double.NegativeInfinity);
+
+    /// <summary>
+    /// Identifies the <see cref="ValidMaximum"/> styled property defining the upper mathematical validity domain.
+    /// </summary>
+    public static readonly StyledProperty<double> ValidMaximumProperty =
+        AvaloniaProperty.Register<NumericSlider, double>(nameof(ValidMaximum), double.PositiveInfinity);
+
+    /// <summary>
+    /// Identifies the <see cref="IsValidMinimumExclusive"/> styled property.
+    /// </summary>
+    public static readonly StyledProperty<bool> IsValidMinimumExclusiveProperty =
+        AvaloniaProperty.Register<NumericSlider, bool>(nameof(IsValidMinimumExclusive), false);
+
+    /// <summary>
+    /// Identifies the <see cref="IsValidMaximumExclusive"/> styled property.
+    /// </summary>
+    public static readonly StyledProperty<bool> IsValidMaximumExclusiveProperty =
+        AvaloniaProperty.Register<NumericSlider, bool>(nameof(IsValidMaximumExclusive), false);
+
+    /// <summary>
+    /// Identifies the <see cref="ValidationError"/> direct property.
+    /// </summary>
+    public static readonly DirectProperty<NumericSlider, string?> ValidationErrorProperty =
+        AvaloniaProperty.RegisterDirect<NumericSlider, string?>(
+            nameof(ValidationError),
+            o => o.ValidationError);
+
+    /// <summary>
     /// Identifies the <see cref="Step"/> styled property.
     /// </summary>
     public static readonly StyledProperty<double> StepProperty =
@@ -123,7 +155,10 @@ public partial class NumericSlider : UserControl
         RoutedEvent.Register<NumericSlider, RoutedEventArgs>(nameof(DragCompleted), RoutingStrategies.Bubble);
 
     private bool _isUpdatingControls;
+    private bool _isUpdatingTextBox;
+    private bool _isCommittingTextBox;
     private bool _isDragging;
+    private string? _validationError;
 
     /// <summary>
     /// Initializes a new instance of <see cref="NumericSlider"/>.
@@ -146,6 +181,7 @@ public partial class NumericSlider : UserControl
         PART_ValueTextBox.GotFocus += OnValueTextBoxGotFocus;
         PART_ValueTextBox.LostFocus += OnValueTextBoxLostFocus;
         PART_ValueTextBox.KeyDown += OnValueTextBoxKeyDown;
+        PART_ValueTextBox.PropertyChanged += OnValueTextBoxPropertyChanged;
 
         SyncAllControls();
     }
@@ -230,6 +266,58 @@ public partial class NumericSlider : UserControl
         get => GetValue(MaximumProperty);
         set => SetValue(MaximumProperty, value);
     }
+
+    /// <summary>
+    /// Gets or sets the mathematical minimum value accepted by numeric text entry.
+    /// Defaults to <see cref="double.NegativeInfinity"/>.
+    /// </summary>
+    public double ValidMinimum
+    {
+        get => GetValue(ValidMinimumProperty);
+        set => SetValue(ValidMinimumProperty, value);
+    }
+
+    /// <summary>
+    /// Gets or sets the mathematical maximum value accepted by numeric text entry.
+    /// Defaults to <see cref="double.PositiveInfinity"/>.
+    /// </summary>
+    public double ValidMaximum
+    {
+        get => GetValue(ValidMaximumProperty);
+        set => SetValue(ValidMaximumProperty, value);
+    }
+
+    /// <summary>
+    /// Gets or sets whether <see cref="ValidMinimum"/> is strictly exclusive (<c>&gt;</c> instead of <c>&gt;=</c>).
+    /// </summary>
+    public bool IsValidMinimumExclusive
+    {
+        get => GetValue(IsValidMinimumExclusiveProperty);
+        set => SetValue(IsValidMinimumExclusiveProperty, value);
+    }
+
+    /// <summary>
+    /// Gets or sets whether <see cref="ValidMaximum"/> is strictly exclusive (<c>&lt;</c> instead of <c>&lt;=</c>).
+    /// </summary>
+    public bool IsValidMaximumExclusive
+    {
+        get => GetValue(IsValidMaximumExclusiveProperty);
+        set => SetValue(IsValidMaximumExclusiveProperty, value);
+    }
+
+    /// <summary>
+    /// Gets the active validation error message, or <see langword="null"/> when valid.
+    /// </summary>
+    public string? ValidationError
+    {
+        get => _validationError;
+        private set => SetAndRaise(ValidationErrorProperty, ref _validationError, value);
+    }
+
+    /// <summary>
+    /// Gets whether the numeric text entry currently has an active validation error.
+    /// </summary>
+    public bool HasValidationError => !string.IsNullOrWhiteSpace(ValidationError);
 
     /// <summary>
     /// Gets or sets the small step increment used by keyboard nudges and slider changes.
@@ -323,13 +411,25 @@ public partial class NumericSlider : UserControl
         }
 
         double target = IsInteger ? Math.Round(BaselineValue, MidpointRounding.AwayFromZero) : BaselineValue;
+        ClearValidationError();
         SetCurrentValue(ValueProperty, target);
+        SetTextBoxTextProgrammatically(FormatNumericValue(Value));
     }
 
     /// <inheritdoc />
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
     {
         base.OnPropertyChanged(change);
+
+        if (change.Property == ValueProperty && !_isCommittingTextBox)
+        {
+            ClearValidationError();
+        }
+
+        if (change.Property == DataContextProperty)
+        {
+            ClearValidationError();
+        }
 
         if (change.Property == LabelProperty ||
             change.Property == DescriptionProperty ||
@@ -338,6 +438,10 @@ public partial class NumericSlider : UserControl
             change.Property == ValueProperty ||
             change.Property == MinimumProperty ||
             change.Property == MaximumProperty ||
+            change.Property == ValidMinimumProperty ||
+            change.Property == ValidMaximumProperty ||
+            change.Property == IsValidMinimumExclusiveProperty ||
+            change.Property == IsValidMaximumExclusiveProperty ||
             change.Property == StepProperty ||
             change.Property == BaselineValueProperty ||
             change.Property == HasBaselineProperty ||
@@ -412,9 +516,20 @@ public partial class NumericSlider : UserControl
             PART_Slider.IsSnapToTickEnabled = IsInteger;
             PART_Slider.Value = clampedValue;
 
+            if (double.IsFinite(Value) && (Value < min - 1e-12 || Value > max + 1e-12))
+            {
+                ToolTip.SetTip(
+                    PART_Slider,
+                    $"Current value ({FormatNumericValue(Value)}) is outside slider track [{FormatNumericValue(min)}, {FormatNumericValue(max)}]. Dragging the slider returns within track bounds.");
+            }
+            else
+            {
+                ToolTip.SetTip(PART_Slider, null);
+            }
+
             if (!PART_ValueTextBox.IsFocused)
             {
-                PART_ValueTextBox.Text = FormatNumericValue(Value);
+                SetTextBoxTextProgrammatically(FormatNumericValue(Value));
             }
         }
         finally
@@ -430,12 +545,59 @@ public partial class NumericSlider : UserControl
 
         double min = Math.Min(rawMin, rawMax);
         double max = Math.Max(rawMin, rawMax);
+
+        if (HasBaseline && double.IsFinite(BaselineValue) && IsWithinValidDomain(BaselineValue))
+        {
+            if (BaselineValue < min)
+            {
+                min = BaselineValue;
+            }
+
+            if (BaselineValue > max)
+            {
+                max = BaselineValue;
+            }
+        }
+
         if (max - min < 1e-9)
         {
             max = min + 1.0;
         }
 
         return (min, max);
+    }
+
+    private (double Min, bool MinExclusive, double Max, bool MaxExclusive) GetValidDomain()
+    {
+        double min = double.IsNaN(ValidMinimum) ? double.NegativeInfinity : ValidMinimum;
+        double max = double.IsNaN(ValidMaximum) ? double.PositiveInfinity : ValidMaximum;
+        return (min, IsValidMinimumExclusive, max, IsValidMaximumExclusive);
+    }
+
+    private bool IsWithinValidDomain(double candidate)
+    {
+        if (!double.IsFinite(candidate))
+        {
+            return false;
+        }
+
+        (double min, bool minExclusive, double max, bool maxExclusive) = GetValidDomain();
+        if (!double.IsNegativeInfinity(min) && (minExclusive ? candidate <= min : candidate < min))
+        {
+            return false;
+        }
+
+        if (!double.IsPositiveInfinity(max) && (maxExclusive ? candidate >= max : candidate > max))
+        {
+            return false;
+        }
+
+        if (IsInteger && (candidate < int.MinValue || candidate > int.MaxValue || Math.Truncate(candidate) != candidate))
+        {
+            return false;
+        }
+
+        return true;
     }
 
     private double GetEffectiveStep(double min, double max)
@@ -463,10 +625,17 @@ public partial class NumericSlider : UserControl
             return "0";
         }
 
+        if (value == 0.0)
+        {
+            value = 0.0;
+        }
+
         string format = string.IsNullOrWhiteSpace(FormatString) ? "F2" : FormatString.Trim();
         if (IsInteger)
         {
-            long rounded = (long)Math.Round(value, MidpointRounding.AwayFromZero);
+            long rounded = (long)Math.Round(
+                Math.Clamp(value, long.MinValue / 2.0, long.MaxValue / 2.0),
+                MidpointRounding.AwayFromZero);
             if (string.Equals(format, "F2", StringComparison.Ordinal))
             {
                 return rounded.ToString("F0", CultureInfo.CurrentCulture);
@@ -482,14 +651,53 @@ public partial class NumericSlider : UserControl
             }
         }
 
+        string formatted;
         try
         {
-            return value.ToString(format, CultureInfo.CurrentCulture);
+            formatted = value.ToString(format, CultureInfo.CurrentCulture);
         }
         catch (FormatException)
         {
-            return value.ToString("F2", CultureInfo.CurrentCulture);
+            formatted = value.ToString("F2", CultureInfo.CurrentCulture);
         }
+
+        if (double.TryParse(formatted, NumberStyles.Float, CultureInfo.CurrentCulture, out double roundTripped))
+        {
+            bool sameZeroSign = (roundTripped == 0.0 && value == 0.0) || (roundTripped != 0.0 && value != 0.0);
+            double tolerance = 1e-12 * Math.Max(1e-12, Math.Abs(value));
+            if (sameZeroSign && Math.Abs(roundTripped - value) <= tolerance)
+            {
+                return formatted;
+            }
+        }
+
+        double abs = Math.Abs(value);
+        if (abs == 0.0 || (abs >= 1e-8 && abs < 1e9))
+        {
+            return value.ToString("0.############", CultureInfo.CurrentCulture);
+        }
+
+        return value.ToString("G9", CultureInfo.CurrentCulture);
+    }
+
+    private string FormatBoundValue(double bound)
+    {
+        if (!double.IsFinite(bound))
+        {
+            return bound.ToString(CultureInfo.CurrentCulture);
+        }
+
+        if (bound == 0.0)
+        {
+            return "0";
+        }
+
+        if (Math.Truncate(bound) == bound && Math.Abs(bound) < 1e9)
+        {
+            return ((long)bound).ToString(CultureInfo.CurrentCulture);
+        }
+
+        return FormatNumericValue(bound);
     }
 
     private void OnSliderPropertyChanged(object? sender, AvaloniaPropertyChangedEventArgs e)
@@ -505,6 +713,7 @@ public partial class NumericSlider : UserControl
             return;
         }
 
+        ClearValidationError();
         (double min, double max) = GetEffectiveBounds();
         double next = ClampAndSnapForSlider(PART_Slider.Value, min, max);
         if (Math.Abs(next - Value) > 1e-12)
@@ -606,16 +815,26 @@ public partial class NumericSlider : UserControl
         PART_ValueTextBox.SelectAll();
     }
 
+    private void OnValueTextBoxPropertyChanged(object? sender, AvaloniaPropertyChangedEventArgs e)
+    {
+        if (e.Property != TextBox.TextProperty || _isUpdatingControls || _isUpdatingTextBox)
+        {
+            return;
+        }
+
+        ClearValidationError();
+    }
+
     private void OnValueTextBoxLostFocus(object? sender, RoutedEventArgs e)
     {
-        CommitTextBoxValue();
+        CommitTextBoxValue(keepInvalidText: false);
     }
 
     private void OnValueTextBoxKeyDown(object? sender, KeyEventArgs e)
     {
         if (e.Key == Key.Enter)
         {
-            CommitTextBoxValue();
+            CommitTextBoxValue(keepInvalidText: true);
             PART_ValueTextBox.SelectAll();
             e.Handled = true;
             return;
@@ -623,7 +842,8 @@ public partial class NumericSlider : UserControl
 
         if (e.Key == Key.Escape)
         {
-            PART_ValueTextBox.Text = FormatNumericValue(Value);
+            ClearValidationError();
+            SetTextBoxTextProgrammatically(FormatNumericValue(Value));
             PART_ValueTextBox.SelectAll();
             e.Handled = true;
             return;
@@ -631,48 +851,131 @@ public partial class NumericSlider : UserControl
 
         if (!IsReadOnly && (e.Key == Key.Up || e.Key == Key.Down))
         {
-            (double min, double max) = GetEffectiveBounds();
-            double step = GetEffectiveStep(min, max);
+            (double sliderMin, double sliderMax) = GetEffectiveBounds();
+            double step = GetEffectiveStep(sliderMin, sliderMax);
             if (e.KeyModifiers.HasFlag(KeyModifiers.Shift))
             {
                 step *= 10.0;
             }
 
             double delta = e.Key == Key.Up ? step : -step;
-            double next = ClampAndSnapForSlider(Value + delta, min, max);
-            SetCurrentValue(ValueProperty, next);
-            PART_ValueTextBox.Text = FormatNumericValue(Value);
+            double baseValue = TryValidateUserText(PART_ValueTextBox.Text, out double editedValue, out _)
+                ? editedValue
+                : Value;
+            double next = ClampForKeyboardNudge(baseValue, delta);
+
+            ClearValidationError();
+            if (next != Value)
+            {
+                SetCurrentValue(ValueProperty, next);
+            }
+
+            SetTextBoxTextProgrammatically(FormatNumericValue(Value));
             PART_ValueTextBox.SelectAll();
             e.Handled = true;
         }
     }
 
-    private void CommitTextBoxValue()
+    private double ClampForKeyboardNudge(double current, double delta)
     {
-        if (IsReadOnly)
+        double safeCurrent = double.IsFinite(current) ? current : 0.0;
+        double candidate = safeCurrent + delta;
+        if (!double.IsFinite(candidate))
         {
-            PART_ValueTextBox.Text = FormatNumericValue(Value);
-            return;
+            return safeCurrent;
         }
 
-        if (TryParseUserText(PART_ValueTextBox.Text, out double parsed))
+        if (IsInteger)
         {
-            (double min, double max) = GetEffectiveBounds();
-            double clamped = ClampAndSnapForSlider(parsed, min, max);
-            if (Math.Abs(clamped - Value) > 1e-12)
+            candidate = Math.Round(candidate, MidpointRounding.AwayFromZero);
+            candidate = Math.Clamp(candidate, int.MinValue, int.MaxValue);
+        }
+
+        (double validMin, bool minExclusive, double validMax, bool maxExclusive) = GetValidDomain();
+        if (!double.IsNegativeInfinity(validMin))
+        {
+            if (minExclusive)
             {
-                SetCurrentValue(ValueProperty, clamped);
+                if (candidate <= validMin)
+                {
+                    return safeCurrent;
+                }
+            }
+            else if (candidate < validMin)
+            {
+                candidate = validMin;
             }
         }
 
-        PART_ValueTextBox.Text = FormatNumericValue(Value);
+        if (!double.IsPositiveInfinity(validMax))
+        {
+            if (maxExclusive)
+            {
+                if (candidate >= validMax)
+                {
+                    return safeCurrent;
+                }
+            }
+            else if (candidate > validMax)
+            {
+                candidate = validMax;
+            }
+        }
+
+        return candidate == 0.0 ? 0.0 : candidate;
     }
 
-    private bool TryParseUserText(string? rawText, out double value)
+    private void CommitTextBoxValue(bool keepInvalidText)
+    {
+        if (IsReadOnly)
+        {
+            ClearValidationError();
+            SetTextBoxTextProgrammatically(FormatNumericValue(Value));
+            return;
+        }
+
+        string? rawText = PART_ValueTextBox.Text;
+        if (TryValidateUserText(rawText, out double parsed, out string errorMessage))
+        {
+            ClearValidationError();
+            _isCommittingTextBox = true;
+            try
+            {
+                if (parsed != Value)
+                {
+                    SetCurrentValue(ValueProperty, parsed);
+                }
+            }
+            finally
+            {
+                _isCommittingTextBox = false;
+            }
+
+            SetTextBoxTextProgrammatically(FormatNumericValue(Value));
+            return;
+        }
+
+        if (keepInvalidText)
+        {
+            SetValidationError(errorMessage);
+            return;
+        }
+
+        SetTextBoxTextProgrammatically(FormatNumericValue(Value));
+        string rejectedMessage = string.IsNullOrWhiteSpace(rawText)
+            ? errorMessage
+            : $"Rejected \"{rawText.Trim()}\": {errorMessage}";
+        SetValidationError(rejectedMessage);
+    }
+
+    private bool TryValidateUserText(string? rawText, out double value, out string errorMessage)
     {
         value = 0.0;
+        errorMessage = string.Empty;
+
         if (string.IsNullOrWhiteSpace(rawText))
         {
+            errorMessage = IsInteger ? "Enter a whole integer." : "Enter a numeric value.";
             return false;
         }
 
@@ -683,19 +986,93 @@ public partial class NumericSlider : UserControl
             text = text[..^Unit.Trim().Length].Trim();
         }
 
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            errorMessage = IsInteger ? "Enter a whole integer." : "Enter a numeric value.";
+            return false;
+        }
+
         const NumberStyles styles = NumberStyles.Float | NumberStyles.AllowThousands;
-        if (double.TryParse(text, styles, CultureInfo.CurrentCulture, out double local) && double.IsFinite(local))
+        bool parsedOk =
+            (double.TryParse(text, styles, CultureInfo.CurrentCulture, out double parsed) ||
+             double.TryParse(text, styles, CultureInfo.InvariantCulture, out parsed)) &&
+            double.IsFinite(parsed);
+
+        if (!parsedOk)
         {
-            value = local;
-            return true;
+            errorMessage = IsInteger ? "Enter a valid finite whole integer." : "Enter a valid finite number.";
+            return false;
         }
 
-        if (double.TryParse(text, styles, CultureInfo.InvariantCulture, out double invariant) && double.IsFinite(invariant))
+        if (IsInteger && Math.Truncate(parsed) != parsed)
         {
-            value = invariant;
-            return true;
+            errorMessage = "Value must be a whole integer without decimals.";
+            return false;
         }
 
-        return false;
+        (double validMin, bool minExclusive, double validMax, bool maxExclusive) = GetValidDomain();
+
+        if (!double.IsNegativeInfinity(validMin) && (minExclusive ? parsed <= validMin : parsed < validMin))
+        {
+            errorMessage = minExclusive
+                ? $"Must be greater than {FormatBoundValue(validMin)}."
+                : $"Must be at least {FormatBoundValue(validMin)}.";
+            return false;
+        }
+
+        if (!double.IsPositiveInfinity(validMax) && (maxExclusive ? parsed >= validMax : parsed > validMax))
+        {
+            errorMessage = maxExclusive
+                ? $"Must be less than {FormatBoundValue(validMax)}."
+                : $"Must be at most {FormatBoundValue(validMax)}.";
+            return false;
+        }
+
+        if (IsInteger && (parsed < int.MinValue || parsed > int.MaxValue))
+        {
+            errorMessage = !double.IsNegativeInfinity(validMin) && double.IsPositiveInfinity(validMax)
+                ? $"Must be an integer from {FormatBoundValue(Math.Max(int.MinValue, validMin))} to {int.MaxValue}."
+                : $"Must be a 32-bit integer ({int.MinValue} to {int.MaxValue}).";
+            return false;
+        }
+
+        value = IsInteger ? Math.Truncate(parsed) : parsed;
+        if (value == 0.0)
+        {
+            value = 0.0;
+        }
+
+        return true;
+    }
+
+    private void SetTextBoxTextProgrammatically(string text)
+    {
+        _isUpdatingTextBox = true;
+        try
+        {
+            PART_ValueTextBox.Text = text;
+        }
+        finally
+        {
+            _isUpdatingTextBox = false;
+        }
+    }
+
+    private void SetValidationError(string message)
+    {
+        ValidationError = message;
+        if (PART_ValueTextBox is not null)
+        {
+            ValidationFeedbackHelper.ShowError(PART_ValueTextBox, PART_ValidationErrorText, message);
+        }
+    }
+
+    private void ClearValidationError()
+    {
+        ValidationError = null;
+        if (PART_ValueTextBox is not null)
+        {
+            ValidationFeedbackHelper.ClearError(PART_ValueTextBox, PART_ValidationErrorText);
+        }
     }
 }

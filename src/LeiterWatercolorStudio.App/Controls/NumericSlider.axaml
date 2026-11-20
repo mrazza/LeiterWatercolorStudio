@@ -40,8 +40,8 @@
 
             <TextBox x:Name="PART_ValueTextBox"
                      Grid.Column="1"
-                     MinWidth="56"
-                     Width="62"
+                     MinWidth="60"
+                     Width="66"
                      Height="24"
                      MinHeight="24"
                      Padding="6,2"
@@ -82,5 +82,9 @@
                 LargeChange="0.1"
                 MinHeight="20"
                 Margin="0,-3,0,0" />
+
+        <TextBlock x:Name="PART_ValidationErrorText"
+                   Classes="validation-error"
+                   IsVisible="False" />
     </StackPanel>
 </UserControl>

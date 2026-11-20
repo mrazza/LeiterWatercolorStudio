@@ -87,6 +87,7 @@
                                                 Unit="px"
                                                 Minimum="0"
                                                 Maximum="20"
+                                                ValidMinimum="0"
                                                 Step="0.1"
                                                 FormatString="F2"
                                                 Value="{Binding Amplitude, Mode=TwoWay}"
@@ -97,6 +98,8 @@
                                                 InfoText="Keeps your main subject drawn with steadier brushwork than the background. Lower values steady the subject outline cleanly while the background remains loose; 1.0 wobbles subject and background edges equally in Hand Tremor and final output."
                                                 Minimum="0"
                                                 Maximum="1"
+                                                ValidMinimum="0"
+                                                ValidMaximum="1"
                                                 Step="0.01"
                                                 FormatString="F2"
                                                 Value="{Binding SalientAmplitudeScale, Mode=TwoWay}"
@@ -107,6 +110,8 @@
                                                 InfoText="Sets how much darker paint layers appear where adjacent watercolor washes accidentally brush over each other at contrasting edges. At 0, overlapped areas look softly blended; higher values deepen crisp two-coat shadow seams in Hand Tremor and the final painting."
                                                 Minimum="0"
                                                 Maximum="1"
+                                                ValidMinimum="0"
+                                                ValidMaximum="1"
                                                 Step="0.01"
                                                 FormatString="F2"
                                                 Value="{Binding OverlapDarkening, Mode=TwoWay}"
@@ -117,6 +122,8 @@
                                                 InfoText="Shifts adjacent strokes apart or closer together along contrasting edges. Positive values pull washes back to open wider strips of bare Paper Color between colors; negative values push washes over one another to hide paper gaps and favor dark overlaps."
                                                 Minimum="-1"
                                                 Maximum="1"
+                                                ValidMinimum="-1"
+                                                ValidMaximum="1"
                                                 Step="0.01"
                                                 FormatString="F2"
                                                 Value="{Binding PaperGapBias, Mode=TwoWay}"
@@ -127,6 +134,8 @@
                                                 InfoText="Controls how brightly raw Paper Color shows through unpainted gaps between contrasting strokes. At 0, gaps fade completely away leaving only overlaps and edges; raising toward 1 reveals crisp unpainted paper slits in Hand Tremor and the final image."
                                                 Minimum="0"
                                                 Maximum="1"
+                                                ValidMinimum="0"
+                                                ValidMaximum="1"
                                                 Step="0.01"
                                                 FormatString="F2"
                                                 Value="{Binding PaperGapOpacity, Mode=TwoWay}"
@@ -137,8 +146,11 @@
                 <!-- Paper Color Editor -->
                 <Border Classes="inspector-card">
                     <StackPanel Spacing="6">
-                        <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
-                            <StackPanel Grid.Column="0"
+                        <Grid RowDefinitions="Auto,Auto"
+                              ColumnDefinitions="*,Auto,Auto"
+                              ColumnSpacing="8">
+                            <StackPanel Grid.Row="0"
+                                        Grid.Column="0"
                                         Orientation="Horizontal"
                                         Spacing="4"
                                         VerticalAlignment="Center">
@@ -151,7 +163,8 @@
                                                           Text="Sets the color of the bare watercolor sheet peeking through unpainted gaps between contrasting brushstrokes. Warm off-white creams (#FAF8F2) look like natural cotton rag paper, while bright white, cool slate, or tinted paper changes gap contrast in Hand Tremor and Finishing." />
                             </StackPanel>
 
-                            <Border Grid.Column="1"
+                            <Border Grid.Row="0"
+                                    Grid.Column="1"
                                     Width="26"
                                     Height="24"
                                     CornerRadius="4"
@@ -162,6 +175,7 @@
                                     ToolTip.Tip="Live paper background color preview" />
 
                             <TextBox x:Name="PART_PaperColorHexTextBox"
+                                     Grid.Row="0"
                                      Grid.Column="2"
                                      Width="84"
                                      Height="24"
@@ -170,9 +184,13 @@
                                      FontFamily="Consolas, Menlo, Monaco, monospace"
                                      FontSize="11.5"
                                      VerticalContentAlignment="Center"
-                                     Text="{Binding PaperColorHex, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
-                                     KeyDown="OnPaperColorHexKeyDown"
                                      ToolTip.Tip="Hexadecimal #RRGGBB paper color (press Enter to apply)" />
+
+                            <TextBlock x:Name="PART_PaperColorHexErrorText"
+                                       Grid.Row="1"
+                                       Grid.ColumnSpan="3"
+                                       Classes="validation-error"
+                                       IsVisible="False" />
                         </Grid>
 
                         <controls:NumericSlider Label="Red (R)"
@@ -180,6 +198,8 @@
                                                 InfoText="Adjusts the red warmth of unpainted paper gaps shown by Hand Tremor. Raising Red warms bare paper toward cream or ivory; lowering it cools paper gaps toward cyan-blue."
                                                 Minimum="0"
                                                 Maximum="255"
+                                                ValidMinimum="0"
+                                                ValidMaximum="255"
                                                 Step="1"
                                                 IsInteger="True"
                                                 FormatString="F0"
@@ -191,6 +211,8 @@
                                                 InfoText="Adjusts the green balance of unpainted paper gaps shown by Hand Tremor. Raising Green alongside Red shifts bare paper toward soft cream and sunlight; lowering it tints gaps toward rose or magenta."
                                                 Minimum="0"
                                                 Maximum="255"
+                                                ValidMinimum="0"
+                                                ValidMaximum="255"
                                                 Step="1"
                                                 IsInteger="True"
                                                 FormatString="F0"
@@ -202,6 +224,8 @@
                                                 InfoText="Adjusts the coolness versus yellow warmth of unpainted paper gaps shown by Hand Tremor. Higher values match crisp cool-white bright paper; lower values give vintage warm-ivory or buff watercolor paper."
                                                 Minimum="0"
                                                 Maximum="255"
+                                                ValidMinimum="0"
+                                                ValidMaximum="255"
                                                 Step="1"
                                                 IsInteger="True"
                                                 FormatString="F0"
@@ -223,6 +247,8 @@
                                                     Unit="°"
                                                     Minimum="0"
                                                     Maximum="180"
+                                                    ValidMinimum="0"
+                                                    ValidMaximum="180"
                                                     Step="1"
                                                     FormatString="F1"
                                                     Value="{Binding SimilarHueThresholdDegrees, Mode=TwoWay}"
@@ -233,6 +259,8 @@
                                                     InfoText="Protects neutral grays, blacks, and whites from sprouting distracting paper gaps. At 0, even black-and-white shadows can show paper gaps and overlaps; higher values confine gaps to richly saturated contrasting colors."
                                                     Minimum="0"
                                                     Maximum="1"
+                                                    ValidMinimum="0"
+                                                    ValidMaximum="1"
                                                     Step="0.01"
                                                     FormatString="F2"
                                                     Value="{Binding MinContrastingChroma, Mode=TwoWay}"

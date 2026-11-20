@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Globalization;
 using System.Windows.Input;
 using Avalonia;
 using Avalonia.Controls;
@@ -108,7 +109,17 @@ public partial class PerlinNoiseEditor : UserControl
     public static readonly RoutedEvent<RoutedEventArgs> DragCompletedEvent =
         RoutedEvent.Register<PerlinNoiseEditor, RoutedEventArgs>(nameof(DragCompleted), RoutingStrategies.Bubble);
 
+    /// <summary>
+    /// Identifies the <see cref="SeedValidationError"/> direct property.
+    /// </summary>
+    public static readonly DirectProperty<PerlinNoiseEditor, string?> SeedValidationErrorProperty =
+        AvaloniaProperty.RegisterDirect<PerlinNoiseEditor, string?>(
+            nameof(SeedValidationError),
+            o => o.SeedValidationError);
+
+    private readonly ValidatedTextBoxHandler _seedInputHandler;
     private PerlinNoiseViewModel? _subscribedViewModel;
+    private string? _seedValidationError;
 
     /// <summary>
     /// Initializes a new instance of <see cref="PerlinNoiseEditor"/>.
@@ -116,6 +127,38 @@ public partial class PerlinNoiseEditor : UserControl
     public PerlinNoiseEditor()
     {
         InitializeComponent();
+
+        _seedInputHandler = new ValidatedTextBoxHandler(
+            PART_SeedTextBox,
+            PART_SeedErrorText,
+            () => DataContext is PerlinNoiseViewModel vm
+                ? vm.Seed.ToString(CultureInfo.CurrentCulture)
+                : string.Empty,
+            rawText =>
+            {
+                if (DataContext is not PerlinNoiseViewModel vm)
+                {
+                    return null;
+                }
+
+                if (!ValidationFeedbackHelper.TryParseInt32(
+                        rawText,
+                        int.MinValue,
+                        int.MaxValue,
+                        out int seed,
+                        out string error))
+                {
+                    return error;
+                }
+
+                if (vm.Seed != seed)
+                {
+                    vm.Seed = seed;
+                }
+
+                return null;
+            },
+            err => SeedValidationError = err);
 
         PART_ExpandButton.Click += OnExpandButtonClick;
         PART_ResetButton.Click += OnResetToBaselineClick;
@@ -245,6 +288,15 @@ public partial class PerlinNoiseEditor : UserControl
         set => SetValue(DragCompletedCommandProperty, value);
     }
 
+    /// <summary>
+    /// Gets the active validation error message for the seed input, or <see langword="null"/> when valid.
+    /// </summary>
+    public string? SeedValidationError
+    {
+        get => _seedValidationError;
+        private set => SetAndRaise(SeedValidationErrorProperty, ref _seedValidationError, value);
+    }
+
     /// <inheritdoc />
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
     {
@@ -304,11 +356,18 @@ public partial class PerlinNoiseEditor : UserControl
             _subscribedViewModel.PropertyChanged += OnViewModelPropertyChanged;
         }
 
+        _seedInputHandler.ResetValidationAndSync();
         SyncHeaderState();
     }
 
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
+        if (string.IsNullOrEmpty(e.PropertyName) ||
+            string.Equals(e.PropertyName, nameof(PerlinNoiseViewModel.Seed), StringComparison.Ordinal))
+        {
+            _seedInputHandler.ResetValidationAndSync();
+        }
+
         SyncHeaderState();
     }
 
@@ -318,6 +377,8 @@ public partial class PerlinNoiseEditor : UserControl
         {
             return;
         }
+
+        _seedInputHandler.SyncFromModel();
 
         string effectiveTitle = string.IsNullOrWhiteSpace(Title) ? "Noise" : Title;
         PART_TitleText.Text = effectiveTitle;
@@ -364,6 +425,7 @@ public partial class PerlinNoiseEditor : UserControl
         if (DataContext is PerlinNoiseViewModel vm)
         {
             vm.RandomizeSeed();
+            _seedInputHandler.ResetValidationAndSync();
         }
     }
 
@@ -372,6 +434,7 @@ public partial class PerlinNoiseEditor : UserControl
         if (DataContext is PerlinNoiseViewModel vm)
         {
             vm.ResetToBaseline();
+            _seedInputHandler.ResetValidationAndSync();
         }
     }
 

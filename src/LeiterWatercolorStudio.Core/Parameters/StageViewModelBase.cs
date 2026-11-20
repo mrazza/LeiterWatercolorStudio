@@ -177,8 +177,11 @@ public abstract class StageViewModelBase : ObservableObject
         double minEpsilon = MinPositiveValue,
         double max = double.MaxValue,
         bool isImmediate = false,
-        [CallerMemberName] string? propertyName = null) =>
-        SetFiniteDouble(ref field, value, minEpsilon, max, isImmediate, propertyName);
+        [CallerMemberName] string? propertyName = null)
+    {
+        double effectiveMin = value > 0.0 ? double.Epsilon : minEpsilon;
+        return SetFiniteDouble(ref field, value, effectiveMin, max, isImmediate, propertyName);
+    }
 
     /// <summary>
     /// Generates a positive pseudo-random seed distinct from <paramref name="currentSeed"/>.

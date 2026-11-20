@@ -68,8 +68,11 @@
             <!-- Collapsible Editor Body -->
             <StackPanel x:Name="PART_BodyPanel" Spacing="4">
                 <!-- Seed Row -->
-                <Grid ColumnDefinitions="Auto,*,Auto" Margin="0,2,0,2">
-                    <StackPanel Grid.Column="0"
+                <Grid RowDefinitions="Auto,Auto"
+                      ColumnDefinitions="Auto,*,Auto"
+                      Margin="0,2,0,2">
+                    <StackPanel Grid.Row="0"
+                                Grid.Column="0"
                                 Orientation="Horizontal"
                                 Spacing="3"
                                 VerticalAlignment="Center"
@@ -81,20 +84,17 @@
                         <controls:SettingInfoIcon x:Name="PART_SeedInfoIcon"
                                                   Header="Seed" />
                     </StackPanel>
-                    <NumericUpDown x:Name="PART_SeedUpDown"
-                                   Grid.Column="1"
-                                   Value="{Binding Seed, Mode=TwoWay, Converter={x:Static converters:IntToDecimalConverter.Instance}}"
-                                   Minimum="-2147483648"
-                                   Maximum="2147483647"
-                                   Increment="1"
-                                   FormatString="F0"
-                                   ShowButtonSpinner="False"
-                                   MinHeight="26"
-                                   Height="26"
-                                   Padding="6,2"
-                                   FontSize="12"
-                                   VerticalContentAlignment="Center" />
+                    <TextBox x:Name="PART_SeedTextBox"
+                             Grid.Row="0"
+                             Grid.Column="1"
+                             MinHeight="26"
+                             Height="26"
+                             Padding="6,2"
+                             FontSize="12"
+                             TextAlignment="Right"
+                             VerticalContentAlignment="Center" />
                     <Button x:Name="PART_RandomizeSeedButton"
+                            Grid.Row="0"
                             Grid.Column="2"
                             Content="🎲 Random"
                             Height="26"
@@ -103,6 +103,11 @@
                             Margin="6,0,0,0"
                             VerticalContentAlignment="Center"
                             ToolTip.Tip="Generate a new random seed" />
+                    <TextBlock x:Name="PART_SeedErrorText"
+                               Grid.Row="1"
+                               Grid.ColumnSpan="3"
+                               Classes="validation-error"
+                               IsVisible="False" />
                 </Grid>
 
                 <controls:NumericSlider x:Name="PART_FrequencySlider"
@@ -110,6 +115,8 @@
                                         Description="Base spatial sampling frequency (cycles per pixel) of the first Perlin noise octave."
                                         Minimum="0.001"
                                         Maximum="0.5"
+                                        ValidMinimum="0"
+                                        IsValidMinimumExclusive="True"
                                         Step="0.001"
                                         FormatString="F3"
                                         Value="{Binding Frequency, Mode=TwoWay}"
@@ -120,6 +127,8 @@
                                         Description="Number of layered fractal Brownian motion (fBm) noise octaves summed together."
                                         Minimum="1"
                                         Maximum="16"
+                                        ValidMinimum="1"
+                                        ValidMaximum="16"
                                         Step="1"
                                         IsInteger="True"
                                         FormatString="F0"
@@ -131,6 +140,8 @@
                                         Description="Frequency multiplier between consecutive fractal noise octaves."
                                         Minimum="1.0"
                                         Maximum="4.0"
+                                        ValidMinimum="0"
+                                        IsValidMinimumExclusive="True"
                                         Step="0.05"
                                         FormatString="F2"
                                         Value="{Binding Lacunarity, Mode=TwoWay}"
@@ -141,6 +152,7 @@
                                         Description="Amplitude decay factor applied to each successive fractal noise octave."
                                         Minimum="0.0"
                                         Maximum="1.0"
+                                        ValidMinimum="0"
                                         Step="0.01"
                                         FormatString="F2"
                                         Value="{Binding Persistence, Mode=TwoWay}"
