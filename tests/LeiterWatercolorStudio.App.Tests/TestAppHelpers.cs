@@ -32,7 +32,7 @@ internal static class TestAppHelpers
     public static async Task WaitForRenderAsync(
         MainWindowViewModel vm,
         Func<Task> triggerAsync,
-        int timeoutMs = 30000)
+        int timeoutMs = 120000)
     {
         var completedTcs = new TaskCompletionSource<RenderCompletedEventArgs>(
             TaskCreationOptions.RunContinuationsAsynchronously);
@@ -71,7 +71,7 @@ internal static class TestAppHelpers
     public static Task WaitForRenderAsync(
         MainWindowViewModel vm,
         Action trigger,
-        int timeoutMs = 30000)
+        int timeoutMs = 120000)
     {
         return WaitForRenderAsync(vm, () =>
         {

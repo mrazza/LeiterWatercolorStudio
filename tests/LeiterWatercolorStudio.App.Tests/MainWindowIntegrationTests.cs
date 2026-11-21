@@ -49,6 +49,7 @@ public class MainWindowIntegrationTests
             dialogs,
             uiDispatcher: action => Dispatcher.UIThread.Post(action),
             debounceInterval: TimeSpan.FromMilliseconds(10));
+        vm.PreviewCap = PreviewResolutionCap.Px512;
 
         var window = new MainWindow
         {
@@ -193,7 +194,7 @@ public class MainWindowIntegrationTests
             {
                 SchemaVersion = savedDoc.SchemaVersion,
                 Name = "ScaledTestPreset",
-                CalibrationReferenceDimension = 400.0, // >5% diff from 1408x768 linear dimension (~1039.8)
+                CalibrationReferenceDimension = 1200.0, // >5% diff (~13.3%) from 1408x768 linear dimension (~1039.8)
                 PaletteMode = PaletteMode.Auto,
                 Options = savedDoc.Options with { ColorTransferStrength = 0.72 },
                 StepTimingsMs = savedDoc.StepTimingsMs,
