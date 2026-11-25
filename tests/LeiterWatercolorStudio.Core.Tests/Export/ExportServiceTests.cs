@@ -228,6 +228,60 @@ public class ExportServiceTests
         }
     }
 
+    [Theory]
+    [InlineData("output.png", true)]
+    [InlineData("output.jpg", true)]
+    [InlineData("output.jpeg", true)]
+    [InlineData("output.webp", true)]
+    [InlineData("output.bmp", true)]
+    [InlineData("output.xyz", false)]
+    [InlineData("no_extension", false)]
+    [InlineData("folder/", false)]
+    [InlineData("", false)]
+    public void IsSupportedImageExtension_DetectsEncodableExtensions(string path, bool expected)
+    {
+        Assert.Equal(expected, ExportService.IsSupportedImageExtension(path));
+    }
+
+    [Fact]
+    public async Task ExportStagesAsync_SubsetWithoutSidecar_WritesOnlyRequestedEntries()
+    {
+        SequentialMatrix<Rgb8> source = CreateSyntheticScene(32, 32);
+        WatercolorOptions options = WatercolorOptions.ForSize(source.Size);
+        WatercolorResult result = WatercolorPipeline.RenderDetailed(source, options: options);
+        string tempDir = CreateTempDirectory();
+
+        try
+        {
+            StageExportEntry[] subset =
+            [
+                ExportService.StageManifest[0],
+                ExportService.StageManifest[16],
+                ExportService.StageManifest[23],
+            ];
+
+            await ExportService.ExportStagesAsync(
+                source,
+                result,
+                options,
+                subset,
+                tempDir,
+                includePresetSidecar: false);
+
+            string[] files = Directory.GetFiles(tempDir)
+                .Select(Path.GetFileName)
+                .OrderBy(static n => n, StringComparer.Ordinal)
+                .ToArray()!;
+
+            Assert.Equal(["00_input.png", "05_hand_tremor.png", "06f_final_watercolor.png"], files);
+            Assert.False(File.Exists(Path.Combine(tempDir, "preset.json")));
+        }
+        finally
+        {
+            CleanupDirectory(tempDir);
+        }
+    }
+
     private static SequentialMatrix<Rgb8> CreateSyntheticScene(int width, int height)
     {
         var matrix = new SequentialMatrix<Rgb8>(width, height);

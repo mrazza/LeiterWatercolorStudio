@@ -15,37 +15,50 @@ public static class PreviewScaling
     /// </summary>
     public static Size ComputePreviewSize(Size nativeSize, PreviewResolutionCap cap)
     {
-        if (nativeSize.Width < 0 || nativeSize.Height < 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(nativeSize), nativeSize, "Image dimensions cannot be negative.");
-        }
-
         if (!Enum.IsDefined(cap))
         {
             throw new ArgumentOutOfRangeException(nameof(cap), cap, "Invalid preview resolution cap.");
         }
 
-        if (nativeSize.Width == 0 || nativeSize.Height == 0 || cap == PreviewResolutionCap.Native)
+        return ComputePreviewSize(nativeSize, (int)cap);
+    }
+
+    /// <summary>
+    /// Computes the scaled dimensions for <paramref name="nativeSize"/> capped at <paramref name="maxDimension"/>
+    /// (<c>0</c> means native/uncapped), preserving aspect ratio, never upscaling, and ensuring at least 1px per axis for non-empty images.
+    /// </summary>
+    public static Size ComputePreviewSize(Size nativeSize, int maxDimension)
+    {
+        if (nativeSize.Width < 0 || nativeSize.Height < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(nativeSize), nativeSize, "Image dimensions cannot be negative.");
+        }
+
+        if (maxDimension < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(maxDimension), maxDimension, "Maximum dimension cannot be negative.");
+        }
+
+        if (nativeSize.Width == 0 || nativeSize.Height == 0 || maxDimension == 0)
         {
             return nativeSize;
         }
 
-        int maxCap = (int)cap;
         int maxDim = Math.Max(nativeSize.Width, nativeSize.Height);
-        if (maxDim <= maxCap)
+        if (maxDim <= maxDimension)
         {
             return nativeSize;
         }
 
-        double scale = (double)maxCap / maxDim;
+        double scale = (double)maxDimension / maxDim;
         if (nativeSize.Width >= nativeSize.Height)
         {
             int height = Math.Max(1, (int)Math.Round(nativeSize.Height * scale, MidpointRounding.AwayFromZero));
-            return new Size(maxCap, height);
+            return new Size(maxDimension, height);
         }
 
         int width = Math.Max(1, (int)Math.Round(nativeSize.Width * scale, MidpointRounding.AwayFromZero));
-        return new Size(width, maxCap);
+        return new Size(width, maxDimension);
     }
 
     /// <summary>

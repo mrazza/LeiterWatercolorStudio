@@ -317,4 +317,27 @@ public class PresetSerializerTests
         Assert.Equal(WatercolorOptions.Default, document.Options);
         Assert.Equal(HandTremorOptions.DefaultPaperColor, document.Options.HandTremor.PaperColor);
     }
+
+    [Theory]
+    [InlineData(1000.0, 1000, 1000, false)]
+    [InlineData(1000.0, 1049, 1049, false)] // 4.9% <= 5%
+    [InlineData(1000.0, 1051, 1051, true)]  // 5.1% > 5%
+    [InlineData(1000.0, 949, 949, true)]    // 5.1% > 5%
+    [InlineData(0.0, 2000, 2000, false)]    // uncalibrated
+    [InlineData(1000.0, 0, 1000, false)]    // empty target size
+    public void ShouldAutoScaleForImageSize_AppliesFivePercentThreshold(
+        double referenceDim,
+        int width,
+        int height,
+        bool expected)
+    {
+        var preset = new PresetDocument
+        {
+            CalibrationReferenceDimension = referenceDim,
+            Options = WatercolorOptions.Default,
+        };
+
+        bool actual = PresetSerializer.ShouldAutoScaleForImageSize(preset, new Size(width, height));
+        Assert.Equal(expected, actual);
+    }
 }
