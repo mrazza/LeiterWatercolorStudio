@@ -106,6 +106,25 @@ public class ProgramCliIntegrationTests
     private static string ResolveDotnetExecutable()
     {
         string exeName = OperatingSystem.IsWindows() ? "dotnet.exe" : "dotnet";
+
+        string? processPath = Environment.ProcessPath;
+        if (!string.IsNullOrEmpty(processPath) &&
+            string.Equals(Path.GetFileNameWithoutExtension(processPath), "dotnet", StringComparison.OrdinalIgnoreCase) &&
+            File.Exists(processPath))
+        {
+            return processPath;
+        }
+
+        string? dotnetRoot = Environment.GetEnvironmentVariable("DOTNET_ROOT");
+        if (!string.IsNullOrEmpty(dotnetRoot))
+        {
+            string rootCandidate = Path.Combine(dotnetRoot, exeName);
+            if (File.Exists(rootCandidate))
+            {
+                return rootCandidate;
+            }
+        }
+
         string? coreLibDir = Path.GetDirectoryName(typeof(object).Assembly.Location);
         if (!string.IsNullOrEmpty(coreLibDir))
         {

@@ -5,7 +5,7 @@ namespace LeiterWatercolorStudio.App.Cli;
 /// <summary>
 /// Attaches Windows GUI-subsystem (<c>WinExe</c>) invocations to their parent console when running headlessly.
 /// </summary>
-internal static class WindowsConsoleHelper
+internal static partial class WindowsConsoleHelper
 {
     private const int AttachParentProcess = -1;
 
@@ -29,6 +29,7 @@ internal static class WindowsConsoleHelper
         }
     }
 
-    [DllImport("kernel32.dll", SetLastError = true)]
-    private static extern bool AttachConsole(int dwProcessId);
+    [LibraryImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static partial bool AttachConsole(int dwProcessId);
 }

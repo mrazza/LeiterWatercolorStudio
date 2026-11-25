@@ -1,5 +1,6 @@
 using System;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Threading;
 using Avalonia;
 using LeiterWatercolorStudio.App.Cli;
@@ -20,9 +21,10 @@ public static class Program
         WindowsConsoleHelper.TryAttachParentConsole();
 
         using var cts = new CancellationTokenSource();
-        ConsoleCancelEventHandler cancelHandler = (_, e) =>
+        int sigtermReceived = 0;
+
+        void CancelSafely()
         {
-            e.Cancel = true;
             try
             {
                 cts.Cancel();
@@ -30,19 +32,42 @@ public static class Program
             catch (ObjectDisposedException)
             {
             }
+        }
+
+        ConsoleCancelEventHandler cancelHandler = (_, e) =>
+        {
+            e.Cancel = true;
+            CancelSafely();
         };
 
         Console.CancelKeyPress += cancelHandler;
+        PosixSignalRegistration? sigtermRegistration = !OperatingSystem.IsWindows()
+            ? PosixSignalRegistration.Create(PosixSignal.SIGTERM, context =>
+            {
+                context.Cancel = true;
+                Volatile.Write(ref sigtermReceived, 1);
+                CancelSafely();
+            })
+            : null;
+
         try
         {
-            return CliApplication
+            int exitCode = CliApplication
                 .RunAsync(args, Console.Out, Console.Error, ResolveVersion(), cts.Token)
                 .GetAwaiter()
                 .GetResult();
+
+            if (exitCode == CliExitCodes.Cancelled && Volatile.Read(ref sigtermReceived) != 0)
+            {
+                return CliExitCodes.Terminated;
+            }
+
+            return exitCode;
         }
         finally
         {
             Console.CancelKeyPress -= cancelHandler;
+            sigtermRegistration?.Dispose();
         }
     }
 

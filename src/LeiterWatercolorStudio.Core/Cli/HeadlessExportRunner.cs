@@ -248,6 +248,13 @@ public static class HeadlessExportRunner
             }
         }
 
+        if (IsDisallowedMultiStageOutputPath(options.OutputPath))
+        {
+            throw new ArgumentException(
+                "--output cannot specify an image file extension when exporting multiple stages; provide a directory path instead.",
+                nameof(options));
+        }
+
         string targetDir = string.IsNullOrWhiteSpace(options.OutputPath)
             ? Path.Combine(inputDir, $"{inputStem}_stages")
             : Path.GetFullPath(options.OutputPath);
@@ -258,6 +265,16 @@ public static class HeadlessExportRunner
         }
 
         return new OutputPlan(SingleFilePath: null, DirectoryPath: targetDir);
+    }
+
+    internal static bool IsDisallowedMultiStageOutputPath(string? outputPath)
+    {
+        if (string.IsNullOrWhiteSpace(outputPath) || EndsWithDirectorySeparator(outputPath))
+        {
+            return false;
+        }
+
+        return !Directory.Exists(outputPath) && ExportService.IsSupportedImageExtension(outputPath);
     }
 
     private static bool EndsWithDirectorySeparator(string path) =>
