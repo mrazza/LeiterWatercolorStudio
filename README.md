@@ -104,7 +104,7 @@ LeiterWatercolorStudio stages [--json]
 | `-r, --resolution <cap>` | Max output dimension: `full` (default), `native`, or a positive pixel integer (e.g. `1024`). |
 | `-q, --quiet` / `--json` | Suppress stdout (`--quiet`), or print a single machine-readable JSON summary (`--json`). |
 
-Exit codes: `0` success, `1` runtime/I/O error, `2` CLI usage error, `130` cancelled (`Ctrl+C`).
+Exit codes: `0` success, `1` runtime/I/O error, `2` CLI usage error, `130` cancelled (`Ctrl+C` / `SIGINT`), `143` terminated (`SIGTERM`).
 
 ---
 

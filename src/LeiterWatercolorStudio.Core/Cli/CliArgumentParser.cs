@@ -434,6 +434,14 @@ public static class CliArgumentParser
             resolvedMode = explicitMode ?? CliExportMode.Final;
         }
 
+        bool isMultiStageExport = resolvedMode == CliExportMode.AllStages ||
+                                  (resolvedMode == CliExportMode.Stages && selectedStages.Count > 1);
+        if (isMultiStageExport && HeadlessExportRunner.IsDisallowedMultiStageOutputPath(outputPath))
+        {
+            return UsageError(
+                "--output cannot specify an image file extension when exporting multiple stages; provide a directory path instead.");
+        }
+
         CliPresetScalingMode presetScaling = scalePresetFlag
             ? CliPresetScalingMode.Scale
             : noScalePresetFlag

@@ -273,6 +273,24 @@ public class HeadlessExportRunnerTests
                     InputPath = inputPath,
                     OutputPath = Path.Combine(tempDir, "bad.xyz"),
                 }));
+
+            await Assert.ThrowsAsync<ArgumentException>(() =>
+                HeadlessExportRunner.ExecuteAsync(new CliExportOptions
+                {
+                    InputPath = inputPath,
+                    Mode = CliExportMode.AllStages,
+                    OutputPath = Path.Combine(tempDir, "bundle.png"),
+                }));
+
+            Assert.True(StageSelectorResolver.TryResolve(["saliency"], out var saliencyGroup, out _));
+            await Assert.ThrowsAsync<ArgumentException>(() =>
+                HeadlessExportRunner.ExecuteAsync(new CliExportOptions
+                {
+                    InputPath = inputPath,
+                    Mode = CliExportMode.Stages,
+                    SelectedStages = saliencyGroup,
+                    OutputPath = Path.Combine(tempDir, "bundle.jpg"),
+                }));
         }
         finally
         {

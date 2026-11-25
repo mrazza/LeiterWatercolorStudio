@@ -126,6 +126,19 @@ public class CliArgumentParserTests
         Assert.Equal("-weird-name.png", result.ExportOptions!.InputPath);
     }
 
+    [Fact]
+    public void Parse_MultiStageTrailingSeparatorAndSingleStageImageOutput_AreAccepted()
+    {
+        CliParseResult trailingSep = CliArgumentParser.Parse(["export", "a.png", "-m", "all-stages", "-o", "bundle.png/"]);
+        Assert.False(trailingSep.IsError);
+        Assert.Equal(CliExportMode.AllStages, trailingSep.ExportOptions!.Mode);
+
+        CliParseResult singleStage = CliArgumentParser.Parse(["export", "a.png", "-s", "hand-tremor", "-o", "tremor.png"]);
+        Assert.False(singleStage.IsError);
+        Assert.Equal(CliExportMode.Stages, singleStage.ExportOptions!.Mode);
+        Assert.Single(singleStage.ExportOptions.SelectedStages);
+    }
+
     public static TheoryData<string[]> InvalidArgCases => new()
     {
         new[] { "unknown-cmd" },
@@ -140,6 +153,8 @@ public class CliArgumentParserTests
         new[] { "export", "a.png", "-m", "final", "-s", "hand-tremor" },
         new[] { "export", "a.png", "-m", "all-stages", "-s", "hand-tremor" },
         new[] { "export", "a.png", "-m", "stages" },
+        new[] { "export", "a.png", "-m", "all-stages", "-o", "bundle.png" },
+        new[] { "export", "a.png", "-s", "saliency", "-o", "bundle.webp" },
         new[] { "export", "a.png", "-s", "not-a-stage" },
         new[] { "export", "a.png", "-r", "0" },
         new[] { "export", "a.png", "-r", "-5" },
