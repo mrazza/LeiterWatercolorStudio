@@ -141,4 +141,29 @@ public class PipelineRegistryAndScalingTests
         Assert.Equal(expected, scaled);
         scaled.Validate();
     }
+
+    [Theory]
+    [InlineData(400, 300, 1024, 400, 300)]
+    [InlineData(2048, 1024, 1024, 1024, 512)]
+    [InlineData(1000, 2000, 640, 320, 640)]
+    [InlineData(4000, 3000, 0, 4000, 3000)]
+    [InlineData(10000, 2, 512, 512, 1)]
+    [InlineData(0, 0, 768, 0, 0)]
+    public void ComputePreviewSize_CustomMaxDimension_RespectsCapAndAspectRatio(
+        int width,
+        int height,
+        int maxDimension,
+        int expectedWidth,
+        int expectedHeight)
+    {
+        Size actual = PreviewScaling.ComputePreviewSize(new Size(width, height), maxDimension);
+        Assert.Equal(new Size(expectedWidth, expectedHeight), actual);
+    }
+
+    [Fact]
+    public void ComputePreviewSize_NegativeMaxDimension_Throws()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            PreviewScaling.ComputePreviewSize(new Size(100, 100), -1));
+    }
 }

@@ -12,6 +12,9 @@ using Leiter.Platform.ImageSharp;
 using LeiterWatercolorStudio.Core.Models;
 using LeiterWatercolorStudio.Core.Pipeline;
 using LeiterWatercolorStudio.Core.Presets;
+using SixLabors.ImageSharp.Formats;
+using ImageSharpConfiguration = SixLabors.ImageSharp.Configuration;
+using ImageSharpUnknownFormatException = SixLabors.ImageSharp.UnknownImageFormatException;
 
 /// <summary>
 /// Exports final watercolor paintings and full multi-stage diagnostic PNG bundles with optional preset sidecars.
@@ -48,6 +51,41 @@ public static class ExportService
         new("06e_paper_granulation.png", StageViewId.FinishingPaperGranulation, VisualizationMode.Rgb),
         new("06f_final_watercolor.png", StageViewId.FinishingFinalFxaa, VisualizationMode.Rgb),
     ];
+
+    /// <summary>
+    /// Determines whether <paramref name="path"/> has a file extension supported by ImageSharp for encoding images.
+    /// </summary>
+    /// <param name="path">The candidate output file path.</param>
+    /// <returns><see langword="true"/> if an ImageSharp encoder exists for the path extension; otherwise <see langword="false"/>.</returns>
+    public static bool IsSupportedImageExtension(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return false;
+        }
+
+        string extension = Path.GetExtension(path);
+        if (string.IsNullOrEmpty(extension))
+        {
+            return false;
+        }
+
+        ImageFormatManager formatManager = ImageSharpConfiguration.Default.ImageFormatsManager;
+        if (!formatManager.TryFindFormatByFileExtension(extension, out IImageFormat? format))
+        {
+            return false;
+        }
+
+        try
+        {
+            _ = formatManager.GetEncoder(format);
+            return true;
+        }
+        catch (ImageSharpUnknownFormatException)
+        {
+            return false;
+        }
+    }
 
     /// <summary>
     /// Encodes and saves <paramref name="image"/> asynchronously to <paramref name="outputPath"/> (PNG, JPEG, WebP, or any ImageSharp-supported format).
@@ -92,7 +130,7 @@ public static class ExportService
     /// <param name="paletteMode">The palette mode recorded in <c>preset.json</c>.</param>
     /// <param name="progress">Optional progress callback receiving <c>(Completed, Total, FileName)</c> after each exported file.</param>
     /// <param name="ct">Optional cancellation token.</param>
-    public static async Task ExportAllStagesAsync(
+    public static Task ExportAllStagesAsync(
         IReadOnlyMatrix<Rgb8> source,
         WatercolorResult result,
         WatercolorOptions options,
@@ -103,10 +141,60 @@ public static class ExportService
         PaletteMode paletteMode = PaletteMode.Auto,
         IProgress<(int Completed, int Total, string FileName)>? progress = null,
         CancellationToken ct = default)
+        => ExportStagesAsync(
+            source,
+            result,
+            options,
+            StageManifest,
+            outputDir,
+            customVisualizer,
+            includePresetSidecar,
+            calibrationReferenceDimension,
+            paletteMode,
+            progress,
+            ct);
+
+    /// <summary>
+    /// Exports the specified <paramref name="entries"/> of stage PNGs (plus an optional <c>preset.json</c> sidecar) into <paramref name="outputDir"/>.
+    /// </summary>
+    /// <param name="source">The source RGB image passed into the pipeline.</param>
+    /// <param name="result">The completed pipeline result containing all stage intermediates.</param>
+    /// <param name="options">The canonical pipeline options used for the render.</param>
+    /// <param name="entries">The ordered stage export entries to render and write.</param>
+    /// <param name="outputDir">The directory into which stage PNGs and optional sidecar are written.</param>
+    /// <param name="customVisualizer">Optional custom renderer mapping each <see cref="StageViewId"/> and <see cref="VisualizationMode"/> to an RGB matrix.</param>
+    /// <param name="includePresetSidecar">Whether to also write <c>preset.json</c> alongside the exported PNGs.</param>
+    /// <param name="calibrationReferenceDimension">Optional calibration reference dimension recorded in <c>preset.json</c>; defaults to <see cref="Size.LinearDimension"/> of <paramref name="source"/>.</param>
+    /// <param name="paletteMode">The palette mode recorded in <c>preset.json</c>.</param>
+    /// <param name="progress">Optional progress callback receiving <c>(Completed, Total, FileName)</c> after each exported file.</param>
+    /// <param name="ct">Optional cancellation token.</param>
+    public static async Task ExportStagesAsync(
+        IReadOnlyMatrix<Rgb8> source,
+        WatercolorResult result,
+        WatercolorOptions options,
+        IReadOnlyList<StageExportEntry> entries,
+        string outputDir,
+        Func<StageViewId, VisualizationMode, Matrix<Rgb8>>? customVisualizer = null,
+        bool includePresetSidecar = false,
+        double? calibrationReferenceDimension = null,
+        PaletteMode paletteMode = PaletteMode.Auto,
+        IProgress<(int Completed, int Total, string FileName)>? progress = null,
+        CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(source);
         ArgumentNullException.ThrowIfNull(result);
         ArgumentNullException.ThrowIfNull(options);
+        ArgumentNullException.ThrowIfNull(entries);
+        if (entries.Count == 0)
+        {
+            throw new ArgumentException("At least one stage export entry must be provided.", nameof(entries));
+        }
+
+        for (int i = 0; i < entries.Count; i++)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(entries[i].FileName, nameof(entries));
+        }
+
         ArgumentException.ThrowIfNullOrWhiteSpace(outputDir);
         ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(source.Width, 0, nameof(source));
         ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(source.Height, 0, nameof(source));
@@ -139,12 +227,12 @@ public static class ExportService
         ct.ThrowIfCancellationRequested();
         Directory.CreateDirectory(outputDir);
 
-        int totalFiles = includePresetSidecar ? StageManifest.Count + 1 : StageManifest.Count;
+        int totalFiles = includePresetSidecar ? entries.Count + 1 : entries.Count;
         int completed = 0;
 
         await Task.Run(() =>
         {
-            foreach (StageExportEntry entry in StageManifest)
+            foreach (StageExportEntry entry in entries)
             {
                 ct.ThrowIfCancellationRequested();
 

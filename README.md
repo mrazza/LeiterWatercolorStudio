@@ -17,7 +17,7 @@ An interactive cross-platform desktop watercolor studio for [Leiter](https://git
 - **A/B Visual Comparison & Diagnostics:** Compare any active view against the **Input** photo, **Previous Stage**, or any **Pinned Stage** using **Split Wipe** or **Side by Side** mode, alongside rich diagnostic visualizations (segmentation region averages/randoms/boundaries, Turbo/Viridis saliency heatmaps, wet masks, pigment density maps, paper relief, and FXAA edge magnifier).
 - **Full Parameter Control with Layman & Technical Guidance:** Edit Basic and Advanced parameters for all 7 configurable stages—including an interactive `ToneCurveEditor`, `PerlinNoiseEditor` cards, and `Auto` / `Built-In` / `Custom` CIELAB & reference-image palette extraction. Every setting title retains its technical tooltip while its adjacent `(i)` icon provides a layman explanation of intermediate and final visual impact.
 - **Baseline Calibration, Drag-Coalesced Undo/Redo & Themes:** Switch baseline modes (`For Image`, `For Size`, `Default`), undo/redo smoothly across slider drags (`200`-step history), pause/resume Auto-Run, and switch between Dark and Light studio themes.
-- **Presets & Full-Resolution Exports:** Save and load portable JSON presets (`preset.json`) with optional resolution-adaptive scaling, render full resolution on demand, export single final images (PNG, JPEG, WebP), or export all **24 diagnostic stage PNGs** plus a `preset.json` sidecar in one bundle.
+- **Presets, Headless CLI & Full-Resolution Exports:** Save and load portable JSON presets (`preset.json`) with optional resolution-adaptive scaling, render full resolution on demand, export single final images (PNG, JPEG, WebP), export all **24 diagnostic stage PNGs** plus a `preset.json` sidecar in one bundle, or automate final, downscaled, and partial stage exports headlessly from the command line.
 
 ---
 
@@ -66,6 +66,48 @@ dotnet build src/LeiterWatercolorStudio.App/LeiterWatercolorStudio.App.csproj -c
 
 ---
 
+## Headless CLI
+
+When invoked with CLI arguments, `LeiterWatercolorStudio` executes headlessly (no display server required) and terminates on completion:
+
+```bash
+# Export full-resolution watercolor image using automatic image-tuned baseline
+LeiterWatercolorStudio export photo.jpg
+
+# Apply an input preset JSON (auto-scales if image size differs > 5%) and write WebP
+LeiterWatercolorStudio export photo.jpg -p warm.json -o watercolor.webp
+
+# Force exact or resolution-scaled preset parameters, or pick a baseline without a preset
+LeiterWatercolorStudio export photo.jpg -p warm.json --no-scale-preset -o exact.png
+LeiterWatercolorStudio export photo.jpg -b for-size -r 1024 -o preview.png
+
+# Export all 24 diagnostic stage PNGs or a selected subset / group (no sidecar written)
+LeiterWatercolorStudio export photo.jpg -m all-stages -o ./stages_out
+LeiterWatercolorStudio export photo.jpg -s saliency,05_hand_tremor -o ./partial
+LeiterWatercolorStudio export photo.jpg -s hand-tremor -o tremor.png
+
+# List all 24 stage names, short aliases, and stage-group aliases
+LeiterWatercolorStudio stages [--json]
+```
+
+### CLI Options (`export`)
+
+| Option | Description |
+|---|---|
+| `<input>`, `-i, --input <path>` | Required source image path (PNG, JPEG, WebP, BMP, etc.). |
+| `-o, --output <path>` | Output file (`final` or single-stage export) or directory (`all-stages` / multi-stage `stages`). Defaults to `<stem>_watercolor.png` or `<stem>_stages/`. |
+| `-p, --preset <path.json>` | Optional preset JSON input configuring pipeline parameters. |
+| `--scale-preset` / `--no-scale-preset` | Override the default `> 5%` relative-size auto-scaling threshold for `--preset`. |
+| `-b, --baseline <mode>` | Baseline when `--preset` is omitted: `for-image` (default), `for-size`, or `default`. |
+| `-m, --mode <mode>` | Export mode: `final` (default), `all-stages`, or `stages` (inferred when `--stages` is passed). |
+| `-s, --stages <list>` | Comma-separated and/or repeatable stage names, short aliases, or group aliases. |
+| `-r, --resolution <cap>` | Max output dimension: `full` (default), `native`, or a positive pixel integer (e.g. `1024`). |
+| `-q, --quiet` / `--json` | Suppress stdout (`--quiet`), or print a single machine-readable JSON summary (`--json`). |
+
+Exit codes: `0` success, `1` runtime/I/O error, `2` CLI usage error, `130` cancelled (`Ctrl+C`).
+
+---
+
 ## Pipeline Stages & Inspectable Views
 
 | # | Primary Stage | Inspectable Stage Views (`StageViewId`) | Highlight Controls |
@@ -107,7 +149,7 @@ dotnet build src/LeiterWatercolorStudio.App/LeiterWatercolorStudio.App.csproj -c
 
 ## Solution Architecture
 
-- **`src/LeiterWatercolorStudio.Core`**: UI-agnostic domain engine (`PipelineEngine`, `PipelineStageRegistry`, `PreviewScaling`, `PipelineStalenessTracker`, `StageVisualizers`, `PixelInspectorReadout`), observable stage ViewModels (`PipelineParametersViewModel`, `UndoRedoManager`), preset serialization (`PresetSerializer`), palette extraction (`PaletteExtractor`), and batch/final export (`ExportService`).
+- **`src/LeiterWatercolorStudio.Core`**: UI-agnostic domain engine (`PipelineEngine`, `PipelineStageRegistry`, `PreviewScaling`, `PipelineStalenessTracker`, `StageVisualizers`, `PixelInspectorReadout`), observable stage ViewModels (`PipelineParametersViewModel`, `UndoRedoManager`), preset serialization (`PresetSerializer`), palette extraction (`PaletteExtractor`), batch/final export (`ExportService`), and headless CLI orchestration (`Cli`).
 - **`src/LeiterWatercolorStudio.App`**: Avalonia UI desktop application (`MainWindow`, `ZoomPanViewport`, `PipelineFilmstrip`, `StageGridView`, `NumericSlider`, `PerlinNoiseEditor`, `ToneCurveEditor`, `SettingInfoIcon`, stage parameter inspectors, and Dark/Light themes).
 - **`tests/LeiterWatercolorStudio.Core.Tests`**: xUnit suite covering pipeline DAG execution, staleness, visualizers, constraints, undo/redo, palette extraction, presets, exports, and real-image integration.
 - **`tests/LeiterWatercolorStudio.App.Tests`**: Avalonia Headless xUnit suite covering UI integration, filmstrip/grid interactions, viewport zoom/pan, tone curve editing, tooltip/info-icon layout & theme coverage, and large-image caching.

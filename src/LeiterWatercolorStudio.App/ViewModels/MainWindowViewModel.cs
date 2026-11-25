@@ -28,8 +28,6 @@ namespace LeiterWatercolorStudio.App.ViewModels;
 /// </summary>
 public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
 {
-    private const double PresetScalePromptThreshold = 0.05;
-
     private readonly IFileDialogService _fileDialogs;
     private readonly Action<Action> _uiDispatcher;
     private readonly Dictionary<StageViewId, VisualizationMode> _viewModes = new();
@@ -965,23 +963,16 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
 
             WatercolorOptions optionsToLoad = preset.Options;
             if (Engine.HasImage &&
-                double.IsFinite(preset.CalibrationReferenceDimension) &&
-                preset.CalibrationReferenceDimension > 0.0)
+                PresetSerializer.ShouldAutoScaleForImageSize(preset, Engine.NativeSize))
             {
                 double currentDim = Engine.NativeSize.LinearDimension;
-                double relativeDiff = Math.Abs(currentDim - preset.CalibrationReferenceDimension) /
-                                      Math.Max(1.0, preset.CalibrationReferenceDimension);
+                bool scaleToSize = await _fileDialogs.ConfirmAsync(
+                    "Scale Preset Parameters?",
+                    $"This preset was calibrated at reference dimension {preset.CalibrationReferenceDimension:0} px, while the active image is {Engine.NativeSize.Width}×{Engine.NativeSize.Height} ({currentDim:0} px).\n\nScale spatial parameters to match the current image?",
+                    "Scale to Image",
+                    "Keep Exact Values");
 
-                if (relativeDiff > PresetScalePromptThreshold)
-                {
-                    bool scaleToSize = await _fileDialogs.ConfirmAsync(
-                        "Scale Preset Parameters?",
-                        $"This preset was calibrated at reference dimension {preset.CalibrationReferenceDimension:0} px, while the active image is {Engine.NativeSize.Width}×{Engine.NativeSize.Height} ({currentDim:0} px).\n\nScale spatial parameters to match the current image?",
-                        "Scale to Image",
-                        "Keep Exact Values");
-
-                    optionsToLoad = PresetSerializer.AdaptForImageSize(preset, Engine.NativeSize, scaleToSize);
-                }
+                optionsToLoad = PresetSerializer.AdaptForImageSize(preset, Engine.NativeSize, scaleToSize);
             }
 
             Parameters.LoadFromOptions(optionsToLoad, recordUndo: true, paletteModeHint: preset.PaletteMode);

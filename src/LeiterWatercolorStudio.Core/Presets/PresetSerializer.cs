@@ -17,6 +17,11 @@ using LeiterWatercolorStudio.Core.Presets.Converters;
 public static class PresetSerializer
 {
     /// <summary>
+    /// The default relative linear-dimension difference threshold (<c>5%</c>) above which a preset is auto-scaled to match a target image.
+    /// </summary>
+    public const double DefaultScalePromptThreshold = 0.05;
+
+    /// <summary>
     /// Gets the shared <see cref="JsonSerializerOptions"/> configured for preset serialization.
     /// </summary>
     public static JsonSerializerOptions SerializerOptions { get; } = CreateSerializerOptions();
@@ -136,6 +141,50 @@ public static class PresetSerializer
         }
 
         return preset.Options;
+    }
+
+    /// <summary>
+    /// Determines whether a preset's calibration reference dimension differs enough from <paramref name="targetSize"/>
+    /// to warrant resolution-adaptive scaling.
+    /// </summary>
+    /// <param name="preset">The preset document containing calibration metadata.</param>
+    /// <param name="targetSize">The target image dimensions.</param>
+    /// <param name="relativeThreshold">Relative linear-dimension difference threshold (defaults to <see cref="DefaultScalePromptThreshold"/>).</param>
+    /// <returns>
+    /// <see langword="true"/> when <paramref name="targetSize"/> is non-empty,
+    /// <see cref="PresetDocument.CalibrationReferenceDimension"/> is finite and positive, and the relative linear-dimension difference
+    /// exceeds <paramref name="relativeThreshold"/>; otherwise <see langword="false"/>.
+    /// </returns>
+    public static bool ShouldAutoScaleForImageSize(
+        PresetDocument preset,
+        Size targetSize,
+        double relativeThreshold = DefaultScalePromptThreshold)
+    {
+        ArgumentNullException.ThrowIfNull(preset);
+        ArgumentOutOfRangeException.ThrowIfNegative(targetSize.Width, nameof(targetSize));
+        ArgumentOutOfRangeException.ThrowIfNegative(targetSize.Height, nameof(targetSize));
+
+        if (!double.IsFinite(relativeThreshold) || relativeThreshold < 0.0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(relativeThreshold),
+                relativeThreshold,
+                "Relative threshold must be finite and non-negative.");
+        }
+
+        if (targetSize.Width == 0 ||
+            targetSize.Height == 0 ||
+            !double.IsFinite(preset.CalibrationReferenceDimension) ||
+            preset.CalibrationReferenceDimension <= 0.0)
+        {
+            return false;
+        }
+
+        double currentDim = targetSize.LinearDimension;
+        double relativeDiff = Math.Abs(currentDim - preset.CalibrationReferenceDimension) /
+                              Math.Max(1.0, preset.CalibrationReferenceDimension);
+
+        return relativeDiff > relativeThreshold;
     }
 
     private static JsonSerializerOptions CreateSerializerOptions()
