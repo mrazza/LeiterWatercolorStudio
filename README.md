@@ -21,13 +21,34 @@ An interactive cross-platform desktop watercolor studio for [Leiter](https://git
 
 ---
 
-## Getting Started
+## Installation & Getting Started
 
-### Prerequisites
+### Prebuilt Binaries (Linux, Windows, macOS)
+
+Standalone executables for the latest release ([v0.1.0](https://github.com/mrazza/LeiterWatercolorStudio/releases/tag/v0.1.0)) are available for download:
+
+- **Linux:** [x64 (tar.gz)](https://github.com/mrazza/LeiterWatercolorStudio/releases/download/v0.1.0/LeiterWatercolorStudio-linux-x64.tar.gz) • [ARM64 (tar.gz)](https://github.com/mrazza/LeiterWatercolorStudio/releases/download/v0.1.0/LeiterWatercolorStudio-linux-arm64.tar.gz)
+- **Windows:** [x64 (zip)](https://github.com/mrazza/LeiterWatercolorStudio/releases/download/v0.1.0/LeiterWatercolorStudio-win-x64.zip) • [ARM64 (zip)](https://github.com/mrazza/LeiterWatercolorStudio/releases/download/v0.1.0/LeiterWatercolorStudio-win-arm64.zip)
+- **macOS:** [Apple Silicon / ARM64 (tar.gz)](https://github.com/mrazza/LeiterWatercolorStudio/releases/download/v0.1.0/LeiterWatercolorStudio-osx-arm64.tar.gz) • [Intel / x64 (tar.gz)](https://github.com/mrazza/LeiterWatercolorStudio/releases/download/v0.1.0/LeiterWatercolorStudio-osx-x64.tar.gz)
+
+Extract the archive and run `LeiterWatercolorStudio` (or `LeiterWatercolorStudio.exe` on Windows).
+
+### Gentoo via Portage
+
+Leiter Watercolor Studio is available in the [razza overlay](https://github.com/mrazza/razza-overlay) with ReadyToRun precompilation and Dynamic PGO optimization:
+
+```bash
+eselect repository add razza git https://github.com/mrazza/razza-overlay.git
+emerge media-gfx/leiter-watercolor-studio
+```
+
+### Building from Source
+
+#### Prerequisites
 
 - [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) (targets `net10.0`)
 
-### Clone & Run
+#### Clone & Run
 
 Because `LeiterWatercolorStudio` includes [Leiter](https://github.com/mrazza/Leiter) as a git submodule at `extern/Leiter`, clone recursively:
 
@@ -48,7 +69,7 @@ Run the desktop studio:
 dotnet run --project src/LeiterWatercolorStudio.App -c Release
 ```
 
-### Build & Test
+#### Build & Test
 
 ```bash
 # Build the full solution
