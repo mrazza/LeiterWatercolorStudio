@@ -142,6 +142,25 @@ public class PipelineRegistryAndScalingTests
         scaled.Validate();
     }
 
+    [Fact]
+    public void ComputeEffectivePreviewOptions_FromNativeForAnalysis_MatchesSingleHopScalingWithoutOverDarkeningOrEgbiShrink()
+    {
+        var nativeSize = new Size(4000, 3000);
+        var previewSize = new Size(1024, 768);
+        WatercolorOptions nativeCanonical = WatercolorOptions.ForSize(nativeSize);
+
+        WatercolorOptions effective = PreviewScaling.ComputeEffectivePreviewOptions(
+            nativeCanonical,
+            nativeSize,
+            previewSize);
+        WatercolorOptions directPreview = WatercolorOptions.ForSize(previewSize);
+
+        Assert.Equal(directPreview.EdgeDarkening.Intensity, effective.EdgeDarkening.Intensity, 10);
+        Assert.Equal(directPreview.EdgeDarkening.BlurSigma, effective.EdgeDarkening.BlurSigma, 10);
+        Assert.Equal(directPreview.Egbi.KFactor, effective.Egbi.KFactor, 10);
+        Assert.Equal(directPreview.Egbi.Epsilon, effective.Egbi.Epsilon, 10);
+    }
+
     [Theory]
     [InlineData(400, 300, 1024, 400, 300)]
     [InlineData(2048, 1024, 1024, 1024, 512)]
