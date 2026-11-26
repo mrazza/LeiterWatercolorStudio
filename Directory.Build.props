@@ -4,5 +4,14 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <LangVersion>latest</LangVersion>
+
+    <!-- Versioning & Assembly Metadata -->
+    <VersionPrefix>0.1.0</VersionPrefix>
+    <Product>Leiter Watercolor Studio</Product>
+    <Authors>Matt Razza</Authors>
+    <Company>Matt Razza</Company>
+    <Copyright>Copyright © 2026 Matt Razza</Copyright>
+    <Description>Interactive desktop watercolor studio and headless pipeline for Leiter</Description>
+    <RepositoryUrl>https://github.com/mrazza/LeiterWatercolorStudio</RepositoryUrl>
   </PropertyGroup>
 </Project>
