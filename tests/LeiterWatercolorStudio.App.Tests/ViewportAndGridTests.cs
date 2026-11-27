@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
@@ -440,6 +441,69 @@ public class ViewportAndGridTests
             {
                 card.Dispose();
             }
+        }
+    }
+
+    [AvaloniaFact]
+    public void ZoomPanViewport_HoverDiagnosticsToggle_ControlsDetailsVisibility()
+    {
+        var primaryMatrix = new SequentialMatrix<Rgb8>(64, 48);
+        WriteableBitmap primaryBitmap = MatrixBitmapConverter.Blit(primaryMatrix);
+
+        var viewport = new ZoomPanViewport
+        {
+            PrimaryBitmap = primaryBitmap,
+            IsEmpty = false,
+            HoverHudText = "(10, 12) RGB(180, 120, 90) Lab(55.0, 20.0, 25.0)",
+            HoverHudDetailsText = "Region #42 Area:512px Salient:100%\nSaliency:0.850 Wet:No",
+            HoverSwatchColor = Color.FromRgb(180, 120, 90),
+        };
+
+        var window = new Window
+        {
+            Width = 640,
+            Height = 400,
+            Content = viewport,
+        };
+
+        try
+        {
+            window.Show();
+            TestAppHelpers.PumpUi();
+
+            Border hoverHud = viewport.FindControl<Border>("PART_HoverHud")!;
+            TextBlock detailsText = viewport.FindControl<TextBlock>("PART_HoverHudDetailsText")!;
+            ToggleButton diagnosticsToggle = viewport.FindControl<ToggleButton>("PART_DiagnosticsToggle")!;
+
+            Assert.False(viewport.ShowHoverDiagnostics);
+            Assert.False(diagnosticsToggle.IsChecked == true);
+            Assert.True(hoverHud.IsVisible);
+            Assert.False(detailsText.IsVisible);
+
+            Point togglePoint = diagnosticsToggle.TranslatePoint(
+                new Point(diagnosticsToggle.Bounds.Width * 0.5, diagnosticsToggle.Bounds.Height * 0.5),
+                window)!.Value;
+
+            window.MouseDown(togglePoint, MouseButton.Left);
+            window.MouseUp(togglePoint, MouseButton.Left);
+            TestAppHelpers.PumpUi();
+
+            Assert.True(viewport.ShowHoverDiagnostics);
+            Assert.True(diagnosticsToggle.IsChecked == true);
+            Assert.True(detailsText.IsVisible);
+            Assert.Contains("Region #42", detailsText.Text);
+
+            window.MouseDown(togglePoint, MouseButton.Left);
+            window.MouseUp(togglePoint, MouseButton.Left);
+            TestAppHelpers.PumpUi();
+
+            Assert.False(viewport.ShowHoverDiagnostics);
+            Assert.False(detailsText.IsVisible);
+        }
+        finally
+        {
+            window.Close();
+            primaryBitmap.Dispose();
         }
     }
 }

@@ -289,27 +289,29 @@
                             <Flyout Placement="BottomEdgeAlignedRight">
                                 <StackPanel Spacing="6" Width="280" Margin="4">
                                     <TextBlock Classes="studio-heading" Text="Keyboard &amp; Canvas Shortcuts" />
-                                    <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="4">
+                                    <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="4">
                                         <TextBlock Grid.Row="0" Grid.Column="0" Classes="studio-mono" Text="1 – 8" />
                                         <TextBlock Grid.Row="0" Grid.Column="1" Classes="studio-label" Text="Select pipeline stage 1–8" />
                                         <TextBlock Grid.Row="1" Grid.Column="0" Classes="studio-mono" Text="G" />
                                         <TextBlock Grid.Row="1" Grid.Column="1" Classes="studio-label" Text="Toggle Single / 4×2 Grid view" />
                                         <TextBlock Grid.Row="2" Grid.Column="0" Classes="studio-mono" Text="I" />
                                         <TextBlock Grid.Row="2" Grid.Column="1" Classes="studio-label" Text="Toggle Inspector sidebar" />
-                                        <TextBlock Grid.Row="3" Grid.Column="0" Classes="studio-mono" Text="P" />
-                                        <TextBlock Grid.Row="3" Grid.Column="1" Classes="studio-label" Text="Pin / unpin active stage for compare" />
-                                        <TextBlock Grid.Row="4" Grid.Column="0" Classes="studio-mono" Text="C" />
-                                        <TextBlock Grid.Row="4" Grid.Column="1" Classes="studio-label" Text="Toggle A/B Compare on / off" />
-                                        <TextBlock Grid.Row="5" Grid.Column="0" Classes="studio-mono" Text="\" />
-                                        <TextBlock Grid.Row="5" Grid.Column="1" Classes="studio-label" Text="Hold-to-Compare reference image" />
-                                        <TextBlock Grid.Row="6" Grid.Column="0" Classes="studio-mono" Text="Space+Drag" />
-                                        <TextBlock Grid.Row="6" Grid.Column="1" Classes="studio-label" Text="Pan anywhere (overrides wipe handle)" />
-                                        <TextBlock Grid.Row="7" Grid.Column="0" Classes="studio-mono" Text="Ctrl+0 / 1" />
-                                        <TextBlock Grid.Row="7" Grid.Column="1" Classes="studio-label" Text="Fit to view / Zoom 1:1 (100%)" />
-                                        <TextBlock Grid.Row="8" Grid.Column="0" Classes="studio-mono" Text="Ctrl++ / -" />
-                                        <TextBlock Grid.Row="8" Grid.Column="1" Classes="studio-label" Text="Zoom in / out around center" />
-                                        <TextBlock Grid.Row="9" Grid.Column="0" Classes="studio-mono" Text="Ctrl+Z / Y" />
-                                        <TextBlock Grid.Row="9" Grid.Column="1" Classes="studio-label" Text="Undo / Redo parameter edit" />
+                                        <TextBlock Grid.Row="3" Grid.Column="0" Classes="studio-mono" Text="D" />
+                                        <TextBlock Grid.Row="3" Grid.Column="1" Classes="studio-label" Text="Toggle pixel stage diagnostics" />
+                                        <TextBlock Grid.Row="4" Grid.Column="0" Classes="studio-mono" Text="P" />
+                                        <TextBlock Grid.Row="4" Grid.Column="1" Classes="studio-label" Text="Pin / unpin active stage for compare" />
+                                        <TextBlock Grid.Row="5" Grid.Column="0" Classes="studio-mono" Text="C" />
+                                        <TextBlock Grid.Row="5" Grid.Column="1" Classes="studio-label" Text="Toggle A/B Compare on / off" />
+                                        <TextBlock Grid.Row="6" Grid.Column="0" Classes="studio-mono" Text="\" />
+                                        <TextBlock Grid.Row="6" Grid.Column="1" Classes="studio-label" Text="Hold-to-Compare reference image" />
+                                        <TextBlock Grid.Row="7" Grid.Column="0" Classes="studio-mono" Text="Space+Drag" />
+                                        <TextBlock Grid.Row="7" Grid.Column="1" Classes="studio-label" Text="Pan anywhere (overrides wipe handle)" />
+                                        <TextBlock Grid.Row="8" Grid.Column="0" Classes="studio-mono" Text="Ctrl+0 / 1" />
+                                        <TextBlock Grid.Row="8" Grid.Column="1" Classes="studio-label" Text="Fit to view / Zoom 1:1 (100%)" />
+                                        <TextBlock Grid.Row="9" Grid.Column="0" Classes="studio-mono" Text="Ctrl++ / -" />
+                                        <TextBlock Grid.Row="9" Grid.Column="1" Classes="studio-label" Text="Zoom in / out around center" />
+                                        <TextBlock Grid.Row="10" Grid.Column="0" Classes="studio-mono" Text="Ctrl+Z / Y" />
+                                        <TextBlock Grid.Row="10" Grid.Column="1" Classes="studio-label" Text="Undo / Redo parameter edit" />
                                     </Grid>
                                 </StackPanel>
                             </Flyout>
@@ -361,6 +363,7 @@
                                           PanY="{Binding PanY, Mode=TwoWay}"
                                           HoverHudText="{Binding HoverHudText}"
                                           HoverHudDetailsText="{Binding HoverHudDetailsText}"
+                                          ShowHoverDiagnostics="{Binding ShowHoverDiagnostics, Mode=TwoWay}"
                                           HoverSwatchColor="{Binding HoverSwatchColor}"
                                           AvailableVisualizationModes="{Binding AvailableVisualizationModes}"
                                           SelectedVisualizationMode="{Binding SelectedVisualizationMode, Mode=TwoWay}"

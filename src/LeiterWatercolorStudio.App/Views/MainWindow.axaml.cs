@@ -448,6 +448,17 @@ public partial class MainWindow : Window
                 return;
             }
 
+            if (e.Key == Key.D)
+            {
+                if (vm.ToggleHoverDiagnosticsCommand.CanExecute(null))
+                {
+                    vm.ToggleHoverDiagnosticsCommand.Execute(null);
+                    e.Handled = true;
+                }
+
+                return;
+            }
+
             if (e.Key is Key.OemPipe or Key.OemBackslash && !vm.IsGridView && vm.HasImage)
             {
                 vm.IsHoldComparing = true;
