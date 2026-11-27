@@ -78,8 +78,19 @@ public partial class PipelineFilmstrip : UserControl
     public static readonly StyledProperty<ICommand?> TogglePinStageCommandProperty =
         AvaloniaProperty.Register<PipelineFilmstrip, ICommand?>(nameof(TogglePinStageCommand));
 
+    private const double CompactHeightThreshold = 132.0;
+
+    /// <summary>
+    /// Identifies the <see cref="IsCompactHeight"/> direct property.
+    /// </summary>
+    public static readonly DirectProperty<PipelineFilmstrip, bool> IsCompactHeightProperty =
+        AvaloniaProperty.RegisterDirect<PipelineFilmstrip, bool>(
+            nameof(IsCompactHeight),
+            o => o.IsCompactHeight);
+
     private readonly List<StageCardViewModel> _subscribedCards = [];
     private INotifyCollectionChanged? _subscribedCollection;
+    private bool _isCompactHeight;
 
     /// <summary>
     /// Initializes a new <see cref="PipelineFilmstrip"/>.
@@ -164,6 +175,15 @@ public partial class PipelineFilmstrip : UserControl
     }
 
     /// <summary>
+    /// Gets whether the filmstrip is currently resized into compact text-only height (thumbnails collapsed).
+    /// </summary>
+    public bool IsCompactHeight
+    {
+        get => _isCompactHeight;
+        private set => SetAndRaise(IsCompactHeightProperty, ref _isCompactHeight, value);
+    }
+
+    /// <summary>
     /// Gets or sets the command invoked when a stage's pin button is clicked.
     /// Receives the target <see cref="StageCardViewModel"/> (or its <see cref="Core.Models.PrimaryStageId"/>).
     /// </summary>
@@ -221,6 +241,11 @@ public partial class PipelineFilmstrip : UserControl
             {
                 newSub.IsSelected = true;
             }
+        }
+        else if (change.Property == BoundsProperty)
+        {
+            double height = Bounds.Height;
+            IsCompactHeight = height > 0.0 && height < CompactHeightThreshold;
         }
     }
 

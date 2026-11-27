@@ -155,8 +155,35 @@
             <Setter Property="Background" Value="{DynamicResource StudioPinPinnedBgBrush}" />
             <Setter Property="BorderBrush" Value="{DynamicResource StudioPinPinnedFgBrush}" />
         </Style>
-        <Style Selector="Button.pin-btn.pinned Path.pin-glyph">
+        <Style Selector="Button.pin-btn.pinned Path.pin-glyph, Button.compact-pin-btn.pinned Path.pin-glyph">
             <Setter Property="Fill" Value="{DynamicResource StudioPinPinnedFgBrush}" />
+        </Style>
+
+        <!-- Compact header pin button (visible only when filmstrip is dragged into compact text-only height) -->
+        <Style Selector="Button.compact-pin-btn">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="2" />
+            <Setter Property="Width" Value="18" />
+            <Setter Property="Height" Value="18" />
+            <Setter Property="CornerRadius" Value="4" />
+            <Setter Property="Opacity" Value="0.45" />
+            <Setter Property="Cursor" Value="Hand" />
+        </Style>
+        <Style Selector="Border.stage-card:pointerover Button.compact-pin-btn">
+            <Setter Property="Opacity" Value="0.95" />
+        </Style>
+        <Style Selector="Button.compact-pin-btn:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource StudioPinHoverBgBrush}" />
+        </Style>
+        <Style Selector="Button.compact-pin-btn Path.pin-glyph">
+            <Setter Property="Fill" Value="{DynamicResource StudioMutedBrush}" />
+        </Style>
+        <Style Selector="Button.compact-pin-btn.pinned">
+            <Setter Property="Opacity" Value="1" />
+            <Setter Property="Background" Value="{DynamicResource StudioPinPinnedBgBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource StudioPinPinnedFgBrush}" />
         </Style>
 
         <!-- Hide trailing chevron after the final stage card while preserving equal column width -->
@@ -167,10 +194,8 @@
     </UserControl.Styles>
 
     <Border Background="{DynamicResource StudioFilmstripBgBrush}"
-            BorderBrush="{DynamicResource StudioFilmstripBorderBrush}"
-            BorderThickness="0,1,0,0"
-            Padding="10,7">
-        <Grid RowDefinitions="Auto,Auto" RowSpacing="7">
+            Padding="10,6">
+        <Grid RowDefinitions="Auto,*" RowSpacing="6">
             <!-- Persistent Sub-Stage Bar (constant MinHeight prevents canvas height jump) -->
             <Border Grid.Row="0"
                     MinHeight="38"
@@ -258,7 +283,7 @@
                 </ItemsControl.ItemsPanel>
                 <ItemsControl.ItemTemplate>
                     <DataTemplate x:DataType="vm:StageCardViewModel">
-                        <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
+                        <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Stretch">
                             <Border Grid.Column="0"
                                     Classes="stage-card"
                                     Classes.selected="{Binding IsSelected}"
@@ -269,13 +294,13 @@
                                     Classes.pinned="{Binding IsPinned}"
                                     MinWidth="96"
                                     CornerRadius="8"
-                                    Padding="6"
+                                    Padding="6,5"
                                     Cursor="Hand"
                                     Focusable="True"
                                     PointerPressed="OnStageCardPointerPressed">
-                                <Grid RowDefinitions="Auto,62,Auto" RowSpacing="4">
-                                    <!-- Card Header (full width for stage title) -->
-                                    <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="4">
+                                <Grid RowDefinitions="Auto,*,Auto" RowSpacing="4">
+                                    <!-- Card Header (full width for stage title + compact-only pin toggle) -->
+                                    <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto,Auto,Auto" ColumnSpacing="4">
                                         <Border Grid.Column="0"
                                                 Width="16"
                                                 Height="16"
@@ -303,16 +328,29 @@
                                                    FontSize="11"
                                                    Foreground="{DynamicResource StudioMutedBrush}"
                                                    VerticalAlignment="Center" />
-                                        <Ellipse Grid.Column="3"
+                                        <Button Grid.Column="3"
+                                                Classes="compact-pin-btn"
+                                                Classes.pinned="{Binding IsPinned}"
+                                                IsVisible="{Binding #Root.IsCompactHeight}"
+                                                Click="OnPinButtonClick"
+                                                ToolTip.Tip="Pin stage for A/B comparison">
+                                            <Path Classes="pin-glyph"
+                                                  Width="9"
+                                                  Height="9"
+                                                  Stretch="Uniform"
+                                                  Data="M16,12V4H17V2H7V4H8V12L6,14V16H11.2V22H12.8V16H18V14L16,12Z" />
+                                        </Button>
+                                        <Ellipse Grid.Column="4"
                                                  Classes="status-dot"
                                                  Width="7"
                                                  Height="7"
                                                  VerticalAlignment="Center" />
                                     </Grid>
 
-                                    <!-- Live Thumbnail Preview + Hover/Pinned Pin Button -->
+                                    <!-- Adaptive Thumbnail Preview + Hover/Pinned Pin Button (hidden in compact text-only height) -->
                                     <Border Grid.Row="1"
                                             Classes="thumb-frame"
+                                            IsVisible="{Binding !#Root.IsCompactHeight}"
                                             Background="{DynamicResource StudioFilmstripThumbBgBrush}"
                                             BorderBrush="{DynamicResource StudioFilmstripThumbBorderBrush}"
                                             BorderThickness="1"
