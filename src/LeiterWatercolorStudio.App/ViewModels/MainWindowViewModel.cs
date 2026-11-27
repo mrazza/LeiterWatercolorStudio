@@ -2335,7 +2335,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     private static void UpdateStageCardBitmapsFromMatrix(StageCardViewModel card, IReadOnlyMatrix<Rgb8> matrix)
     {
         WriteableBitmap? oldThumb = card.Thumbnail;
-        WriteableBitmap nextThumb = MatrixBitmapConverter.BlitThumbnail(matrix, oldThumb);
+        WriteableBitmap nextThumb = MatrixBitmapConverter.BlitThumbnail(matrix, oldThumb, maxEdge: 320);
         card.Thumbnail = nextThumb;
 
         WriteableBitmap? oldGrid = card.GridBitmap;

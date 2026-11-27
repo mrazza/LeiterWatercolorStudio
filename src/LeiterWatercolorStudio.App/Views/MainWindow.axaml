@@ -18,7 +18,43 @@
         Background="{DynamicResource StudioCanvasBrush}"
         Foreground="{DynamicResource StudioForegroundBrush}">
 
-    <Grid RowDefinitions="Auto,*,Auto,Auto">
+    <Window.Styles>
+        <Style Selector="GridSplitter.filmstrip-splitter">
+            <Setter Property="Background" Value="{DynamicResource StudioFilmstripBgBrush}" />
+            <Setter Property="Height" Value="7" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="Cursor" Value="SizeNorthSouth" />
+            <Setter Property="Template">
+                <ControlTemplate>
+                    <Border Background="{TemplateBinding Background}"
+                            BorderBrush="{DynamicResource StudioFilmstripBorderBrush}"
+                            BorderThickness="0,1,0,0">
+                        <Border x:Name="PART_GripPill"
+                                Width="40"
+                                Height="2"
+                                CornerRadius="1"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                Background="{DynamicResource StudioMutedBrush}"
+                                Opacity="0.45" />
+                    </Border>
+                </ControlTemplate>
+            </Setter>
+        </Style>
+        <Style Selector="GridSplitter.filmstrip-splitter:pointerover /template/ Border#PART_GripPill">
+            <Setter Property="Background" Value="{DynamicResource StudioAccentBrush}" />
+            <Setter Property="Opacity" Value="0.95" />
+        </Style>
+    </Window.Styles>
+
+    <Grid x:Name="RootLayoutGrid">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" MinHeight="220" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="178" MinHeight="96" MaxHeight="380" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
         <!-- Top Studio Toolbar (single row at 1440x900 across all Compare modes) -->
         <Border Grid.Row="0" Classes="studio-toolbar" Padding="5,5">
             <Grid ColumnDefinitions="*,Auto">
@@ -506,8 +542,16 @@
             </Border>
         </Grid>
 
+        <!-- Horizontal Filmstrip Splitter (drag to resize, double-click to reset) -->
+        <GridSplitter x:Name="FilmstripSplitter"
+                      Grid.Row="2"
+                      Classes="filmstrip-splitter"
+                      ResizeDirection="Rows"
+                      ShowsPreview="False"
+                      ToolTip.Tip="Drag to resize pipeline filmstrip (double-click to reset)" />
+
         <!-- Bottom Pipeline Filmstrip -->
-        <controls:PipelineFilmstrip Grid.Row="2"
+        <controls:PipelineFilmstrip Grid.Row="3"
                                     x:Name="Filmstrip"
                                     Stages="{Binding Stages}"
                                     SelectedStage="{Binding SelectedStage, Mode=TwoWay}"
@@ -520,7 +564,7 @@
                                     TogglePinStageCommand="{Binding TogglePinStageCommand}" />
 
         <!-- Compact Bottom Status Bar -->
-        <Border Grid.Row="3" Classes="studio-statusbar">
+        <Border Grid.Row="4" Classes="studio-statusbar">
             <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="12">
                 <!-- Status & Active Progress -->
                 <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
@@ -587,7 +631,7 @@
 
         <!-- Window-Wide Drag-and-Drop Overlay -->
         <Border x:Name="WindowDropOverlay"
-                Grid.RowSpan="4"
+                Grid.RowSpan="5"
                 Margin="6"
                 CornerRadius="12"
                 BorderBrush="{DynamicResource StudioDropOverlayBorderBrush}"

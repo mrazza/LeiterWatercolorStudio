@@ -332,4 +332,81 @@ public class PipelineFilmstripTests
             }
         }
     }
+
+    [AvaloniaFact]
+    public async Task MainWindow_FilmstripSplitter_ResizesThumbnails_EntersCompactMode_AndResetsOnDoubleTap()
+    {
+        var vm = new MainWindowViewModel(
+            fileDialogs: null,
+            uiDispatcher: action => Dispatcher.UIThread.Post(action),
+            debounceInterval: TimeSpan.FromMilliseconds(10));
+
+        var window = new MainWindow
+        {
+            Width = 1440,
+            Height = 900,
+            DataContext = vm,
+        };
+
+        try
+        {
+            window.Show();
+            TestAppHelpers.PumpUi();
+
+            var sampleMatrix = CreateSampleMatrix(48, 36);
+            await TestAppHelpers.WaitForRenderAsync(vm, () => vm.LoadImageFromMatrix(sampleMatrix, "sample.png"));
+
+            Grid rootGrid = window.FindControl<Grid>("RootLayoutGrid")!;
+            GridSplitter splitter = window.FindControl<GridSplitter>("FilmstripSplitter")!;
+            PipelineFilmstrip filmstrip = window.FindControl<PipelineFilmstrip>("Filmstrip")!;
+
+            Assert.Equal(178.0, rootGrid.RowDefinitions[3].Height.Value, 1);
+            Assert.False(filmstrip.IsCompactHeight);
+
+            // Real pointer drag upward on FilmstripSplitter makes the bar taller and scales thumbnails up
+            Point splitterCenter = splitter.TranslatePoint(
+                new Point(splitter.Bounds.Width * 0.5, splitter.Bounds.Height * 0.5),
+                window)!.Value;
+
+            window.MouseDown(splitterCenter, MouseButton.Left);
+            window.MouseMove(new Point(splitterCenter.X, splitterCenter.Y - 140.0));
+            window.MouseUp(new Point(splitterCenter.X, splitterCenter.Y - 140.0), MouseButton.Left);
+            TestAppHelpers.PumpUi();
+
+            Assert.True(rootGrid.RowDefinitions[3].Height.Value >= 300.0, $"Expected dragged height >= 300px, got {rootGrid.RowDefinitions[3].Height.Value:F1}px.");
+            Assert.False(filmstrip.IsCompactHeight);
+            Border firstThumb = filmstrip
+                .GetVisualDescendants()
+                .OfType<Border>()
+                .First(b => b.Classes.Contains("thumb-frame"));
+            Assert.True(firstThumb.IsVisible);
+            Assert.True(firstThumb.Bounds.Height > 150.0, $"Expected scaled thumbnail height > 150px, got {firstThumb.Bounds.Height:F1}px.");
+
+            // Resize filmstrip into compact height -> collapses thumbnails cleanly
+            rootGrid.RowDefinitions[3].Height = new GridLength(104.0);
+            TestAppHelpers.PumpUi();
+
+            Assert.True(filmstrip.IsCompactHeight);
+            Assert.False(firstThumb.IsVisible);
+
+            // Double-clicking splitter resets height back to default 178px
+            Point compactSplitterCenter = splitter.TranslatePoint(
+                new Point(splitter.Bounds.Width * 0.5, splitter.Bounds.Height * 0.5),
+                window)!.Value;
+
+            window.MouseDown(compactSplitterCenter, MouseButton.Left);
+            window.MouseUp(compactSplitterCenter, MouseButton.Left);
+            window.MouseDown(compactSplitterCenter, MouseButton.Left);
+            window.MouseUp(compactSplitterCenter, MouseButton.Left);
+            TestAppHelpers.PumpUi();
+
+            Assert.Equal(178.0, rootGrid.RowDefinitions[3].Height.Value, 1);
+            Assert.False(filmstrip.IsCompactHeight);
+        }
+        finally
+        {
+            window.Close();
+            TestAppHelpers.PumpUi();
+        }
+    }
 }

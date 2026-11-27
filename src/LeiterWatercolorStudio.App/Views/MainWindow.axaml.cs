@@ -20,6 +20,7 @@ namespace LeiterWatercolorStudio.App.Views;
 public partial class MainWindow : Window
 {
     private const double ShortcutZoomStep = 1.25;
+    private const double DefaultFilmstripHeight = 178.0;
     private static readonly Cursor HandCursor = new(StandardCursorType.Hand);
     private static readonly Cursor DefaultCursor = new(StandardCursorType.Arrow);
 
@@ -48,6 +49,7 @@ public partial class MainWindow : Window
         HoldCompareButton.AddHandler(PointerPressedEvent, OnHoldComparePointerPressed, RoutingStrategies.Tunnel | RoutingStrategies.Bubble, handledEventsToo: true);
         HoldCompareButton.AddHandler(PointerReleasedEvent, OnHoldComparePointerReleased, RoutingStrategies.Tunnel | RoutingStrategies.Bubble, handledEventsToo: true);
         HoldCompareButton.AddHandler(PointerCaptureLostEvent, OnHoldComparePointerCaptureLost, RoutingStrategies.Tunnel | RoutingStrategies.Bubble, handledEventsToo: true);
+        FilmstripSplitter.DoubleTapped += OnFilmstripSplitterDoubleTapped;
 
         AddHandler(KeyDownEvent, OnWindowKeyDown, RoutingStrategies.Tunnel);
         AddHandler(KeyUpEvent, OnWindowKeyUp, RoutingStrategies.Tunnel);
@@ -155,6 +157,16 @@ public partial class MainWindow : Window
             inspectorColumn.MinWidth = 0;
             inspectorColumn.Width = new GridLength(0, GridUnitType.Pixel);
         }
+    }
+
+    private void OnFilmstripSplitterDoubleTapped(object? sender, TappedEventArgs e)
+    {
+        if (RootLayoutGrid is null || RootLayoutGrid.RowDefinitions.Count < 4)
+        {
+            return;
+        }
+
+        RootLayoutGrid.RowDefinitions[3].Height = new GridLength(DefaultFilmstripHeight, GridUnitType.Pixel);
     }
 
     private void OnInspectorSectionFocusRequested(string sectionKey)
