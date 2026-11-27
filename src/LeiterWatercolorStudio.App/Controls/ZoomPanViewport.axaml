@@ -45,6 +45,38 @@
             <Setter Property="Background" Value="{DynamicResource StudioHoverHudPressedBrush}" />
         </Style>
 
+        <Style Selector="ToggleButton.hud-toggle">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="{DynamicResource StudioHudMutedBrush}" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="Padding" Value="8,4" />
+            <Setter Property="MinHeight" Value="24" />
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="FontWeight" Value="Medium" />
+            <Setter Property="Cursor" Value="Hand" />
+        </Style>
+
+        <Style Selector="ToggleButton.hud-toggle:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource StudioHoverHudBgBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource StudioHudForegroundBrush}" />
+        </Style>
+
+        <Style Selector="ToggleButton.hud-toggle:checked /template/ ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource StudioAccentBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource StudioAccentForegroundBrush}" />
+        </Style>
+
+        <Style Selector="ToggleButton.hud-toggle:checked">
+            <Setter Property="Foreground" Value="{DynamicResource StudioAccentForegroundBrush}" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+
+        <Style Selector="ToggleButton.hud-toggle:checked:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource StudioAccentHoverBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource StudioAccentForegroundBrush}" />
+        </Style>
+
         <Style Selector="Button.mode-chip">
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="Foreground" Value="{DynamicResource StudioHudMutedBrush}" />
@@ -193,6 +225,13 @@
                                 Padding="0"
                                 HorizontalContentAlignment="Center"
                                 ToolTip.Tip="Zoom in (Ctrl++)" />
+                        <Border Width="1"
+                                Margin="3,4"
+                                Background="{DynamicResource StudioHudBorderBrush}" />
+                        <ToggleButton x:Name="PART_DiagnosticsToggle"
+                                      Classes="hud-toggle"
+                                      Content="Diag"
+                                      ToolTip.Tip="Toggle per-pixel stage diagnostics in hover HUD (D)" />
                     </StackPanel>
                 </Border>
             </Grid>
@@ -268,7 +307,7 @@
                 </Grid>
             </Grid>
 
-            <!-- Row 2: Compact 1-line Hover Pixel HUD (Bottom-Left) + Processing Pill with Cancel (Bottom-Right) -->
+            <!-- Row 2: Hover Pixel HUD (Bottom-Left) + Processing Pill with Cancel (Bottom-Right) -->
             <Grid Grid.Row="2"
                   ColumnDefinitions="*,Auto">
                 <Border x:Name="PART_HoverHud"
@@ -280,23 +319,32 @@
                         VerticalAlignment="Bottom"
                         IsHitTestVisible="False"
                         IsVisible="False">
-                    <StackPanel Orientation="Horizontal"
-                                Spacing="8"
-                                VerticalAlignment="Center">
-                        <Border x:Name="PART_HoverSwatch"
-                                Width="16"
-                                Height="16"
-                                CornerRadius="3"
-                                BorderBrush="{DynamicResource StudioHudBorderBrush}"
-                                BorderThickness="1"
-                                VerticalAlignment="Center"
-                                IsVisible="False" />
-                        <TextBlock x:Name="PART_HoverHudText"
+                    <StackPanel Orientation="Vertical"
+                                Spacing="3">
+                        <StackPanel Orientation="Horizontal"
+                                    Spacing="8"
+                                    VerticalAlignment="Center">
+                            <Border x:Name="PART_HoverSwatch"
+                                    Width="16"
+                                    Height="16"
+                                    CornerRadius="3"
+                                    BorderBrush="{DynamicResource StudioHudBorderBrush}"
+                                    BorderThickness="1"
+                                    VerticalAlignment="Center"
+                                    IsVisible="False" />
+                            <TextBlock x:Name="PART_HoverHudText"
+                                       FontFamily="Consolas, Menlo, Monaco, monospace"
+                                       FontSize="11"
+                                       Foreground="{DynamicResource StudioHudForegroundBrush}"
+                                       TextTrimming="CharacterEllipsis"
+                                       VerticalAlignment="Center" />
+                        </StackPanel>
+                        <TextBlock x:Name="PART_HoverHudDetailsText"
                                    FontFamily="Consolas, Menlo, Monaco, monospace"
-                                   FontSize="11"
-                                   Foreground="{DynamicResource StudioHudForegroundBrush}"
-                                   TextTrimming="CharacterEllipsis"
-                                   VerticalAlignment="Center" />
+                                   FontSize="10.5"
+                                   LineHeight="15"
+                                   Foreground="{DynamicResource StudioHudMutedBrush}"
+                                   IsVisible="False" />
                     </StackPanel>
                 </Border>
 

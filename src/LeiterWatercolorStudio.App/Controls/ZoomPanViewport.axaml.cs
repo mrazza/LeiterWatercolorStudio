@@ -84,6 +84,12 @@ public partial class ZoomPanViewport : UserControl
     public static readonly StyledProperty<string?> HoverHudDetailsTextProperty =
         AvaloniaProperty.Register<ZoomPanViewport, string?>(nameof(HoverHudDetailsText));
 
+    public static readonly StyledProperty<bool> ShowHoverDiagnosticsProperty =
+        AvaloniaProperty.Register<ZoomPanViewport, bool>(
+            nameof(ShowHoverDiagnostics),
+            defaultValue: false,
+            defaultBindingMode: Avalonia.Data.BindingMode.TwoWay);
+
     public static readonly StyledProperty<Color?> HoverSwatchColorProperty =
         AvaloniaProperty.Register<ZoomPanViewport, Color?>(nameof(HoverSwatchColor));
 
@@ -169,6 +175,7 @@ public partial class ZoomPanViewport : UserControl
     private Point _lastDragPoint;
     private PixelPoint? _lastHoverPixel;
     private bool _lastHoverIsCompare;
+    private bool _isSyncingDiagnosticsToggle;
 
     /// <summary>
     /// Initializes a new instance of <see cref="ZoomPanViewport"/>.
@@ -187,6 +194,15 @@ public partial class ZoomPanViewport : UserControl
         PART_OneToOneButton.Click += (_, _) => ZoomOneToOne();
         PART_ZoomOutButton.Click += (_, _) => ZoomAroundCenter(Zoom / ZoomButtonStep);
         PART_ZoomInButton.Click += (_, _) => ZoomAroundCenter(Zoom * ZoomButtonStep);
+        PART_DiagnosticsToggle.IsCheckedChanged += (_, _) =>
+        {
+            if (_isSyncingDiagnosticsToggle)
+            {
+                return;
+            }
+
+            ShowHoverDiagnostics = PART_DiagnosticsToggle.IsChecked == true;
+        };
 
         AddHandler(DragDrop.DragOverEvent, OnDragOver);
         AddHandler(DragDrop.DragLeaveEvent, OnDragLeave);
@@ -266,6 +282,12 @@ public partial class ZoomPanViewport : UserControl
     {
         get => GetValue(HoverHudDetailsTextProperty);
         set => SetValue(HoverHudDetailsTextProperty, value);
+    }
+
+    public bool ShowHoverDiagnostics
+    {
+        get => GetValue(ShowHoverDiagnosticsProperty);
+        set => SetValue(ShowHoverDiagnosticsProperty, value);
     }
 
     public Color? HoverSwatchColor
@@ -609,6 +631,7 @@ public partial class ZoomPanViewport : UserControl
         }
         else if (property == HoverHudTextProperty ||
                  property == HoverHudDetailsTextProperty ||
+                 property == ShowHoverDiagnosticsProperty ||
                  property == HoverSwatchColorProperty)
         {
             UpdateHoverHud();
@@ -1093,10 +1116,26 @@ public partial class ZoomPanViewport : UserControl
 
     private void UpdateHoverHud()
     {
+        _isSyncingDiagnosticsToggle = true;
+        try
+        {
+            if (PART_DiagnosticsToggle.IsChecked != ShowHoverDiagnostics)
+            {
+                PART_DiagnosticsToggle.IsChecked = ShowHoverDiagnostics;
+            }
+        }
+        finally
+        {
+            _isSyncingDiagnosticsToggle = false;
+        }
+
         bool show = !IsEmpty && !string.IsNullOrWhiteSpace(HoverHudText);
         PART_HoverHud.IsVisible = show;
         PART_HoverHudText.Text = HoverHudText ?? string.Empty;
-        ToolTip.SetTip(PART_HoverHud, string.IsNullOrWhiteSpace(HoverHudDetailsText) ? null : HoverHudDetailsText);
+
+        bool showDetails = show && ShowHoverDiagnostics && !string.IsNullOrWhiteSpace(HoverHudDetailsText);
+        PART_HoverHudDetailsText.Text = HoverHudDetailsText ?? string.Empty;
+        PART_HoverHudDetailsText.IsVisible = showDetails;
 
         if (HoverSwatchColor is Color swatch)
         {

@@ -68,6 +68,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     private string _statusText = "Ready — Open an image to begin.";
     private string? _hoverHudText;
     private string? _hoverHudDetailsText;
+    private bool _showHoverDiagnostics;
     private Color? _hoverSwatchColor;
     private bool _hasImage;
     private string _sourceFileDisplayText = "No image loaded";
@@ -788,6 +789,15 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     }
 
     /// <summary>
+    /// Gets or sets whether detailed per-pixel stage diagnostics are expanded inside the hover HUD.
+    /// </summary>
+    public bool ShowHoverDiagnostics
+    {
+        get => _showHoverDiagnostics;
+        set => SetProperty(ref _showHoverDiagnostics, value);
+    }
+
+    /// <summary>
     /// Gets the RGB color swatch under the hovered pixel.
     /// </summary>
     public Color? HoverSwatchColor
@@ -1206,6 +1216,12 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     private void ToggleInspector()
     {
         IsInspectorOpen = !IsInspectorOpen;
+    }
+
+    [RelayCommand]
+    private void ToggleHoverDiagnostics()
+    {
+        ShowHoverDiagnostics = !ShowHoverDiagnostics;
     }
 
     [RelayCommand]

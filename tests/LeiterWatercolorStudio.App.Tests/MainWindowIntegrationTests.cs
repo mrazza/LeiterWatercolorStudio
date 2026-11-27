@@ -411,6 +411,14 @@ public class MainWindowIntegrationTests
             viewport.Focus();
             TestAppHelpers.PumpUi();
 
+            Assert.False(vm.ShowHoverDiagnostics);
+            window.KeyPressQwerty(PhysicalKey.D, RawInputModifiers.None);
+            TestAppHelpers.PumpUi();
+            Assert.True(vm.ShowHoverDiagnostics);
+            window.KeyPressQwerty(PhysicalKey.D, RawInputModifiers.None);
+            TestAppHelpers.PumpUi();
+            Assert.False(vm.ShowHoverDiagnostics);
+
             Assert.Equal(CompareMode.Off, vm.CompareMode);
             window.KeyPressQwerty(PhysicalKey.C, RawInputModifiers.None);
             TestAppHelpers.PumpUi();
