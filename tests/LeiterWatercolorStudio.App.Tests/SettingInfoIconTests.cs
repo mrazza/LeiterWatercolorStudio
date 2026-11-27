@@ -298,6 +298,14 @@ public class SettingInfoIconTests
                     TestAppHelpers.PumpUi();
                 }
 
+                if (view is ColorTransferInspectorView colorTransferView)
+                {
+                    colorTransferView.ShowSpreadStats = true;
+                    TestAppHelpers.PumpUi();
+                    colorTransferView.ShowSpreadStats = false;
+                    TestAppHelpers.PumpUi();
+                }
+
                 NumericSlider[] sliders = view.GetVisualDescendants().OfType<NumericSlider>().ToArray();
                 Assert.NotEmpty(sliders);
                 foreach (NumericSlider slider in sliders)

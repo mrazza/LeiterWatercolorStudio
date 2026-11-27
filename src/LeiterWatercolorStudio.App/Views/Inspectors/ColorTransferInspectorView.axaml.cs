@@ -73,6 +73,7 @@ public partial class ColorTransferInspectorView : UserControl
     private readonly Border[] _swatchBorders;
     private ColorTransferStageViewModel? _subscribedViewModel;
     private bool _hasReferencePreview;
+    private bool _showSpreadStats;
 
     /// <summary>
     /// Initializes a new instance of <see cref="ColorTransferInspectorView"/>.
@@ -92,8 +93,30 @@ public partial class ColorTransferInspectorView : UserControl
 
         PART_EditAsCustomCopyButton.Click += OnEditAsCustomCopyClick;
         PART_CopyMatchedToCustomButton.Click += OnEditAsCustomCopyClick;
+        PART_MeanLabTabButton.Click += (_, _) => ShowSpreadStats = false;
+        PART_StdDevLabTabButton.Click += (_, _) => ShowSpreadStats = true;
+        UpdateLabStatsTabVisibility();
         UpdatePalettePreview();
         UpdateHasReferencePreview();
+    }
+
+    /// <summary>
+    /// Gets or sets whether the Advanced CIELAB section displays Spread (StdDev) controls instead of Mean L*a*b*.
+    /// </summary>
+    public bool ShowSpreadStats
+    {
+        get => _showSpreadStats;
+        set
+        {
+            if (_showSpreadStats == value)
+            {
+                UpdateLabStatsTabVisibility();
+                return;
+            }
+
+            _showSpreadStats = value;
+            UpdateLabStatsTabVisibility();
+        }
     }
 
     /// <summary>
@@ -174,6 +197,19 @@ public partial class ColorTransferInspectorView : UserControl
     private void UpdateHasReferencePreview()
     {
         HasReferencePreview = ReferenceThumbnail is not null || !string.IsNullOrWhiteSpace(ReferenceImageName);
+    }
+
+    private void UpdateLabStatsTabVisibility()
+    {
+        if (PART_MeanLabPanel is null || PART_StdDevLabPanel is null)
+        {
+            return;
+        }
+
+        PART_MeanLabPanel.IsVisible = !_showSpreadStats;
+        PART_StdDevLabPanel.IsVisible = _showSpreadStats;
+        PART_MeanLabTabButton.IsChecked = !_showSpreadStats;
+        PART_StdDevLabTabButton.IsChecked = _showSpreadStats;
     }
 
     private void UpdateViewModelSubscription(ColorTransferStageViewModel? next)

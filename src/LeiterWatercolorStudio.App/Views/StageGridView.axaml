@@ -12,11 +12,6 @@
             <Setter Property="Background" Value="{DynamicResource StudioGridTileBgBrush}" />
             <Setter Property="BorderBrush" Value="{DynamicResource StudioGridTileBorderBrush}" />
             <Setter Property="BorderThickness" Value="1.5" />
-            <Setter Property="Transitions">
-                <Transitions>
-                    <BrushTransition Property="BorderBrush" Duration="0:0:0.12" />
-                </Transitions>
-            </Setter>
         </Style>
         <Style Selector="Border.grid-tile:pointerover">
             <Setter Property="BorderBrush" Value="{DynamicResource StudioMutedBrush}" />

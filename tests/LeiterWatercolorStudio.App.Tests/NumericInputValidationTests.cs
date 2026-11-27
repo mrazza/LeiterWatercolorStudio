@@ -827,6 +827,12 @@ public class NumericInputValidationTests
 
                 foreach (NumericSlider slider in sliders)
                 {
+                    if (view is ColorTransferInspectorView colorTransferView && !slider.IsEffectivelyVisible)
+                    {
+                        colorTransferView.ShowSpreadStats = !colorTransferView.ShowSpreadStats;
+                        TestAppHelpers.PumpUi();
+                    }
+
                     // Every inspector slider must reject non-finite/garbage input.
                     double initialValue = slider.Value;
                     SubmitSliderText(window, slider, "invalid-text");
@@ -887,6 +893,184 @@ public class NumericInputValidationTests
 
             // Full Leiter pipeline options produced after pushing every open-ended slider past slider Maximum must validate cleanly.
             parameters.BuildOptions().Validate();
+        }
+        finally
+        {
+            window.Close();
+            TestAppHelpers.PumpUi();
+        }
+    }
+
+    [AvaloniaFact]
+    public void NumericSlider_ExpandsNearMaximumSpatialHeadroom_WhileKeepingBoundedRatiosAndBytesCapped()
+    {
+        var spatialIntSlider = new NumericSlider
+        {
+            Label = "Salient Kernel Size",
+            Minimum = 3.0,
+            Maximum = 25.0,
+            ValidMinimum = 3.0,
+            Step = 2.0,
+            IsInteger = true,
+            FormatString = "F0",
+            BaselineValue = 24.0,
+            Value = 24.0,
+        };
+
+        var amplitudeFloatSlider = new NumericSlider
+        {
+            Label = "Amplitude",
+            Minimum = 0.0,
+            Maximum = 20.0,
+            ValidMinimum = 0.0,
+            Step = 0.1,
+            FormatString = "F2",
+            BaselineValue = 19.67,
+            Value = 19.67,
+        };
+
+        var normalizedBoundedSlider = new NumericSlider
+        {
+            Label = "Max Tone",
+            Minimum = 0.01,
+            Maximum = 1.0,
+            ValidMinimum = 0.05,
+            ValidMaximum = 1.0,
+            Step = 0.01,
+            FormatString = "F2",
+            BaselineValue = 0.96,
+            Value = 0.96,
+        };
+
+        var normalizedRatioWithoutValidMax = new NumericSlider
+        {
+            Label = "Persistence",
+            Minimum = 0.0,
+            Maximum = 1.0,
+            ValidMinimum = 0.0,
+            Step = 0.01,
+            FormatString = "F2",
+            BaselineValue = 0.96,
+            Value = 0.96,
+        };
+
+        var byteChannelSlider = new NumericSlider
+        {
+            Label = "Paper Red",
+            Minimum = 0.0,
+            Maximum = 255.0,
+            ValidMinimum = 0.0,
+            ValidMaximum = 255.0,
+            Step = 1.0,
+            IsInteger = true,
+            FormatString = "F0",
+            BaselineValue = 248.0,
+            Value = 248.0,
+        };
+
+        var window = new Window
+        {
+            Width = 360,
+            Height = 460,
+            Content = new StackPanel
+            {
+                Spacing = 6,
+                Children =
+                {
+                    spatialIntSlider,
+                    amplitudeFloatSlider,
+                    normalizedBoundedSlider,
+                    normalizedRatioWithoutValidMax,
+                    byteChannelSlider,
+                },
+            },
+        };
+
+        try
+        {
+            window.Show();
+            TestAppHelpers.PumpUi();
+
+            Slider spatialTrack = spatialIntSlider.FindControl<Slider>("PART_Slider")!;
+            Assert.InRange(spatialTrack.Maximum, 32.0, 34.0);
+            Assert.Equal(33.0, spatialTrack.Maximum, 6);
+
+            Slider amplitudeTrack = amplitudeFloatSlider.FindControl<Slider>("PART_Slider")!;
+            Assert.InRange(amplitudeTrack.Maximum, 26.0, 28.0);
+            Assert.Equal(27.0, amplitudeTrack.Maximum, 6);
+
+            Slider normalizedTrack = normalizedBoundedSlider.FindControl<Slider>("PART_Slider")!;
+            Assert.Equal(1.0, normalizedTrack.Maximum, 6);
+
+            Slider ratioNoValidMaxTrack = normalizedRatioWithoutValidMax.FindControl<Slider>("PART_Slider")!;
+            Assert.Equal(1.0, ratioNoValidMaxTrack.Maximum, 6);
+
+            Slider byteTrack = byteChannelSlider.FindControl<Slider>("PART_Slider")!;
+            Assert.Equal(255.0, byteTrack.Maximum, 6);
+        }
+        finally
+        {
+            window.Close();
+            TestAppHelpers.PumpUi();
+        }
+    }
+
+    [AvaloniaFact]
+    public void ColorTransferInspector_CustomMode_PairsReferenceExtractionInActivePalette_AndTogglesMeanVsSpread()
+    {
+        var stageVm = new ColorTransferStageViewModel
+        {
+            PaletteMode = PaletteMode.Custom,
+        };
+        var view = new ColorTransferInspectorView
+        {
+            DataContext = stageVm,
+        };
+
+        var window = new Window
+        {
+            Width = 360,
+            Height = 900,
+            Content = view,
+        };
+
+        try
+        {
+            window.Show();
+            TestAppHelpers.PumpUi();
+
+            Border activePaletteCard = view.FindControl<Border>("PART_ActivePaletteCard")!;
+            StackPanel customSection = view.FindControl<StackPanel>("PART_CustomSection")!;
+            Assert.Contains(customSection, activePaletteCard.GetVisualDescendants());
+            Assert.True(customSection.IsVisible);
+
+            Expander advancedExpander = view.FindControl<Expander>("PART_AdvancedExpander")!;
+            advancedExpander.IsExpanded = true;
+            TestAppHelpers.PumpUi();
+
+            var meanTab = view.FindControl<Avalonia.Controls.Primitives.ToggleButton>("PART_MeanLabTabButton")!;
+            var stdDevTab = view.FindControl<Avalonia.Controls.Primitives.ToggleButton>("PART_StdDevLabTabButton")!;
+            StackPanel meanPanel = view.FindControl<StackPanel>("PART_MeanLabPanel")!;
+            StackPanel stdDevPanel = view.FindControl<StackPanel>("PART_StdDevLabPanel")!;
+
+            Assert.True(meanTab.IsChecked == true);
+            Assert.False(stdDevTab.IsChecked == true);
+            Assert.True(meanPanel.IsVisible);
+            Assert.False(stdDevPanel.IsVisible);
+
+            stdDevTab.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+            TestAppHelpers.PumpUi();
+            Assert.False(meanTab.IsChecked == true);
+            Assert.True(stdDevTab.IsChecked == true);
+            Assert.False(meanPanel.IsVisible);
+            Assert.True(stdDevPanel.IsVisible);
+
+            meanTab.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+            TestAppHelpers.PumpUi();
+            Assert.True(meanTab.IsChecked == true);
+            Assert.False(stdDevTab.IsChecked == true);
+            Assert.True(meanPanel.IsVisible);
+            Assert.False(stdDevPanel.IsVisible);
         }
         finally
         {

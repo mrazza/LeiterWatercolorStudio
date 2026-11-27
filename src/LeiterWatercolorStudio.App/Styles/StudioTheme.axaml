@@ -357,6 +357,20 @@
     <Style Selector="Button.studio-icon-btn:disabled">
         <Setter Property="Opacity" Value="0.4" />
     </Style>
+    <Style Selector="Button.studio-icon-btn Path.hold-compare-glyph">
+        <Setter Property="Fill" Value="{DynamicResource StudioForegroundBrush}" />
+    </Style>
+    <Style Selector="Button.studio-icon-btn.hold-active /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource StudioSelectedBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource StudioAccentBrush}" />
+    </Style>
+    <Style Selector="Button.studio-icon-btn.hold-active:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource StudioSelectedBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource StudioAccentBrush}" />
+    </Style>
+    <Style Selector="Button.studio-icon-btn.hold-active Path.hold-compare-glyph">
+        <Setter Property="Fill" Value="{DynamicResource StudioAccentBrush}" />
+    </Style>
 
     <Style Selector="Button.studio-run-subtle">
         <Setter Property="Background" Value="{DynamicResource StudioCardBrush}" />
