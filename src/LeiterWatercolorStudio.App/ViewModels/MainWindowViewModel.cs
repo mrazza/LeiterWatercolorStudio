@@ -1034,8 +1034,14 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
             StatusText = $"Extracting palette from {Path.GetFileName(path)}...";
             (ColorTransferProfile profile, SequentialMatrix<Rgb8> refMatrix) = await Task.Run(() =>
             {
-                ColorTransferProfile extracted = PaletteExtractor.ExtractFromFile(path);
                 SequentialMatrix<Rgb8> loaded = ImageExtensions.LoadRgb8(path);
+                string profileName = Path.GetFileNameWithoutExtension(path);
+                if (string.IsNullOrWhiteSpace(profileName))
+                {
+                    profileName = "Custom Palette";
+                }
+
+                ColorTransferProfile extracted = PaletteExtractor.ExtractFromMatrix(loaded, profileName);
                 return (extracted, loaded);
             });
             if (_disposed)
