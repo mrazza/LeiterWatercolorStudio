@@ -16,6 +16,7 @@ public class AssemblyMetadataTests
         Assert.NotEqual(new Version(1, 0, 0, 0), version);
         Assert.Equal(0, version.Major);
         Assert.Equal(1, version.Minor);
+        Assert.Equal(2, version.Build);
 
         string? product = assembly.GetCustomAttribute<AssemblyProductAttribute>()?.Product;
         Assert.Equal("Leiter Watercolor Studio", product);

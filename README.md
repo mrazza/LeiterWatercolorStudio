@@ -25,11 +25,11 @@ An interactive cross-platform desktop watercolor studio for [Leiter](https://git
 
 ### Prebuilt Binaries (Linux, Windows, macOS)
 
-Standalone executables for the latest release ([v0.1.0](https://github.com/mrazza/LeiterWatercolorStudio/releases/tag/v0.1.0)) are available for download:
+Standalone executables for the latest release ([v0.1.2](https://github.com/mrazza/LeiterWatercolorStudio/releases/tag/v0.1.2)) are available for download:
 
-- **Linux:** [x64 (tar.gz)](https://github.com/mrazza/LeiterWatercolorStudio/releases/download/v0.1.0/LeiterWatercolorStudio-linux-x64.tar.gz) • [ARM64 (tar.gz)](https://github.com/mrazza/LeiterWatercolorStudio/releases/download/v0.1.0/LeiterWatercolorStudio-linux-arm64.tar.gz)
-- **Windows:** [x64 (zip)](https://github.com/mrazza/LeiterWatercolorStudio/releases/download/v0.1.0/LeiterWatercolorStudio-win-x64.zip) • [ARM64 (zip)](https://github.com/mrazza/LeiterWatercolorStudio/releases/download/v0.1.0/LeiterWatercolorStudio-win-arm64.zip)
-- **macOS:** [Apple Silicon / ARM64 (tar.gz)](https://github.com/mrazza/LeiterWatercolorStudio/releases/download/v0.1.0/LeiterWatercolorStudio-osx-arm64.tar.gz) • [Intel / x64 (tar.gz)](https://github.com/mrazza/LeiterWatercolorStudio/releases/download/v0.1.0/LeiterWatercolorStudio-osx-x64.tar.gz)
+- **Linux:** [x64 (tar.gz)](https://github.com/mrazza/LeiterWatercolorStudio/releases/download/v0.1.2/LeiterWatercolorStudio-linux-x64.tar.gz) • [ARM64 (tar.gz)](https://github.com/mrazza/LeiterWatercolorStudio/releases/download/v0.1.2/LeiterWatercolorStudio-linux-arm64.tar.gz)
+- **Windows:** [x64 (zip)](https://github.com/mrazza/LeiterWatercolorStudio/releases/download/v0.1.2/LeiterWatercolorStudio-win-x64.zip) • [ARM64 (zip)](https://github.com/mrazza/LeiterWatercolorStudio/releases/download/v0.1.2/LeiterWatercolorStudio-win-arm64.zip)
+- **macOS:** [Apple Silicon / ARM64 (tar.gz)](https://github.com/mrazza/LeiterWatercolorStudio/releases/download/v0.1.2/LeiterWatercolorStudio-osx-arm64.tar.gz) • [Intel / x64 (tar.gz)](https://github.com/mrazza/LeiterWatercolorStudio/releases/download/v0.1.2/LeiterWatercolorStudio-osx-x64.tar.gz)
 
 Extract the archive and run `LeiterWatercolorStudio` (or `LeiterWatercolorStudio.exe` on Windows).
 
