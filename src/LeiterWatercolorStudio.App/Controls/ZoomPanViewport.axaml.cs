@@ -41,6 +41,9 @@ public partial class ZoomPanViewport : UserControl
     public static readonly StyledProperty<CompareMode> CompareModeProperty =
         AvaloniaProperty.Register<ZoomPanViewport, CompareMode>(nameof(CompareMode), CompareMode.Off);
 
+    public static readonly StyledProperty<bool> IsHoldComparingProperty =
+        AvaloniaProperty.Register<ZoomPanViewport, bool>(nameof(IsHoldComparing), false);
+
     public static readonly StyledProperty<double> WipePositionProperty =
         AvaloniaProperty.Register<ZoomPanViewport, double>(
             nameof(WipePosition),
@@ -78,6 +81,9 @@ public partial class ZoomPanViewport : UserControl
     public static readonly StyledProperty<string?> HoverHudTextProperty =
         AvaloniaProperty.Register<ZoomPanViewport, string?>(nameof(HoverHudText));
 
+    public static readonly StyledProperty<string?> HoverHudDetailsTextProperty =
+        AvaloniaProperty.Register<ZoomPanViewport, string?>(nameof(HoverHudDetailsText));
+
     public static readonly StyledProperty<Color?> HoverSwatchColorProperty =
         AvaloniaProperty.Register<ZoomPanViewport, Color?>(nameof(HoverSwatchColor));
 
@@ -105,6 +111,12 @@ public partial class ZoomPanViewport : UserControl
     public static readonly StyledProperty<ICommand?> OpenImageCommandProperty =
         AvaloniaProperty.Register<ZoomPanViewport, ICommand?>(nameof(OpenImageCommand));
 
+    public static readonly StyledProperty<ICommand?> SampleImageCommandProperty =
+        AvaloniaProperty.Register<ZoomPanViewport, ICommand?>(nameof(SampleImageCommand));
+
+    public static readonly StyledProperty<ICommand?> CancelCommandProperty =
+        AvaloniaProperty.Register<ZoomPanViewport, ICommand?>(nameof(CancelCommand));
+
     public static readonly StyledProperty<ICommand?> ReseedCommandProperty =
         AvaloniaProperty.Register<ZoomPanViewport, ICommand?>(nameof(ReseedCommand));
 
@@ -131,6 +143,16 @@ public partial class ZoomPanViewport : UserControl
             nameof(OpenImageRequested),
             RoutingStrategies.Bubble);
 
+    public static readonly RoutedEvent<RoutedEventArgs> SampleImageRequestedEvent =
+        RoutedEvent.Register<ZoomPanViewport, RoutedEventArgs>(
+            nameof(SampleImageRequested),
+            RoutingStrategies.Bubble);
+
+    public static readonly RoutedEvent<RoutedEventArgs> CancelRequestedEvent =
+        RoutedEvent.Register<ZoomPanViewport, RoutedEventArgs>(
+            nameof(CancelRequested),
+            RoutingStrategies.Bubble);
+
     public static readonly RoutedEvent<FileDroppedEventArgs> FileDroppedEvent =
         RoutedEvent.Register<ZoomPanViewport, FileDroppedEventArgs>(
             nameof(FileDropped),
@@ -146,6 +168,7 @@ public partial class ZoomPanViewport : UserControl
     private bool _isSpaceDown;
     private Point _lastDragPoint;
     private PixelPoint? _lastHoverPixel;
+    private bool _lastHoverIsCompare;
 
     /// <summary>
     /// Initializes a new instance of <see cref="ZoomPanViewport"/>.
@@ -157,6 +180,8 @@ public partial class ZoomPanViewport : UserControl
         PART_Surface.Owner = this;
 
         PART_OpenImageButton.Click += (_, _) => RequestOpenImage();
+        PART_TrySampleButton.Click += (_, _) => RequestSampleImage();
+        PART_CancelButton.Click += (_, _) => RequestCancel();
         PART_ReseedButton.Click += (_, _) => RequestReseed();
         PART_FitButton.Click += (_, _) => FitToView();
         PART_OneToOneButton.Click += (_, _) => ZoomOneToOne();
@@ -187,6 +212,12 @@ public partial class ZoomPanViewport : UserControl
     {
         get => GetValue(CompareModeProperty);
         set => SetValue(CompareModeProperty, value);
+    }
+
+    public bool IsHoldComparing
+    {
+        get => GetValue(IsHoldComparingProperty);
+        set => SetValue(IsHoldComparingProperty, value);
     }
 
     public double WipePosition
@@ -229,6 +260,12 @@ public partial class ZoomPanViewport : UserControl
     {
         get => GetValue(HoverHudTextProperty);
         set => SetValue(HoverHudTextProperty, value);
+    }
+
+    public string? HoverHudDetailsText
+    {
+        get => GetValue(HoverHudDetailsTextProperty);
+        set => SetValue(HoverHudDetailsTextProperty, value);
     }
 
     public Color? HoverSwatchColor
@@ -279,6 +316,18 @@ public partial class ZoomPanViewport : UserControl
         set => SetValue(OpenImageCommandProperty, value);
     }
 
+    public ICommand? SampleImageCommand
+    {
+        get => GetValue(SampleImageCommandProperty);
+        set => SetValue(SampleImageCommandProperty, value);
+    }
+
+    public ICommand? CancelCommand
+    {
+        get => GetValue(CancelCommandProperty);
+        set => SetValue(CancelCommandProperty, value);
+    }
+
     public ICommand? ReseedCommand
     {
         get => GetValue(ReseedCommandProperty);
@@ -313,6 +362,18 @@ public partial class ZoomPanViewport : UserControl
     {
         add => AddHandler(OpenImageRequestedEvent, value);
         remove => RemoveHandler(OpenImageRequestedEvent, value);
+    }
+
+    public event EventHandler<RoutedEventArgs>? SampleImageRequested
+    {
+        add => AddHandler(SampleImageRequestedEvent, value);
+        remove => RemoveHandler(SampleImageRequestedEvent, value);
+    }
+
+    public event EventHandler<RoutedEventArgs>? CancelRequested
+    {
+        add => AddHandler(CancelRequestedEvent, value);
+        remove => RemoveHandler(CancelRequestedEvent, value);
     }
 
     public event EventHandler<FileDroppedEventArgs>? FileDropped
@@ -355,6 +416,52 @@ public partial class ZoomPanViewport : UserControl
         Zoom = CoerceZoom(this, fitZoom);
         PanX = 0.0;
         PanY = 0.0;
+    }
+
+    /// <summary>
+    /// Fits the image to the active pane when the current zoom or pan overflows the pane bounds
+    /// (for example, when entering Side-by-Side comparison while zoomed).
+    /// </summary>
+    public void FitToViewIfNeeded()
+    {
+        WriteableBitmap? referenceBitmap = PrimaryBitmap ?? CompareBitmap;
+        if (referenceBitmap is null || referenceBitmap.PixelSize.Width <= 0 || referenceBitmap.PixelSize.Height <= 0)
+        {
+            return;
+        }
+
+        Size paneSize = GetReferencePaneSize();
+        if (paneSize.Width <= 0 || paneSize.Height <= 0)
+        {
+            return;
+        }
+
+        double renderedW = referenceBitmap.PixelSize.Width * Zoom;
+        double renderedH = referenceBitmap.PixelSize.Height * Zoom;
+        double halfPaneW = paneSize.Width * 0.5;
+        double halfPaneH = paneSize.Height * 0.5;
+        bool overflows =
+            renderedW > paneSize.Width + 2.0 ||
+            renderedH > paneSize.Height + 2.0 ||
+            Math.Abs(PanX) + renderedW * 0.5 > halfPaneW + 2.0 ||
+            Math.Abs(PanY) + renderedH * 0.5 > halfPaneH + 2.0;
+
+        if (overflows)
+        {
+            FitToView();
+        }
+    }
+
+    /// <summary>
+    /// Overrides split-wipe handle capture while the user holds Space to pan anywhere.
+    /// </summary>
+    public void SetSpacePanOverride(bool active)
+    {
+        _isSpaceDown = active;
+        if (!_isPanning && !_isDraggingWipe)
+        {
+            Cursor = active ? HandCursor : DefaultCursor;
+        }
     }
 
     /// <summary>
@@ -483,6 +590,7 @@ public partial class ZoomPanViewport : UserControl
             PART_Surface.InvalidateVisual();
         }
         else if (property == CompareModeProperty ||
+                 property == IsHoldComparingProperty ||
                  property == PrimaryLabelProperty ||
                  property == CompareLabelProperty)
         {
@@ -499,7 +607,9 @@ public partial class ZoomPanViewport : UserControl
             UpdateVisibilityState();
             PART_Surface.InvalidateVisual();
         }
-        else if (property == HoverHudTextProperty || property == HoverSwatchColorProperty)
+        else if (property == HoverHudTextProperty ||
+                 property == HoverHudDetailsTextProperty ||
+                 property == HoverSwatchColorProperty)
         {
             UpdateHoverHud();
         }
@@ -522,6 +632,7 @@ public partial class ZoomPanViewport : UserControl
         else if (property == BoundsProperty)
         {
             UpdateWipeOverlayLayout();
+            UpdateModeBarPosition();
             PART_Surface.InvalidateVisual();
         }
     }
@@ -709,10 +820,13 @@ public partial class ZoomPanViewport : UserControl
         return value;
     }
 
-    private void ZoomAroundCenter(double targetZoom)
+    /// <summary>
+    /// Zooms around the center of the active viewport pane.
+    /// </summary>
+    public void ZoomAroundCenter(double targetZoom)
     {
         Size size = GetEffectiveViewportSize();
-        Point center = CompareMode == CompareMode.SideBySide
+        Point center = CompareMode == CompareMode.SideBySide && !IsHoldComparing
             ? GetSideBySidePanes(size).RightPane.Center
             : new Point(size.Width * 0.5, size.Height * 0.5);
 
@@ -756,7 +870,7 @@ public partial class ZoomPanViewport : UserControl
 
     private Rect ResolvePaneAtPoint(Point viewportPoint, Size viewportSize)
     {
-        if (CompareMode == CompareMode.SideBySide)
+        if (CompareMode == CompareMode.SideBySide && !IsHoldComparing)
         {
             (Rect leftPane, Rect rightPane, _) = GetSideBySidePanes(viewportSize);
             return viewportPoint.X <= leftPane.Right ? leftPane : rightPane;
@@ -767,7 +881,7 @@ public partial class ZoomPanViewport : UserControl
 
     private bool IsPointOnWipeHandle(Point pos)
     {
-        if (CompareMode != CompareMode.SplitWipe || IsEmpty)
+        if (CompareMode != CompareMode.SplitWipe || IsHoldComparing || IsEmpty)
         {
             return false;
         }
@@ -818,10 +932,12 @@ public partial class ZoomPanViewport : UserControl
         PixelPoint? pixel = ScreenToImagePixel(pos);
         if (pixel is PixelPoint px)
         {
-            if (!_lastHoverPixel.HasValue || _lastHoverPixel.Value != px)
+            bool isCompareSide = IsPointInComparePane(pos, GetEffectiveViewportSize());
+            if (!_lastHoverPixel.HasValue || _lastHoverPixel.Value != px || _lastHoverIsCompare != isCompareSide)
             {
                 _lastHoverPixel = px;
-                RaiseEvent(new PixelHoverEventArgs(HoverPixelChangedEvent, px.X, px.Y));
+                _lastHoverIsCompare = isCompareSide;
+                RaiseEvent(new PixelHoverEventArgs(HoverPixelChangedEvent, px.X, px.Y, isCompareSide));
             }
 
             return;
@@ -830,11 +946,34 @@ public partial class ZoomPanViewport : UserControl
         ClearHoverPixel();
     }
 
+    private bool IsPointInComparePane(Point viewportPoint, Size viewportSize)
+    {
+        if (IsHoldComparing)
+        {
+            return true;
+        }
+
+        if (CompareMode == CompareMode.SideBySide)
+        {
+            (Rect leftPane, _, _) = GetSideBySidePanes(viewportSize);
+            return leftPane.Contains(viewportPoint);
+        }
+
+        if (CompareMode == CompareMode.SplitWipe && viewportSize.Width > 0)
+        {
+            double wipeX = Math.Clamp(WipePosition, 0.0, 1.0) * viewportSize.Width;
+            return viewportPoint.X < wipeX;
+        }
+
+        return false;
+    }
+
     private void ClearHoverPixel()
     {
         if (_lastHoverPixel.HasValue)
         {
             _lastHoverPixel = null;
+            _lastHoverIsCompare = false;
             RaiseEvent(new RoutedEventArgs(HoverExitedEvent));
         }
     }
@@ -877,8 +1016,9 @@ public partial class ZoomPanViewport : UserControl
 
     private void UpdateCompareVisuals()
     {
-        bool showWipe = !IsEmpty && CompareMode == CompareMode.SplitWipe;
-        bool showSide = !IsEmpty && CompareMode == CompareMode.SideBySide;
+        bool holdComparing = !IsEmpty && IsHoldComparing;
+        bool showWipe = !IsEmpty && !holdComparing && CompareMode == CompareMode.SplitWipe;
+        bool showSide = !IsEmpty && !holdComparing && CompareMode == CompareMode.SideBySide;
 
         PART_WipeOverlay.IsVisible = showWipe;
         PART_WipeLabels.IsVisible = showWipe;
@@ -888,6 +1028,11 @@ public partial class ZoomPanViewport : UserControl
         string? primaryLabel = PrimaryLabel;
         bool hasCompareLabel = !string.IsNullOrWhiteSpace(compareLabel);
         bool hasPrimaryLabel = !string.IsNullOrWhiteSpace(primaryLabel);
+
+        PART_HoldCompareLabel.Text = hasCompareLabel
+            ? $"Comparing: {compareLabel} (Hold)"
+            : "Comparing Reference";
+        PART_HoldCompareBadge.IsVisible = holdComparing;
 
         PART_WipeCompareLabel.Text = compareLabel ?? string.Empty;
         PART_WipePrimaryLabel.Text = primaryLabel ?? string.Empty;
@@ -903,6 +1048,24 @@ public partial class ZoomPanViewport : UserControl
         {
             UpdateWipeOverlayLayout();
         }
+
+        UpdateModeBarPosition();
+    }
+
+    private void UpdateModeBarPosition()
+    {
+        if (!IsEmpty && !IsHoldComparing && CompareMode == CompareMode.SideBySide)
+        {
+            Size viewportSize = GetEffectiveViewportSize();
+            if (viewportSize.Width > 0)
+            {
+                (Rect _, Rect rightPane, _) = GetSideBySidePanes(viewportSize);
+                PART_ModeBar.Margin = new Thickness(Math.Max(0.0, rightPane.X), 0, 0, 0);
+                return;
+            }
+        }
+
+        PART_ModeBar.Margin = default;
     }
 
     private void UpdateWipeOverlayLayout()
@@ -933,6 +1096,7 @@ public partial class ZoomPanViewport : UserControl
         bool show = !IsEmpty && !string.IsNullOrWhiteSpace(HoverHudText);
         PART_HoverHud.IsVisible = show;
         PART_HoverHudText.Text = HoverHudText ?? string.Empty;
+        ToolTip.SetTip(PART_HoverHud, string.IsNullOrWhiteSpace(HoverHudDetailsText) ? null : HoverHudDetailsText);
 
         if (HoverSwatchColor is Color swatch)
         {
@@ -990,19 +1154,37 @@ public partial class ZoomPanViewport : UserControl
 
     private void UpdateModeBarVisibility()
     {
-        bool hasModes = _modeButtons.Count > 0;
+        bool hasMultipleModes = _modeButtons.Count > 1;
         bool showReseed = ShowReseedButton;
 
-        PART_ModeChips.IsVisible = hasModes;
+        PART_ModeChips.IsVisible = hasMultipleModes;
         PART_ReseedButton.IsVisible = showReseed;
-        PART_ReseedSeparator.IsVisible = hasModes && showReseed;
-        PART_ModeBar.IsVisible = hasModes || showReseed;
+        PART_ReseedSeparator.IsVisible = hasMultipleModes && showReseed;
+        PART_ModeBar.IsVisible = hasMultipleModes || showReseed;
     }
 
     private void RequestOpenImage()
     {
         RaiseEvent(new RoutedEventArgs(OpenImageRequestedEvent));
         if (OpenImageCommand is ICommand cmd && cmd.CanExecute(null))
+        {
+            cmd.Execute(null);
+        }
+    }
+
+    private void RequestSampleImage()
+    {
+        RaiseEvent(new RoutedEventArgs(SampleImageRequestedEvent));
+        if (SampleImageCommand is ICommand cmd && cmd.CanExecute(null))
+        {
+            cmd.Execute(null);
+        }
+    }
+
+    private void RequestCancel()
+    {
+        RaiseEvent(new RoutedEventArgs(CancelRequestedEvent));
+        if (CancelCommand is ICommand cmd && cmd.CanExecute(null))
         {
             cmd.Execute(null);
         }

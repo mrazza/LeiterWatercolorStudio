@@ -10,18 +10,19 @@ public sealed class PixelHoverEventArgs : RoutedEventArgs
     /// <summary>
     /// Initializes a new instance of <see cref="PixelHoverEventArgs"/>.
     /// </summary>
-    public PixelHoverEventArgs(RoutedEvent? routedEvent, int x, int y)
+    public PixelHoverEventArgs(RoutedEvent? routedEvent, int x, int y, bool isCompareSide = false)
         : base(routedEvent)
     {
         X = x;
         Y = y;
+        IsCompareSide = isCompareSide;
     }
 
     /// <summary>
     /// Initializes a new instance of <see cref="PixelHoverEventArgs"/>.
     /// </summary>
-    public PixelHoverEventArgs(int x, int y)
-        : this(null, x, y)
+    public PixelHoverEventArgs(int x, int y, bool isCompareSide = false)
+        : this(null, x, y, isCompareSide)
     {
     }
 
@@ -34,4 +35,9 @@ public sealed class PixelHoverEventArgs : RoutedEventArgs
     /// Gets the zero-based image Y coordinate.
     /// </summary>
     public int Y { get; }
+
+    /// <summary>
+    /// Gets whether the hovered point lies inside the comparison reference pane (left side of Split Wipe / Side-by-Side or Hold-to-Compare).
+    /// </summary>
+    public bool IsCompareSide { get; }
 }

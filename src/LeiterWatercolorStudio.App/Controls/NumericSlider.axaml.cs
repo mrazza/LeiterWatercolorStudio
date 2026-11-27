@@ -6,16 +6,19 @@ using Avalonia.Controls.Primitives;
 using Avalonia.Data;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.VisualTree;
 
 namespace LeiterWatercolorStudio.App.Controls;
 
 /// <summary>
-/// A compact studio slider combining a label, modified indicator dot, synchronized numeric entry,
-/// unit suffix, baseline reset action, and coalesced drag start/completed notifications.
+/// A compact studio slider combining a label, modified indicator dot, baseline track tick,
+/// synchronized numeric entry, unit suffix, baseline reset action, Shift+drag fine-tuning,
+/// wheel nudging, and coalesced drag start/completed notifications.
 /// </summary>
 public partial class NumericSlider : UserControl
 {
     private const double ModifiedEpsilon = 1e-6;
+    private const double ShiftDragScale = 0.1;
 
     /// <summary>
     /// Identifies the <see cref="Label"/> styled property.
@@ -158,6 +161,14 @@ public partial class NumericSlider : UserControl
     private bool _isUpdatingTextBox;
     private bool _isCommittingTextBox;
     private bool _isDragging;
+    private bool _hasDragBounds;
+    private (double Min, double Max) _dragBounds;
+    private bool _isShiftDragging;
+    private bool _capturedByShiftStart;
+    private double _lastShiftPointerX;
+    private double _shiftCurrentValue;
+    private bool _textBoxEditedDuringFocus;
+    private string _focusedInitialText = string.Empty;
     private string? _validationError;
 
     /// <summary>
@@ -169,12 +180,14 @@ public partial class NumericSlider : UserControl
 
         PART_Slider.PropertyChanged += OnSliderPropertyChanged;
         PART_Slider.AddHandler(PointerPressedEvent, OnSliderPointerPressed, RoutingStrategies.Tunnel, handledEventsToo: true);
+        PART_Slider.AddHandler(PointerMovedEvent, OnSliderPointerMoved, RoutingStrategies.Tunnel, handledEventsToo: true);
         PART_Slider.AddHandler(PointerReleasedEvent, OnSliderPointerReleased, RoutingStrategies.Tunnel | RoutingStrategies.Bubble, handledEventsToo: true);
         PART_Slider.AddHandler(PointerCaptureLostEvent, OnSliderPointerCaptureLost, RoutingStrategies.Tunnel | RoutingStrategies.Bubble, handledEventsToo: true);
         PART_Slider.AddHandler(Thumb.DragStartedEvent, OnThumbDragStarted, RoutingStrategies.Bubble, handledEventsToo: true);
         PART_Slider.AddHandler(Thumb.DragCompletedEvent, OnThumbDragCompleted, RoutingStrategies.Bubble, handledEventsToo: true);
         PART_Slider.AddHandler(DoubleTappedEvent, OnResetGesture, RoutingStrategies.Tunnel | RoutingStrategies.Bubble, handledEventsToo: true);
 
+        PART_BaselineTickCanvas.SizeChanged += (_, _) => UpdateBaselineTickPosition();
         PART_LabelArea.DoubleTapped += OnResetGesture;
         PART_ResetButton.Click += OnResetButtonClick;
 
@@ -182,6 +195,8 @@ public partial class NumericSlider : UserControl
         PART_ValueTextBox.LostFocus += OnValueTextBoxLostFocus;
         PART_ValueTextBox.KeyDown += OnValueTextBoxKeyDown;
         PART_ValueTextBox.PropertyChanged += OnValueTextBoxPropertyChanged;
+        PART_ValueTextBox.AddHandler(PointerWheelChangedEvent, OnValueTextBoxPointerWheelChanged, RoutingStrategies.Tunnel | RoutingStrategies.Bubble, handledEventsToo: false);
+        AddHandler(PointerWheelChangedEvent, OnControlPointerWheelChanged, RoutingStrategies.Bubble, handledEventsToo: false);
 
         SyncAllControls();
     }
@@ -414,6 +429,19 @@ public partial class NumericSlider : UserControl
         ClearValidationError();
         SetCurrentValue(ValueProperty, target);
         SetTextBoxTextProgrammatically(FormatNumericValue(Value));
+        if (PART_ValueTextBox.IsFocused)
+        {
+            _focusedInitialText = PART_ValueTextBox.Text ?? string.Empty;
+            _textBoxEditedDuringFocus = false;
+        }
+    }
+
+    /// <inheritdoc />
+    protected override Size ArrangeOverride(Size finalSize)
+    {
+        Size arranged = base.ArrangeOverride(finalSize);
+        UpdateBaselineTickPosition();
+        return arranged;
     }
 
     /// <inheritdoc />
@@ -536,26 +564,66 @@ public partial class NumericSlider : UserControl
         {
             _isUpdatingControls = false;
         }
+
+        UpdateBaselineTickPosition(min, max);
     }
 
     private (double Min, double Max) GetEffectiveBounds()
     {
+        if (_isDragging && _hasDragBounds)
+        {
+            return _dragBounds;
+        }
+
         double rawMin = double.IsFinite(Minimum) ? Minimum : 0.0;
         double rawMax = double.IsFinite(Maximum) ? Maximum : 1.0;
 
         double min = Math.Min(rawMin, rawMax);
         double max = Math.Max(rawMin, rawMax);
 
+        bool keepNonNegative = rawMin >= 0.0;
+
         if (HasBaseline && double.IsFinite(BaselineValue) && IsWithinValidDomain(BaselineValue))
         {
-            if (BaselineValue < min)
-            {
-                min = BaselineValue;
-            }
-
             if (BaselineValue > max)
             {
-                max = BaselineValue;
+                double expandedMax = BaselineValue > 0.0 ? BaselineValue * 1.5 : BaselineValue + (max - min);
+                max = Math.Max(max, ClampExpandedMax(expandedMax, BaselineValue));
+            }
+
+            if (BaselineValue < min)
+            {
+                double expandedMin = BaselineValue >= 0.0
+                    ? BaselineValue * 0.5
+                    : BaselineValue * 1.5;
+                if (keepNonNegative)
+                {
+                    expandedMin = Math.Max(0.0, expandedMin);
+                }
+
+                min = Math.Min(min, ClampExpandedMin(expandedMin, BaselineValue));
+            }
+        }
+
+        if (double.IsFinite(Value) && IsWithinValidDomain(Value))
+        {
+            if (Value > max)
+            {
+                double expandedMax = Value > 0.0 ? Value * 1.15 : Value + (max - min);
+                max = Math.Max(max, ClampExpandedMax(expandedMax, Value));
+            }
+
+            if (Value < min)
+            {
+                double expandedMin = Value >= 0.0
+                    ? Value * 0.5
+                    : Value * 1.15;
+                if (keepNonNegative)
+                {
+                    expandedMin = Math.Max(0.0, expandedMin);
+                }
+
+                min = Math.Min(min, ClampExpandedMin(expandedMin, Value));
             }
         }
 
@@ -565,6 +633,119 @@ public partial class NumericSlider : UserControl
         }
 
         return (min, max);
+    }
+
+    private double ClampExpandedMax(double candidate, double requiredIncludedValue)
+    {
+        double result = Math.Max(candidate, requiredIncludedValue);
+        if (IsInteger)
+        {
+            result = Math.Ceiling(result);
+        }
+
+        if (!double.IsPositiveInfinity(ValidMaximum))
+        {
+            double cap = IsValidMaximumExclusive ? Math.BitDecrement(ValidMaximum) : ValidMaximum;
+            result = Math.Min(result, Math.Max(requiredIncludedValue, cap));
+        }
+
+        return Math.Max(result, requiredIncludedValue);
+    }
+
+    private double ClampExpandedMin(double candidate, double requiredIncludedValue)
+    {
+        double result = Math.Min(candidate, requiredIncludedValue);
+        if (IsInteger)
+        {
+            result = Math.Floor(result);
+        }
+
+        if (!double.IsNegativeInfinity(ValidMinimum))
+        {
+            double floor = IsValidMinimumExclusive ? Math.BitIncrement(ValidMinimum) : ValidMinimum;
+            result = Math.Max(result, Math.Min(requiredIncludedValue, floor));
+        }
+
+        return Math.Min(result, requiredIncludedValue);
+    }
+
+    private void UpdateBaselineTickPosition()
+    {
+        (double min, double max) = GetEffectiveBounds();
+        UpdateBaselineTickPosition(min, max);
+    }
+
+    private void UpdateBaselineTickPosition(double min, double max)
+    {
+        if (PART_BaselineTick is null || PART_BaselineTickCanvas is null)
+        {
+            return;
+        }
+
+        bool showTick = HasBaseline &&
+                        double.IsFinite(BaselineValue) &&
+                        max - min > 1e-12 &&
+                        BaselineValue >= min - 1e-12 &&
+                        BaselineValue <= max + 1e-12;
+
+        if (!showTick)
+        {
+            PART_BaselineTick.IsVisible = false;
+            return;
+        }
+
+        double t = Math.Clamp((BaselineValue - min) / (max - min), 0.0, 1.0);
+        double tickWidth = PART_BaselineTick.Width;
+        double tickHeight = PART_BaselineTick.Height;
+
+        Track? track = PART_Slider.GetVisualDescendants().OfType<Track>().FirstOrDefault();
+        if (track is not null && track.Bounds.Width > 0)
+        {
+            double thumbWidth = track.Thumb is not null && track.Thumb.Bounds.Width > 0
+                ? track.Thumb.Bounds.Width
+                : 16.0;
+            Point? origin = track.TranslatePoint(new Point(0, 0), PART_BaselineTickCanvas);
+            if (origin is Point p)
+            {
+                double travel = Math.Max(1.0, track.Bounds.Width - thumbWidth);
+                double centerX = p.X + (thumbWidth * 0.5) + (t * travel);
+                double centerY = p.Y + (track.Bounds.Height * 0.5);
+                Canvas.SetLeft(PART_BaselineTick, centerX - (tickWidth * 0.5));
+                Canvas.SetTop(PART_BaselineTick, centerY - (tickHeight * 0.5));
+                PART_BaselineTick.IsVisible = true;
+                return;
+            }
+        }
+
+        double canvasWidth = PART_BaselineTickCanvas.Bounds.Width;
+        if (canvasWidth > 0)
+        {
+            double canvasHeight = Math.Max(20.0, PART_BaselineTickCanvas.Bounds.Height);
+            const double fallbackThumbWidth = 16.0;
+            double travel = Math.Max(1.0, canvasWidth - fallbackThumbWidth);
+            double centerX = (fallbackThumbWidth * 0.5) + (t * travel);
+            Canvas.SetLeft(PART_BaselineTick, centerX - (tickWidth * 0.5));
+            Canvas.SetTop(PART_BaselineTick, (canvasHeight - tickHeight) * 0.5);
+            PART_BaselineTick.IsVisible = true;
+        }
+        else
+        {
+            PART_BaselineTick.IsVisible = false;
+        }
+    }
+
+    private double GetTrackTravelWidth()
+    {
+        Track? track = PART_Slider.GetVisualDescendants().OfType<Track>().FirstOrDefault();
+        if (track is not null && track.Bounds.Width > 0)
+        {
+            double thumbWidth = track.Thumb is not null && track.Thumb.Bounds.Width > 0
+                ? track.Thumb.Bounds.Width
+                : 16.0;
+            return Math.Max(1.0, track.Bounds.Width - thumbWidth);
+        }
+
+        return Math.Max(1.0, PART_Slider.Bounds.Width - 16.0);
     }
 
     private (double Min, bool MinExclusive, double Max, bool MaxExclusive) GetValidDomain()
@@ -661,23 +842,35 @@ public partial class NumericSlider : UserControl
             formatted = value.ToString("F2", CultureInfo.CurrentCulture);
         }
 
-        if (double.TryParse(formatted, NumberStyles.Float, CultureInfo.CurrentCulture, out double roundTripped))
+        if (value == 0.0)
         {
-            bool sameZeroSign = (roundTripped == 0.0 && value == 0.0) || (roundTripped != 0.0 && value != 0.0);
-            double tolerance = 1e-12 * Math.Max(1e-12, Math.Abs(value));
-            if (sameZeroSign && Math.Abs(roundTripped - value) <= tolerance)
-            {
-                return formatted;
-            }
+            return formatted;
         }
 
         double abs = Math.Abs(value);
-        if (abs == 0.0 || (abs >= 1e-8 && abs < 1e9))
+        if (abs < 0.05 &&
+            double.TryParse(formatted, NumberStyles.Float, CultureInfo.CurrentCulture, out double roundTripped))
         {
-            return value.ToString("0.############", CultureInfo.CurrentCulture);
+            // For very small non-zero values (e.g., 0.0067115 or 0.0001), avoid rounding to 0 or losing >2% precision.
+            bool collapsedToZero = roundTripped == 0.0;
+            bool significantError = Math.Abs(roundTripped - value) > 0.02 * abs;
+            if (collapsedToZero || significantError)
+            {
+                if (abs >= 0.0001)
+                {
+                    return value.ToString("0.00##", CultureInfo.CurrentCulture);
+                }
+
+                if (abs >= 1e-6)
+                {
+                    return value.ToString("0.######", CultureInfo.CurrentCulture);
+                }
+
+                return value.ToString("G3", CultureInfo.CurrentCulture);
+            }
         }
 
-        return value.ToString("G9", CultureInfo.CurrentCulture);
+        return formatted;
     }
 
     private string FormatBoundValue(double bound)
@@ -729,23 +922,113 @@ public partial class NumericSlider : UserControl
             return;
         }
 
-        PointerPointProperties props = e.GetCurrentPoint(PART_Slider).Properties;
-        if (props.IsLeftButtonPressed)
+        PointerPoint point = e.GetCurrentPoint(PART_Slider);
+        if (!point.Properties.IsLeftButtonPressed)
         {
-            BeginDragSession();
+            return;
         }
+
+        BeginDragSession();
+        _lastShiftPointerX = point.Position.X;
+        _shiftCurrentValue = double.IsFinite(Value) ? Value : _dragBounds.Min;
+
+        if (e.KeyModifiers.HasFlag(KeyModifiers.Shift))
+        {
+            _isShiftDragging = true;
+            _capturedByShiftStart = true;
+            e.Pointer.Capture(PART_Slider);
+            e.Handled = true;
+        }
+        else
+        {
+            _isShiftDragging = false;
+            _capturedByShiftStart = false;
+        }
+    }
+
+    private void OnSliderPointerMoved(object? sender, PointerEventArgs e)
+    {
+        if (IsReadOnly || !_isDragging)
+        {
+            return;
+        }
+
+        PointerPoint point = e.GetCurrentPoint(PART_Slider);
+        double currentX = point.Position.X;
+        bool isShiftHeld = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
+
+        if (!isShiftHeld && !_capturedByShiftStart)
+        {
+            _isShiftDragging = false;
+            _lastShiftPointerX = currentX;
+            _shiftCurrentValue = double.IsFinite(Value) ? Value : _dragBounds.Min;
+            return;
+        }
+
+        if (isShiftHeld && !_isShiftDragging)
+        {
+            // Entering Shift fine-drag mid-gesture: anchor smoothly to current Value.
+            _isShiftDragging = true;
+            _lastShiftPointerX = currentX;
+            _shiftCurrentValue = double.IsFinite(Value) ? Value : _dragBounds.Min;
+            e.Handled = true;
+            return;
+        }
+
+        double dx = currentX - _lastShiftPointerX;
+        _lastShiftPointerX = currentX;
+
+        (double min, double max) = GetEffectiveBounds();
+        double travel = GetTrackTravelWidth();
+        double sensitivity = isShiftHeld ? ShiftDragScale : 1.0;
+        double delta = (dx / travel) * (max - min) * sensitivity;
+
+        _shiftCurrentValue = Math.Clamp(_shiftCurrentValue + delta, min, max);
+        double next = ClampAndSnapForSlider(_shiftCurrentValue, min, max);
+
+        ClearValidationError();
+        _isUpdatingControls = true;
+        try
+        {
+            PART_Slider.Value = next;
+        }
+        finally
+        {
+            _isUpdatingControls = false;
+        }
+
+        if (Math.Abs(next - Value) > 1e-12)
+        {
+            SetCurrentValue(ValueProperty, next);
+        }
+
+        if (!PART_ValueTextBox.IsFocused)
+        {
+            SetTextBoxTextProgrammatically(FormatNumericValue(Value));
+        }
+
+        e.Handled = true;
     }
 
     private void OnSliderPointerReleased(object? sender, PointerReleasedEventArgs e)
     {
         if (e.InitialPressMouseButton == MouseButton.Left)
         {
+            if (_capturedByShiftStart && e.Pointer.Captured == PART_Slider)
+            {
+                e.Pointer.Capture(null);
+            }
+
+            _isShiftDragging = false;
+            _capturedByShiftStart = false;
             EndDragSession();
         }
     }
 
     private void OnSliderPointerCaptureLost(object? sender, PointerCaptureLostEventArgs e)
     {
+        _isShiftDragging = false;
+        _capturedByShiftStart = false;
         EndDragSession();
     }
 
@@ -769,6 +1052,8 @@ public partial class NumericSlider : UserControl
             return;
         }
 
+        _dragBounds = GetEffectiveBounds();
+        _hasDragBounds = true;
         _isDragging = true;
         RaiseEvent(new RoutedEventArgs(DragStartedEvent, this));
         ICommand? command = DragStartedCommand;
@@ -786,6 +1071,10 @@ public partial class NumericSlider : UserControl
         }
 
         _isDragging = false;
+        _hasDragBounds = false;
+        _isShiftDragging = false;
+        _capturedByShiftStart = false;
+        SyncAllControls();
         RaiseEvent(new RoutedEventArgs(DragCompletedEvent, this));
         ICommand? command = DragCompletedCommand;
         if (command is not null && command.CanExecute(null))
@@ -812,6 +1101,8 @@ public partial class NumericSlider : UserControl
 
     private void OnValueTextBoxGotFocus(object? sender, GotFocusEventArgs e)
     {
+        _focusedInitialText = PART_ValueTextBox.Text ?? string.Empty;
+        _textBoxEditedDuringFocus = false;
         PART_ValueTextBox.SelectAll();
     }
 
@@ -822,6 +1113,7 @@ public partial class NumericSlider : UserControl
             return;
         }
 
+        _textBoxEditedDuringFocus = true;
         ClearValidationError();
     }
 
@@ -844,6 +1136,8 @@ public partial class NumericSlider : UserControl
         {
             ClearValidationError();
             SetTextBoxTextProgrammatically(FormatNumericValue(Value));
+            _focusedInitialText = PART_ValueTextBox.Text ?? string.Empty;
+            _textBoxEditedDuringFocus = false;
             PART_ValueTextBox.SelectAll();
             e.Handled = true;
             return;
@@ -851,28 +1145,62 @@ public partial class NumericSlider : UserControl
 
         if (!IsReadOnly && (e.Key == Key.Up || e.Key == Key.Down))
         {
-            (double sliderMin, double sliderMax) = GetEffectiveBounds();
-            double step = GetEffectiveStep(sliderMin, sliderMax);
-            if (e.KeyModifiers.HasFlag(KeyModifiers.Shift))
-            {
-                step *= 10.0;
-            }
-
-            double delta = e.Key == Key.Up ? step : -step;
-            double baseValue = TryValidateUserText(PART_ValueTextBox.Text, out double editedValue, out _)
-                ? editedValue
-                : Value;
-            double next = ClampForKeyboardNudge(baseValue, delta);
-
-            ClearValidationError();
-            if (next != Value)
-            {
-                SetCurrentValue(ValueProperty, next);
-            }
-
-            SetTextBoxTextProgrammatically(FormatNumericValue(Value));
-            PART_ValueTextBox.SelectAll();
+            NudgeByStep(e.Key == Key.Up ? 1.0 : -1.0, e.KeyModifiers.HasFlag(KeyModifiers.Shift));
             e.Handled = true;
+        }
+    }
+
+    private void OnValueTextBoxPointerWheelChanged(object? sender, PointerWheelEventArgs e)
+    {
+        if (IsReadOnly || !PART_ValueTextBox.IsFocused || Math.Abs(e.Delta.Y) < 1e-6)
+        {
+            return;
+        }
+
+        NudgeByStep(e.Delta.Y > 0 ? 1.0 : -1.0, e.KeyModifiers.HasFlag(KeyModifiers.Shift));
+        e.Handled = true;
+    }
+
+    private void OnControlPointerWheelChanged(object? sender, PointerWheelEventArgs e)
+    {
+        if (IsReadOnly || !e.KeyModifiers.HasFlag(KeyModifiers.Control) || Math.Abs(e.Delta.Y) < 1e-6)
+        {
+            return;
+        }
+
+        NudgeByStep(e.Delta.Y > 0 ? 1.0 : -1.0, e.KeyModifiers.HasFlag(KeyModifiers.Shift));
+        e.Handled = true;
+    }
+
+    private void NudgeByStep(double direction, bool coarse)
+    {
+        (double sliderMin, double sliderMax) = GetEffectiveBounds();
+        double step = GetEffectiveStep(sliderMin, sliderMax);
+        if (coarse)
+        {
+            step *= 10.0;
+        }
+
+        double delta = direction > 0 ? step : -step;
+        double baseValue = PART_ValueTextBox.IsFocused &&
+                           _textBoxEditedDuringFocus &&
+                           TryValidateUserText(PART_ValueTextBox.Text, out double editedValue, out _)
+            ? editedValue
+            : Value;
+        double next = ClampForKeyboardNudge(baseValue, delta);
+
+        ClearValidationError();
+        if (next != Value)
+        {
+            SetCurrentValue(ValueProperty, next);
+        }
+
+        SetTextBoxTextProgrammatically(FormatNumericValue(Value));
+        _focusedInitialText = PART_ValueTextBox.Text ?? string.Empty;
+        _textBoxEditedDuringFocus = false;
+        if (PART_ValueTextBox.IsFocused)
+        {
+            PART_ValueTextBox.SelectAll();
         }
     }
 
@@ -935,6 +1263,19 @@ public partial class NumericSlider : UserControl
         }
 
         string? rawText = PART_ValueTextBox.Text;
+
+        // Focusing/unfocusing an unmodified box must never overwrite exact baseline/model precision
+        // with a rounded display string or falsely mark the slider modified.
+        if (!_textBoxEditedDuringFocus ||
+            string.Equals(rawText ?? string.Empty, _focusedInitialText, StringComparison.Ordinal))
+        {
+            ClearValidationError();
+            SetTextBoxTextProgrammatically(FormatNumericValue(Value));
+            _focusedInitialText = PART_ValueTextBox.Text ?? string.Empty;
+            _textBoxEditedDuringFocus = false;
+            return;
+        }
+
         if (TryValidateUserText(rawText, out double parsed, out string errorMessage))
         {
             ClearValidationError();
@@ -952,6 +1293,8 @@ public partial class NumericSlider : UserControl
             }
 
             SetTextBoxTextProgrammatically(FormatNumericValue(Value));
+            _focusedInitialText = PART_ValueTextBox.Text ?? string.Empty;
+            _textBoxEditedDuringFocus = false;
             return;
         }
 
@@ -962,6 +1305,8 @@ public partial class NumericSlider : UserControl
         }
 
         SetTextBoxTextProgrammatically(FormatNumericValue(Value));
+        _focusedInitialText = PART_ValueTextBox.Text ?? string.Empty;
+        _textBoxEditedDuringFocus = false;
         string rejectedMessage = string.IsNullOrWhiteSpace(rawText)
             ? errorMessage
             : $"Rejected \"{rawText.Trim()}\": {errorMessage}";

@@ -5,6 +5,7 @@ using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
 using Avalonia.Media.Imaging;
+using Avalonia.Styling;
 using CommunityToolkit.Mvvm.Input;
 using Leiter.Algorithms.Stylization;
 using LeiterWatercolorStudio.App.Controls;
@@ -47,6 +48,208 @@ public class ToneCurveEditorTests
         finally
         {
             window.Close();
+        }
+    }
+
+    [AvaloniaFact]
+    public void ToneCurveEditor_HistogramAndThemeAdaptation_RenderCleanlyInDarkAndLight()
+    {
+        var vm = new FinishingStageViewModel();
+        var editor = CreateBoundEditor(vm);
+        editor.Histogram = Enumerable.Range(0, 64)
+            .Select(i => Math.Sin((i / 63.0) * Math.PI))
+            .ToArray();
+
+        var window = new Window
+        {
+            Width = 360,
+            Height = 240,
+            Content = editor,
+        };
+
+        try
+        {
+            if (Application.Current is Application app)
+            {
+                app.RequestedThemeVariant = ThemeVariant.Dark;
+            }
+
+            window.Show();
+            TestAppHelpers.PumpUi();
+            using WriteableBitmap? darkFrame = window.CaptureRenderedFrame();
+            Assert.NotNull(darkFrame);
+
+            if (Application.Current is Application lightApp)
+            {
+                lightApp.RequestedThemeVariant = ThemeVariant.Light;
+            }
+
+            TestAppHelpers.PumpUi();
+            using WriteableBitmap? lightFrame = window.CaptureRenderedFrame();
+            Assert.NotNull(lightFrame);
+        }
+        finally
+        {
+            if (Application.Current is Application resetApp)
+            {
+                resetApp.RequestedThemeVariant = ThemeVariant.Dark;
+            }
+
+            window.Close();
+            TestAppHelpers.PumpUi();
+        }
+    }
+
+    [AvaloniaFact]
+    public void ToneCurveEditor_PresetsAndResetToBaseline_UpdateBoundViewModel()
+    {
+        var vm = new FinishingStageViewModel();
+        var editor = CreateBoundEditor(vm);
+        editor.BaselineMinTone = 0.06;
+        editor.BaselineMaxTone = 0.94;
+        editor.BaselineShadowKnee = 0.16;
+        editor.BaselineHighlightKnee = 0.84;
+
+        var window = new Window
+        {
+            Width = 360,
+            Height = 240,
+            Content = editor,
+        };
+
+        try
+        {
+            window.Show();
+            TestAppHelpers.PumpUi();
+
+            editor.ApplyPreset(ToneCurvePreset.Linear);
+            TestAppHelpers.PumpUi();
+            Assert.Equal(0.0, vm.MinTone, 4);
+            Assert.Equal(1.0, vm.MaxTone, 4);
+            Assert.Equal(0.25, vm.ShadowKnee, 4);
+            Assert.Equal(0.75, vm.HighlightKnee, 4);
+
+            Assert.True(editor.ApplyPreset("Soft Wash"));
+            TestAppHelpers.PumpUi();
+            Assert.Equal(0.08, vm.MinTone, 4);
+            Assert.Equal(0.94, vm.MaxTone, 4);
+
+            editor.ApplyPreset(ToneCurvePreset.HighContrast);
+            TestAppHelpers.PumpUi();
+            Assert.Equal(0.02, vm.MinTone, 4);
+            Assert.Equal(0.98, vm.MaxTone, 4);
+
+            Assert.True(editor.ApplyPreset("Lifted Paper"));
+            TestAppHelpers.PumpUi();
+            Assert.Equal(0.12, vm.MinTone, 4);
+            Assert.Equal(0.92, vm.MaxTone, 4);
+
+            Assert.False(editor.ApplyPreset("Unknown Preset"));
+
+            editor.ResetToBaseline();
+            TestAppHelpers.PumpUi();
+            Assert.Equal(0.06, vm.MinTone, 4);
+            Assert.Equal(0.94, vm.MaxTone, 4);
+            Assert.Equal(0.16, vm.ShadowKnee, 4);
+            Assert.Equal(0.84, vm.HighlightKnee, 4);
+        }
+        finally
+        {
+            window.Close();
+            TestAppHelpers.PumpUi();
+        }
+    }
+
+    [AvaloniaFact]
+    public void ToneCurveEditor_DoubleClickHandle_ResetsOnlyClickedHandleToBaseline()
+    {
+        var vm = new FinishingStageViewModel();
+        var editor = CreateBoundEditor(vm);
+        editor.BaselineMinTone = 0.07;
+        editor.BaselineMaxTone = 0.95;
+
+        var window = new Window
+        {
+            Width = 360,
+            Height = 240,
+            Content = editor,
+        };
+
+        try
+        {
+            window.Show();
+            TestAppHelpers.PumpUi();
+
+            vm.MinTone = 0.30;
+            vm.MaxTone = 0.80;
+            TestAppHelpers.PumpUi();
+
+            Point minHandleWindow = ToWindowPoint(editor, window, editor.CurveToScreen(0.0, editor.MinTone));
+            window.MouseDown(minHandleWindow, MouseButton.Left);
+            window.MouseUp(minHandleWindow, MouseButton.Left);
+            window.MouseDown(minHandleWindow, MouseButton.Left);
+            window.MouseUp(minHandleWindow, MouseButton.Left);
+            TestAppHelpers.PumpUi();
+
+            Assert.Equal(0.07, vm.MinTone, 4);
+            Assert.Equal(0.80, vm.MaxTone, 4);
+        }
+        finally
+        {
+            window.Close();
+            TestAppHelpers.PumpUi();
+        }
+    }
+
+    [AvaloniaFact]
+    public void ToneCurveEditor_KeyboardTabAndArrows_CycleAndNudgeHandles()
+    {
+        var vm = new FinishingStageViewModel();
+        var editor = CreateBoundEditor(vm);
+
+        var window = new Window
+        {
+            Width = 360,
+            Height = 240,
+            Content = editor,
+        };
+
+        try
+        {
+            window.Show();
+            TestAppHelpers.PumpUi();
+
+            Assert.True(editor.Focus());
+            TestAppHelpers.PumpUi();
+
+            double startMin = vm.MinTone;
+            window.KeyPressQwerty(PhysicalKey.ArrowUp, RawInputModifiers.None);
+            TestAppHelpers.PumpUi();
+            Assert.Equal(startMin + 0.02, vm.MinTone, 4);
+
+            window.KeyPressQwerty(PhysicalKey.ArrowUp, RawInputModifiers.Shift);
+            TestAppHelpers.PumpUi();
+            Assert.Equal(startMin + 0.025, vm.MinTone, 4);
+
+            // Tab advances from MinTone -> ShadowKnee
+            double startShadow = vm.ShadowKnee;
+            window.KeyPressQwerty(PhysicalKey.Tab, RawInputModifiers.None);
+            TestAppHelpers.PumpUi();
+            window.KeyPressQwerty(PhysicalKey.ArrowRight, RawInputModifiers.None);
+            TestAppHelpers.PumpUi();
+            Assert.Equal(startShadow + 0.02, vm.ShadowKnee, 4);
+
+            // Shift+Tab moves back to MinTone
+            window.KeyPressQwerty(PhysicalKey.Tab, RawInputModifiers.Shift);
+            TestAppHelpers.PumpUi();
+            window.KeyPressQwerty(PhysicalKey.ArrowDown, RawInputModifiers.Shift);
+            TestAppHelpers.PumpUi();
+            Assert.Equal(startMin + 0.02, vm.MinTone, 4);
+        }
+        finally
+        {
+            window.Close();
+            TestAppHelpers.PumpUi();
         }
     }
 

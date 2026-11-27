@@ -13,8 +13,8 @@
 
     <UserControl.Styles>
         <Style Selector="Border.inspector-card">
-            <Setter Property="Background" Value="#1264748B" />
-            <Setter Property="BorderBrush" Value="#3064748B" />
+            <Setter Property="Background" Value="{DynamicResource StudioCardBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource StudioBorderBrush}" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="CornerRadius" Value="6" />
             <Setter Property="Padding" Value="10,9" />
@@ -25,8 +25,8 @@
             <Setter Property="Opacity" Value="0.7" />
         </Style>
         <Style Selector="ListBox.segmented">
-            <Setter Property="Background" Value="#1464748B" />
-            <Setter Property="BorderBrush" Value="#3864748B" />
+            <Setter Property="Background" Value="{DynamicResource StudioSurfaceAltBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource StudioBorderBrush}" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="CornerRadius" Value="6" />
             <Setter Property="Padding" Value="2" />
@@ -38,279 +38,278 @@
             <Setter Property="VerticalContentAlignment" Value="Center" />
             <Setter Property="CornerRadius" Value="4" />
             <Setter Property="FontSize" Value="11.5" />
+            <Setter Property="Foreground" Value="{DynamicResource StudioForegroundBrush}" />
             <Setter Property="Cursor" Value="Hand" />
         </Style>
         <Style Selector="ListBox.segmented ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background" Value="#2563EB" />
-            <Setter Property="Foreground" Value="#FFFFFF" />
+            <Setter Property="Background" Value="{DynamicResource StudioAccentBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource StudioAccentForegroundBrush}" />
         </Style>
         <Style Selector="ListBox.segmented ListBoxItem:selected">
-            <Setter Property="Foreground" Value="#FFFFFF" />
+            <Setter Property="Foreground" Value="{DynamicResource StudioAccentForegroundBrush}" />
             <Setter Property="FontWeight" Value="SemiBold" />
         </Style>
     </UserControl.Styles>
 
     <ScrollViewer VerticalScrollBarVisibility="Auto"
                   HorizontalScrollBarVisibility="Disabled">
-        <StackPanel Spacing="12" Margin="12">
-            <!-- Stage Header -->
-            <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
-                <StackPanel Grid.Column="0" Spacing="1" VerticalAlignment="Center">
-                    <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
-                        <TextBlock Text="1. Color Transfer"
-                                   FontSize="14"
-                                   FontWeight="SemiBold"
-                                   ToolTip.Tip="CIELAB Reinhard statistical color palette transfer" />
-                        <controls:SettingInfoIcon Header="Color Transfer"
-                                                  Text="Shifts your photo's colors into a cohesive watercolor palette before any later painting stages run. Turn this off to paint using the original photo colors instead, which also updates region borders in Segmentation, Wet-in-Wet bleeds, and the final artwork." />
-                    </StackPanel>
-                    <TextBlock Text="CIELAB Reinhard palette wash"
-                               FontSize="11.5"
-                               Opacity="0.68" />
+        <StackPanel Spacing="10"
+                    Margin="12"
+                    IsEnabled="{Binding EnableColorTransfer}"
+                    Opacity="{Binding EnableColorTransfer, Converter={x:Static converters:BoolToOpacityConverter.Instance}}">
+            <!-- Palette Mode Selector -->
+            <StackPanel Spacing="4">
+                <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                    <TextBlock Classes="section-title"
+                               Text="PALETTE MODE"
+                               VerticalAlignment="Center"
+                               ToolTip.Tip="Source strategy for CIELAB Reinhard color transfer statistics" />
+                    <controls:SettingInfoIcon Header="Palette Mode"
+                                              Text="Chooses where the watercolor color mood comes from. Auto picks the closest built-in palette for your photo, Built-In lets you pick any preset palette, and Custom unlocks manual color tuning or sampling from a reference painting. Changing this updates Color Transfer and every stage after it." />
                 </StackPanel>
+                <ListBox x:Name="PART_PaletteModeSelector"
+                         Classes="segmented"
+                         ItemsSource="{x:Static local:ColorTransferInspectorView.PaletteModes}"
+                         SelectedItem="{Binding PaletteMode, Mode=TwoWay}"
+                         SelectionMode="Single,AlwaysSelected">
+                    <ListBox.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <UniformGrid Columns="3" />
+                        </ItemsPanelTemplate>
+                    </ListBox.ItemsPanel>
+                    <ListBox.ItemTemplate>
+                        <DataTemplate x:DataType="models:PaletteMode">
+                            <TextBlock Text="{Binding Converter={x:Static converters:EnumDisplayNameConverter.Instance}}"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center" />
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </StackPanel>
 
-                <ToggleSwitch x:Name="PART_EnableToggle"
-                              Grid.Column="1"
-                              IsChecked="{Binding EnableColorTransfer, Mode=TwoWay}"
-                              OnContent=""
-                              OffContent=""
-                              MinWidth="0"
-                              Padding="0"
-                              VerticalAlignment="Center"
-                              ToolTip.Tip="Enable or bypass Stage 1 Color Transfer" />
+            <!-- Built-in Palette Selector (visible when PaletteMode == BuiltIn) -->
+            <StackPanel x:Name="PART_BuiltInSection"
+                        Spacing="6"
+                        IsVisible="{Binding PaletteMode, Converter={x:Static converters:PaletteModeMatchConverter.BuiltIn}}">
+                <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                    <TextBlock Classes="section-title"
+                               Text="BUILT-IN PALETTE"
+                               VerticalAlignment="Center"
+                               ToolTip.Tip="Curated watercolor target CIELAB color profile" />
+                    <controls:SettingInfoIcon Header="Built-In Palette"
+                                              Text="Remaps your photo's brightness, warmth, and color balance to match the selected 5-swatch watercolor scheme. Switching palettes immediately changes Color Transfer and shifts downstream paint washes and paper contrast." />
+                </StackPanel>
+                <ComboBox x:Name="PART_BuiltInPaletteComboBox"
+                          HorizontalAlignment="Stretch"
+                          ItemsSource="{Binding BuiltInPalettes}"
+                          SelectedItem="{Binding SelectedBuiltInPalette, Mode=TwoWay}">
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate x:DataType="lcolor:ColorTransferProfile">
+                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                <TextBlock Grid.Column="0"
+                                           Text="{Binding Name}"
+                                           VerticalAlignment="Center"
+                                           TextTrimming="CharacterEllipsis" />
+                                <ItemsControl Grid.Column="1"
+                                              ItemsSource="{Binding Converter={x:Static converters:ProfileToSwatchesConverter.Instance}}"
+                                              VerticalAlignment="Center">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <StackPanel Orientation="Horizontal" Spacing="2" />
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="lpixels:Rgb8">
+                                            <Border Width="11"
+                                                    Height="11"
+                                                    CornerRadius="2"
+                                                    BorderThickness="0.5"
+                                                    BorderBrush="{DynamicResource StudioBorderBrush}"
+                                                    Background="{Binding Converter={x:Static converters:Rgb8ToBrushConverter.Instance}}" />
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </Grid>
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                </ComboBox>
 
-                <Button x:Name="PART_ResetButton"
-                        Grid.Column="2"
-                        x:DataType="local:ColorTransferInspectorView"
-                        Content="↺"
-                        Width="28"
-                        Height="28"
-                        Padding="0"
-                        FontSize="13"
+                <Button x:Name="PART_EditAsCustomCopyButton"
+                        Classes="studio-btn"
+                        Content="Edit as Custom Copy"
+                        HorizontalAlignment="Stretch"
                         HorizontalContentAlignment="Center"
-                        VerticalContentAlignment="Center"
-                        VerticalAlignment="Center"
-                        Command="{Binding ResetStageCommand, RelativeSource={RelativeSource AncestorType=local:ColorTransferInspectorView}}"
-                        CommandParameter="{x:Static models:PrimaryStageId.ColorTransfer}"
-                        ToolTip.Tip="Reset Stage 1 Color Transfer to baseline" />
-            </Grid>
+                        Padding="8,5"
+                        ToolTip.Tip="Duplicate this built-in palette into Custom mode to tweak its CIELAB colors" />
+            </StackPanel>
 
-            <!-- Stage Body -->
-            <StackPanel Spacing="10"
-                        Opacity="{Binding EnableColorTransfer, Converter={x:Static converters:BoolToOpacityConverter.Instance}}">
-                <!-- Palette Mode Selector -->
-                <StackPanel Spacing="4">
-                    <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
-                        <TextBlock Classes="section-title"
-                                   Text="PALETTE MODE"
-                                   VerticalAlignment="Center"
-                                   ToolTip.Tip="Source strategy for CIELAB Reinhard color transfer statistics" />
-                        <controls:SettingInfoIcon Header="Palette Mode"
-                                                  Text="Chooses where the watercolor color mood comes from. Auto picks the closest built-in palette for your photo, Built-In lets you pick any preset palette, and Custom unlocks manual color tuning or sampling from a reference painting. Changing this updates Color Transfer and every stage after it." />
-                    </StackPanel>
-                    <ListBox x:Name="PART_PaletteModeSelector"
-                             Classes="segmented"
-                             ItemsSource="{x:Static local:ColorTransferInspectorView.PaletteModes}"
-                             SelectedItem="{Binding PaletteMode, Mode=TwoWay}"
-                             SelectionMode="Single,AlwaysSelected">
-                        <ListBox.ItemsPanel>
-                            <ItemsPanelTemplate>
-                                <UniformGrid Columns="3" />
-                            </ItemsPanelTemplate>
-                        </ListBox.ItemsPanel>
-                        <ListBox.ItemTemplate>
-                            <DataTemplate x:DataType="models:PaletteMode">
-                                <TextBlock Text="{Binding Converter={x:Static converters:EnumDisplayNameConverter.Instance}}"
-                                           HorizontalAlignment="Center"
-                                           VerticalAlignment="Center" />
-                            </DataTemplate>
-                        </ListBox.ItemTemplate>
-                    </ListBox>
-                </StackPanel>
-
-                <!-- Built-in Palette Selector (visible when PaletteMode == BuiltIn) -->
-                <StackPanel x:Name="PART_BuiltInSection"
-                            Spacing="4"
-                            IsVisible="{Binding PaletteMode, Converter={x:Static converters:PaletteModeMatchConverter.BuiltIn}}">
-                    <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
-                        <TextBlock Classes="section-title"
-                                   Text="BUILT-IN PALETTE"
-                                   VerticalAlignment="Center"
-                                   ToolTip.Tip="Curated watercolor target CIELAB color profile" />
-                        <controls:SettingInfoIcon Header="Built-In Palette"
-                                                  Text="Remaps your photo's brightness, warmth, and color balance to match the selected 5-swatch watercolor scheme. Switching palettes immediately changes Color Transfer and shifts downstream paint washes and paper contrast." />
-                    </StackPanel>
-                    <ComboBox x:Name="PART_BuiltInPaletteComboBox"
-                              HorizontalAlignment="Stretch"
-                              ItemsSource="{Binding BuiltInPalettes}"
-                              SelectedItem="{Binding SelectedBuiltInPalette, Mode=TwoWay}">
-                        <ComboBox.ItemTemplate>
-                            <DataTemplate x:DataType="lcolor:ColorTransferProfile">
-                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
-                                    <TextBlock Grid.Column="0"
-                                               Text="{Binding Name}"
-                                               VerticalAlignment="Center"
-                                               TextTrimming="CharacterEllipsis" />
-                                    <ItemsControl Grid.Column="1"
-                                                  ItemsSource="{Binding Converter={x:Static converters:ProfileToSwatchesConverter.Instance}}"
-                                                  VerticalAlignment="Center">
-                                        <ItemsControl.ItemsPanel>
-                                            <ItemsPanelTemplate>
-                                                <StackPanel Orientation="Horizontal" Spacing="2" />
-                                            </ItemsPanelTemplate>
-                                        </ItemsControl.ItemsPanel>
-                                        <ItemsControl.ItemTemplate>
-                                            <DataTemplate x:DataType="lpixels:Rgb8">
-                                                <Border Width="11"
-                                                        Height="11"
-                                                        CornerRadius="2"
-                                                        BorderThickness="0.5"
-                                                        BorderBrush="#40FFFFFF"
-                                                        Background="{Binding Converter={x:Static converters:Rgb8ToBrushConverter.Instance}}" />
-                                            </DataTemplate>
-                                        </ItemsControl.ItemTemplate>
-                                    </ItemsControl>
-                                </Grid>
-                            </DataTemplate>
-                        </ComboBox.ItemTemplate>
-                    </ComboBox>
-                </StackPanel>
-
-                <!-- Extract Reference Palette Action -->
+            <!-- Custom Mode Reference Extraction (visible when PaletteMode == Custom) -->
+            <StackPanel x:Name="PART_CustomSection"
+                        Spacing="6"
+                        IsVisible="{Binding PaletteMode, Converter={x:Static converters:PaletteModeMatchConverter.Custom}}">
                 <Button x:Name="PART_ExtractPaletteButton"
                         x:DataType="local:ColorTransferInspectorView"
+                        Classes="studio-btn"
                         Content="Extract from Reference Image..."
                         HorizontalAlignment="Stretch"
                         HorizontalContentAlignment="Center"
                         Padding="10,7"
                         Command="{Binding ExtractPaletteCommand, RelativeSource={RelativeSource AncestorType=local:ColorTransferInspectorView}}" />
 
-                <!-- Transfer Strength Slider -->
-                <controls:NumericSlider Label="Transfer Strength"
-                                        Description="Blend weight between original colors (0) and transferred watercolor palette (1)."
-                                        InfoText="Controls how strongly the watercolor palette overrides your photo's original colors. At 0, original colors pass straight through unchanged; raising toward 1 moves deeper into the target watercolor mood in both Color Transfer and the final painting."
-                                        Minimum="0"
-                                        Maximum="1"
-                                        ValidMinimum="0"
-                                        ValidMaximum="1"
-                                        Step="0.01"
-                                        FormatString="F2"
-                                        BaselineValue="1"
-                                        Value="{Binding ColorTransferStrength, Mode=TwoWay}" />
-
-                <!-- Live Matched / Active Palette Swatch Preview -->
-                <Border x:Name="PART_ActivePaletteCard" Classes="inspector-card">
-                    <StackPanel Spacing="6">
-                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
-                            <TextBlock Grid.Column="0"
-                                       Classes="section-title"
-                                       Text="ACTIVE PALETTE"
-                                       VerticalAlignment="Center" />
-                            <Border Grid.Column="1"
-                                    Background="#2438BDF8"
-                                    BorderBrush="#5038BDF8"
-                                    BorderThickness="1"
-                                    CornerRadius="4"
-                                    Padding="6,2">
-                                <TextBlock x:Name="PART_ActivePaletteBadgeText"
-                                           Text="Auto"
-                                           FontSize="10.5"
-                                           FontWeight="SemiBold" />
-                            </Border>
-                        </Grid>
-
-                        <TextBlock x:Name="PART_ActivePaletteNameText"
-                                   Text="Awaiting render..."
-                                   FontSize="12.5"
-                                   FontWeight="SemiBold"
-                                   TextTrimming="CharacterEllipsis" />
-
-                        <TextBlock x:Name="PART_ActivePaletteMetaText"
-                                   Text="Closest watercolor palette is selected automatically"
-                                   FontSize="11"
-                                   Opacity="0.68"
-                                   TextWrapping="Wrap" />
-
-                        <UniformGrid x:Name="PART_ActiveSwatchStrip"
-                                     Columns="5"
-                                     IsVisible="False">
-                            <Border x:Name="PART_Swatch0" Height="22" Margin="0,0,2,0" CornerRadius="4" BorderThickness="1" BorderBrush="#3864748B" />
-                            <Border x:Name="PART_Swatch1" Height="22" Margin="1,0,1,0" CornerRadius="4" BorderThickness="1" BorderBrush="#3864748B" />
-                            <Border x:Name="PART_Swatch2" Height="22" Margin="1,0,1,0" CornerRadius="4" BorderThickness="1" BorderBrush="#3864748B" />
-                            <Border x:Name="PART_Swatch3" Height="22" Margin="1,0,1,0" CornerRadius="4" BorderThickness="1" BorderBrush="#3864748B" />
-                            <Border x:Name="PART_Swatch4" Height="22" Margin="2,0,0,0" CornerRadius="4" BorderThickness="1" BorderBrush="#3864748B" />
-                        </UniformGrid>
-                    </StackPanel>
-                </Border>
-
-                <!-- Advanced CIELAB 6D Parameters -->
-                <Expander x:Name="PART_AdvancedExpander"
-                          Header="Advanced"
-                          HorizontalAlignment="Stretch"
-                          IsExpanded="False">
-                    <StackPanel Spacing="8" Margin="0,6,0,0">
-                        <Border Classes="inspector-card"
-                                IsVisible="{Binding PaletteMode, Converter={x:Static converters:PaletteModeMatchConverter.NotCustom}}">
-                            <StackPanel Spacing="6">
-                                <TextBlock Text="Custom CIELAB statistics are read-only outside Custom mode."
-                                           FontSize="11"
-                                           Opacity="0.72"
-                                           TextWrapping="Wrap" />
-                                <Button x:Name="PART_EditAsCustomCopyButton"
-                                        Content="Edit as Custom Copy"
-                                        HorizontalAlignment="Stretch"
-                                        HorizontalContentAlignment="Center"
-                                        Padding="8,5" />
-                            </StackPanel>
+                <Border x:Name="PART_ReferencePreviewCard"
+                        x:DataType="local:ColorTransferInspectorView"
+                        Classes="inspector-card"
+                        IsVisible="{Binding HasReferencePreview, RelativeSource={RelativeSource AncestorType=local:ColorTransferInspectorView}}">
+                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
+                        <Border Grid.Column="0"
+                                Width="44"
+                                Height="44"
+                                CornerRadius="4"
+                                ClipToBounds="True"
+                                Background="{DynamicResource StudioSurfaceAltBrush}"
+                                BorderBrush="{DynamicResource StudioBorderBrush}"
+                                BorderThickness="1">
+                            <Image Source="{Binding ReferenceThumbnail, RelativeSource={RelativeSource AncestorType=local:ColorTransferInspectorView}}"
+                                   Stretch="UniformToFill" />
                         </Border>
-
-                        <StackPanel Spacing="3">
-                            <StackPanel Orientation="Horizontal" Spacing="3" VerticalAlignment="Center">
-                                <TextBlock Text="Custom Palette Name"
-                                           FontSize="12"
-                                           VerticalAlignment="Center"
-                                           ToolTip.Tip="Display name stored with the custom ColorTransferProfile" />
-                                <controls:SettingInfoIcon Header="Custom Palette Name"
-                                                          Text="Sets a friendly label shown in Active Palette and saved inside preset files. Renaming a palette helps organize your looks and does not change the rendered pixels." />
-                            </StackPanel>
-                            <TextBox x:Name="PART_CustomPaletteNameTextBox"
-                                     Text="{Binding CustomPaletteName, Mode=TwoWay}"
-                                     IsReadOnly="{Binding PaletteMode, Converter={x:Static converters:PaletteModeMatchConverter.NotCustom}}" />
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
+                            <TextBlock Classes="section-title" Text="REFERENCE IMAGE" />
+                            <TextBlock Text="{Binding ReferenceImageName, RelativeSource={RelativeSource AncestorType=local:ColorTransferInspectorView}, TargetNullValue='Extracted palette'}"
+                                       FontSize="12"
+                                       FontWeight="SemiBold"
+                                       TextTrimming="CharacterEllipsis" />
                         </StackPanel>
+                    </Grid>
+                </Border>
+            </StackPanel>
 
-                        <StackPanel Spacing="3">
-                            <StackPanel Orientation="Horizontal" Spacing="3" VerticalAlignment="Center">
-                                <TextBlock Text="Illuminant"
-                                           FontSize="12"
-                                           VerticalAlignment="Center"
-                                           ToolTip.Tip="CIE standard reference white illuminant for XYZ to CIELAB conversion" />
-                                <controls:SettingInfoIcon Header="Illuminant"
-                                                          Text="Sets the white light reference used to interpret colors (editable in Custom mode). D65 matches standard daylight screens; E uses equal-energy white balanced for artistic color transfer, causing a subtle shift in white balance in Color Transfer and the final output." />
-                            </StackPanel>
-                            <ComboBox x:Name="PART_CustomIlluminantComboBox"
-                                      HorizontalAlignment="Stretch"
-                                      ItemsSource="{x:Static local:ColorTransferInspectorView.Illuminants}"
-                                      SelectedItem="{Binding CustomIlluminant, Mode=TwoWay}"
-                                      IsEnabled="{Binding PaletteMode, Converter={x:Static converters:PaletteModeMatchConverter.Custom}}">
-                                <ComboBox.ItemTemplate>
-                                    <DataTemplate x:DataType="lpixcs:Illuminant">
-                                        <TextBlock Text="{Binding Converter={x:Static converters:EnumDisplayNameConverter.Instance}}" />
-                                    </DataTemplate>
-                                </ComboBox.ItemTemplate>
-                            </ComboBox>
+            <!-- Transfer Strength Slider -->
+            <controls:NumericSlider Label="Transfer Strength"
+                                    Description="Blend weight between original colors (0) and transferred watercolor palette (1)."
+                                    InfoText="Controls how strongly the watercolor palette overrides your photo's original colors. At 0, original colors pass straight through unchanged; raising toward 1 moves deeper into the target watercolor mood in both Color Transfer and the final painting."
+                                    Minimum="0"
+                                    Maximum="1"
+                                    ValidMinimum="0"
+                                    ValidMaximum="1"
+                                    Step="0.01"
+                                    FormatString="F2"
+                                    BaselineValue="{Binding Baseline.ColorTransferStrength}"
+                                    Value="{Binding ColorTransferStrength, Mode=TwoWay}" />
+
+            <!-- Live Matched / Active Palette Swatch Preview -->
+            <Border x:Name="PART_ActivePaletteCard" Classes="inspector-card">
+                <StackPanel Spacing="6">
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+                        <TextBlock Grid.Column="0"
+                                   Classes="section-title"
+                                   Text="ACTIVE PALETTE"
+                                   VerticalAlignment="Center" />
+                        <Border Grid.Column="1"
+                                Background="{DynamicResource StudioSelectedBrush}"
+                                BorderBrush="{DynamicResource StudioPillActiveBorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="4"
+                                Padding="6,2">
+                            <TextBlock x:Name="PART_ActivePaletteBadgeText"
+                                       Text="Auto"
+                                       FontSize="10.5"
+                                       FontWeight="SemiBold" />
+                        </Border>
+                    </Grid>
+
+                    <TextBlock x:Name="PART_ActivePaletteNameText"
+                               Text="Awaiting render..."
+                               FontSize="12.5"
+                               FontWeight="SemiBold"
+                               TextTrimming="CharacterEllipsis" />
+
+                    <TextBlock x:Name="PART_ActivePaletteMetaText"
+                               Text="Closest watercolor palette is selected automatically"
+                               FontSize="11"
+                               Opacity="0.72"
+                               TextWrapping="Wrap" />
+
+                    <UniformGrid x:Name="PART_ActiveSwatchStrip"
+                                 Columns="5"
+                                 IsVisible="False">
+                        <Border x:Name="PART_Swatch0" Height="22" Margin="0,0,2,0" CornerRadius="4" BorderThickness="1" BorderBrush="{DynamicResource StudioBorderBrush}" />
+                        <Border x:Name="PART_Swatch1" Height="22" Margin="1,0,1,0" CornerRadius="4" BorderThickness="1" BorderBrush="{DynamicResource StudioBorderBrush}" />
+                        <Border x:Name="PART_Swatch2" Height="22" Margin="1,0,1,0" CornerRadius="4" BorderThickness="1" BorderBrush="{DynamicResource StudioBorderBrush}" />
+                        <Border x:Name="PART_Swatch3" Height="22" Margin="1,0,1,0" CornerRadius="4" BorderThickness="1" BorderBrush="{DynamicResource StudioBorderBrush}" />
+                        <Border x:Name="PART_Swatch4" Height="22" Margin="2,0,0,0" CornerRadius="4" BorderThickness="1" BorderBrush="{DynamicResource StudioBorderBrush}" />
+                    </UniformGrid>
+
+                    <Button x:Name="PART_CopyMatchedToCustomButton"
+                            Classes="studio-chip"
+                            Content="Edit as Custom Copy"
+                            HorizontalAlignment="Left"
+                            IsVisible="{Binding PaletteMode, Converter={x:Static local:ColorTransferInspectorView.IsAutoModeConverter}}"
+                            ToolTip.Tip="Copy the matched palette into Custom mode for manual CIELAB tuning" />
+                </StackPanel>
+            </Border>
+
+            <!-- Advanced CIELAB 6D Parameters -->
+            <Expander x:Name="PART_AdvancedExpander"
+                      Header="Advanced"
+                      HorizontalAlignment="Stretch"
+                      IsExpanded="False">
+                <StackPanel Spacing="8" Margin="0,6,0,0">
+                    <Border Classes="inspector-card"
+                            IsVisible="{Binding PaletteMode, Converter={x:Static converters:PaletteModeMatchConverter.NotCustom}}">
+                        <TextBlock Text="Custom CIELAB statistics are read-only outside Custom mode. Use Edit as Custom Copy above to customize."
+                                   FontSize="11"
+                                   Opacity="0.72"
+                                   TextWrapping="Wrap" />
+                    </Border>
+
+                    <StackPanel Spacing="3">
+                        <StackPanel Orientation="Horizontal" Spacing="3" VerticalAlignment="Center">
+                            <TextBlock Text="Custom Palette Name"
+                                       FontSize="12"
+                                       VerticalAlignment="Center"
+                                       ToolTip.Tip="Display name stored with the custom ColorTransferProfile" />
+                            <controls:SettingInfoIcon Header="Custom Palette Name"
+                                                      Text="Sets a friendly label shown in Active Palette and saved inside preset files. Renaming a palette helps organize your looks and does not change the rendered pixels." />
                         </StackPanel>
+                        <TextBox x:Name="PART_CustomPaletteNameTextBox"
+                                 Text="{Binding CustomPaletteName, Mode=TwoWay}"
+                                 IsReadOnly="{Binding PaletteMode, Converter={x:Static converters:PaletteModeMatchConverter.NotCustom}}" />
+                    </StackPanel>
 
-                        <controls:NumericSlider Label="Mean L*"
-                                                Description="Target mean CIELAB lightness (L* in [0, 100]) for Custom palette statistics"
-                                                InfoText="Controls overall brightness of the transferred palette (editable in Custom mode). Lower values create moody, darker washes; higher values yield airy, light-filled watercolor tones in Color Transfer and the final painting."
-                                                Minimum="0"
-                                                Maximum="100"
-                                                Step="0.1"
-                                                FormatString="F2"
-                                                HasBaseline="False"
-                                                IsReadOnly="{Binding PaletteMode, Converter={x:Static converters:PaletteModeMatchConverter.NotCustom}}"
-                                                Value="{Binding MeanL, Mode=TwoWay}" />
+                    <StackPanel Spacing="3">
+                        <StackPanel Orientation="Horizontal" Spacing="3" VerticalAlignment="Center">
+                            <TextBlock Text="Illuminant"
+                                       FontSize="12"
+                                       VerticalAlignment="Center"
+                                       ToolTip.Tip="CIE standard reference white illuminant for XYZ to CIELAB conversion" />
+                            <controls:SettingInfoIcon Header="Illuminant"
+                                                      Text="Sets the white light reference used to interpret colors (editable in Custom mode). D65 matches standard daylight screens; E uses equal-energy white balanced for artistic color transfer, causing a subtle shift in white balance in Color Transfer and the final output." />
+                        </StackPanel>
+                        <ComboBox x:Name="PART_CustomIlluminantComboBox"
+                                  HorizontalAlignment="Stretch"
+                                  ItemsSource="{x:Static local:ColorTransferInspectorView.Illuminants}"
+                                  SelectedItem="{Binding CustomIlluminant, Mode=TwoWay}"
+                                  IsEnabled="{Binding PaletteMode, Converter={x:Static converters:PaletteModeMatchConverter.Custom}}">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate x:DataType="lpixcs:Illuminant">
+                                    <TextBlock Text="{Binding Converter={x:Static converters:EnumDisplayNameConverter.Instance}}" />
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                    </StackPanel>
 
+                    <controls:NumericSlider Label="Mean L*"
+                                            Description="Target mean CIELAB lightness (L* in [0, 100]) for Custom palette statistics"
+                                            InfoText="Controls overall brightness of the transferred palette (editable in Custom mode). Lower values create moody, darker washes; higher values yield airy, light-filled watercolor tones in Color Transfer and the final painting."
+                                            Minimum="0"
+                                            Maximum="100"
+                                            Step="0.1"
+                                            FormatString="F2"
+                                            HasBaseline="False"
+                                            IsReadOnly="{Binding PaletteMode, Converter={x:Static converters:PaletteModeMatchConverter.NotCustom}}"
+                                            Value="{Binding MeanL, Mode=TwoWay}" />
+
+                    <StackPanel Spacing="0">
                         <controls:NumericSlider Label="Mean a*"
                                                 Description="Target mean CIELAB green-red opponent axis (a*) for Custom palette statistics"
                                                 InfoText="Shifts the overall color balance between cool greens and warm pinks/reds (editable in Custom mode). Negative values push washes cooler toward green; positive values add rosy or terracotta warmth in Color Transfer and downstream stages."
@@ -321,7 +320,24 @@
                                                 HasBaseline="False"
                                                 IsReadOnly="{Binding PaletteMode, Converter={x:Static converters:PaletteModeMatchConverter.NotCustom}}"
                                                 Value="{Binding MeanA, Mode=TwoWay}" />
+                        <Grid RowDefinitions="Auto,Auto" RowSpacing="2" Margin="0,0,0,4">
+                            <Border Grid.Row="0" Height="4" CornerRadius="2" Opacity="0.88">
+                                <Border.Background>
+                                    <LinearGradientBrush StartPoint="0%,50%" EndPoint="100%,50%">
+                                        <GradientStop Offset="0" Color="#22C55E" />
+                                        <GradientStop Offset="0.5" Color="#94A3B8" />
+                                        <GradientStop Offset="1" Color="#EF4444" />
+                                    </LinearGradientBrush>
+                                </Border.Background>
+                            </Border>
+                            <Grid Grid.Row="1" ColumnDefinitions="*,*">
+                                <TextBlock Grid.Column="0" Classes="studio-muted" FontSize="10" Text="−a* Green" />
+                                <TextBlock Grid.Column="1" Classes="studio-muted" FontSize="10" HorizontalAlignment="Right" Text="+a* Red" />
+                            </Grid>
+                        </Grid>
+                    </StackPanel>
 
+                    <StackPanel Spacing="0">
                         <controls:NumericSlider Label="Mean b*"
                                                 Description="Target mean CIELAB blue-yellow opponent axis (b*) for Custom palette statistics"
                                                 InfoText="Shifts the overall color balance between cool blues and sunny yellows (editable in Custom mode). Negative values cool the scene toward cobalt blue; positive values add golden amber warmth across Color Transfer and the final image."
@@ -332,45 +348,60 @@
                                                 HasBaseline="False"
                                                 IsReadOnly="{Binding PaletteMode, Converter={x:Static converters:PaletteModeMatchConverter.NotCustom}}"
                                                 Value="{Binding MeanB, Mode=TwoWay}" />
-
-                        <controls:NumericSlider Label="StdDev L*"
-                                                Description="Target standard deviation of CIELAB lightness (L*) controlling tonal spread"
-                                                InfoText="Controls light-to-dark contrast across the palette (editable in Custom mode). Lower values soften contrast into gentle, misty midtones; higher values push deep shadows and bright highlights farther apart in Color Transfer and downstream stages."
-                                                Minimum="0"
-                                                Maximum="100"
-                                                ValidMinimum="0"
-                                                Step="0.1"
-                                                FormatString="F2"
-                                                HasBaseline="False"
-                                                IsReadOnly="{Binding PaletteMode, Converter={x:Static converters:PaletteModeMatchConverter.NotCustom}}"
-                                                Value="{Binding StdDevL, Mode=TwoWay}" />
-
-                        <controls:NumericSlider Label="StdDev a*"
-                                                Description="Target standard deviation of CIELAB a* controlling green-red chromatic spread"
-                                                InfoText="Controls how vivid greens and reds become (editable in Custom mode). Lower values mute green/red differences toward neutral grays; higher values boost rich magentas and emeralds in Color Transfer, also making boundaries stronger for later stages."
-                                                Minimum="0"
-                                                Maximum="128"
-                                                ValidMinimum="0"
-                                                Step="0.1"
-                                                FormatString="F2"
-                                                HasBaseline="False"
-                                                IsReadOnly="{Binding PaletteMode, Converter={x:Static converters:PaletteModeMatchConverter.NotCustom}}"
-                                                Value="{Binding StdDevA, Mode=TwoWay}" />
-
-                        <controls:NumericSlider Label="StdDev b*"
-                                                Description="Target standard deviation of CIELAB b* controlling blue-yellow chromatic spread"
-                                                InfoText="Controls how vivid blues and yellows become (editable in Custom mode). Lower values tone down blue/yellow contrast; higher values amplify vivid skies and warm ochres in Color Transfer and throughout the final painting."
-                                                Minimum="0"
-                                                Maximum="128"
-                                                ValidMinimum="0"
-                                                Step="0.1"
-                                                FormatString="F2"
-                                                HasBaseline="False"
-                                                IsReadOnly="{Binding PaletteMode, Converter={x:Static converters:PaletteModeMatchConverter.NotCustom}}"
-                                                Value="{Binding StdDevB, Mode=TwoWay}" />
+                        <Grid RowDefinitions="Auto,Auto" RowSpacing="2" Margin="0,0,0,4">
+                            <Border Grid.Row="0" Height="4" CornerRadius="2" Opacity="0.88">
+                                <Border.Background>
+                                    <LinearGradientBrush StartPoint="0%,50%" EndPoint="100%,50%">
+                                        <GradientStop Offset="0" Color="#3B82F6" />
+                                        <GradientStop Offset="0.5" Color="#94A3B8" />
+                                        <GradientStop Offset="1" Color="#EAB308" />
+                                    </LinearGradientBrush>
+                                </Border.Background>
+                            </Border>
+                            <Grid Grid.Row="1" ColumnDefinitions="*,*">
+                                <TextBlock Grid.Column="0" Classes="studio-muted" FontSize="10" Text="−b* Blue" />
+                                <TextBlock Grid.Column="1" Classes="studio-muted" FontSize="10" HorizontalAlignment="Right" Text="+b* Yellow" />
+                            </Grid>
+                        </Grid>
                     </StackPanel>
-                </Expander>
-            </StackPanel>
+
+                    <controls:NumericSlider Label="StdDev L*"
+                                            Description="Target standard deviation of CIELAB lightness (L*) controlling tonal spread"
+                                            InfoText="Controls light-to-dark contrast across the palette (editable in Custom mode). Lower values soften contrast into gentle, misty midtones; higher values push deep shadows and bright highlights farther apart in Color Transfer and downstream stages."
+                                            Minimum="0"
+                                            Maximum="100"
+                                            ValidMinimum="0"
+                                            Step="0.1"
+                                            FormatString="F2"
+                                            HasBaseline="False"
+                                            IsReadOnly="{Binding PaletteMode, Converter={x:Static converters:PaletteModeMatchConverter.NotCustom}}"
+                                            Value="{Binding StdDevL, Mode=TwoWay}" />
+
+                    <controls:NumericSlider Label="StdDev a*"
+                                            Description="Target standard deviation of CIELAB a* controlling green-red chromatic spread"
+                                            InfoText="Controls how vivid greens and reds become (editable in Custom mode). Lower values mute green/red differences toward neutral grays; higher values boost rich magentas and emeralds in Color Transfer, also making boundaries stronger for later stages."
+                                            Minimum="0"
+                                            Maximum="128"
+                                            ValidMinimum="0"
+                                            Step="0.1"
+                                            FormatString="F2"
+                                            HasBaseline="False"
+                                            IsReadOnly="{Binding PaletteMode, Converter={x:Static converters:PaletteModeMatchConverter.NotCustom}}"
+                                            Value="{Binding StdDevA, Mode=TwoWay}" />
+
+                    <controls:NumericSlider Label="StdDev b*"
+                                            Description="Target standard deviation of CIELAB b* controlling blue-yellow chromatic spread"
+                                            InfoText="Controls how vivid blues and yellows become (editable in Custom mode). Lower values tone down blue/yellow contrast; higher values amplify vivid skies and warm ochres in Color Transfer and throughout the final painting."
+                                            Minimum="0"
+                                            Maximum="128"
+                                            ValidMinimum="0"
+                                            Step="0.1"
+                                            FormatString="F2"
+                                            HasBaseline="False"
+                                            IsReadOnly="{Binding PaletteMode, Converter={x:Static converters:PaletteModeMatchConverter.NotCustom}}"
+                                            Value="{Binding StdDevB, Mode=TwoWay}" />
+                </StackPanel>
+            </Expander>
         </StackPanel>
     </ScrollViewer>
 </UserControl>

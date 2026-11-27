@@ -2,15 +2,13 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:controls="using:LeiterWatercolorStudio.App.Controls"
              xmlns:converters="using:LeiterWatercolorStudio.App.Converters"
-             xmlns:local="using:LeiterWatercolorStudio.App.Views.Inspectors"
-             xmlns:models="clr-namespace:LeiterWatercolorStudio.Core.Models;assembly=LeiterWatercolorStudio.Core"
              xmlns:stages="clr-namespace:LeiterWatercolorStudio.Core.Parameters.Stages;assembly=LeiterWatercolorStudio.Core"
              x:Class="LeiterWatercolorStudio.App.Views.Inspectors.LodAbstractionInspectorView"
              x:DataType="stages:LodAbstractionStageViewModel">
     <UserControl.Styles>
         <Style Selector="Border.inspector-card">
-            <Setter Property="Background" Value="#1064748B" />
-            <Setter Property="BorderBrush" Value="#3864748B" />
+            <Setter Property="Background" Value="{DynamicResource StudioCardBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource StudioBorderBrush}" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="CornerRadius" Value="6" />
             <Setter Property="Padding" Value="10,8" />
@@ -23,157 +21,109 @@
         </Style>
     </UserControl.Styles>
 
-    <Grid RowDefinitions="Auto,*">
-        <!-- Stage Header -->
-        <Border Grid.Row="0"
-                BorderBrush="#3364748B"
-                BorderThickness="0,0,0,1"
-                Padding="12,10">
-            <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
-                <StackPanel Grid.Column="0" Spacing="1" VerticalAlignment="Center">
-                    <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
-                        <TextBlock Text="LOD Abstraction"
-                                   FontSize="14"
-                                   FontWeight="SemiBold"
-                                   TextTrimming="CharacterEllipsis"
-                                   ToolTip.Tip="Saliency-guided bilateral level-of-detail abstraction" />
-                        <controls:SettingInfoIcon Header="LOD Abstraction"
-                                                  Text="Keeps your main subject sharp while simplifying background details into smooth, painterly washes. When turned off, the entire photo passes through unsimplified, preserving raw photographic sharpness everywhere rather than watercolor hierarchy." />
-                    </StackPanel>
-                    <TextBlock Text="Saliency-guided bilateral filtering"
-                               FontSize="11"
-                               Opacity="0.65"
-                               TextTrimming="CharacterEllipsis" />
+    <ScrollViewer VerticalScrollBarVisibility="Auto"
+                  HorizontalScrollBarVisibility="Disabled">
+        <StackPanel Margin="12"
+                    Spacing="10"
+                    IsEnabled="{Binding EnableLodAbstraction}"
+                    Opacity="{Binding EnableLodAbstraction, Converter={x:Static converters:BoolToOpacityConverter.Instance}}">
+            <!-- Basic Tier -->
+            <Border Classes="inspector-card">
+                <StackPanel Spacing="4">
+                    <TextBlock Classes="section-label" Text="BASIC" />
+
+                    <controls:NumericSlider Label="Salient Kernel Size"
+                                            Description="Fixed bilateral filter kernel size inside salient regions"
+                                            InfoText="Sets how much detail softening is applied directly inside your main subject while keeping its crisp outlines intact. Small values keep sharp photographic texture; higher values paint the subject in smoother, cleaner tonal steps in LOD Abstraction and the final image."
+                                            Unit="px"
+                                            Minimum="1"
+                                            Maximum="25"
+                                            ValidMinimum="1"
+                                            Step="1"
+                                            IsInteger="True"
+                                            FormatString="F0"
+                                            Value="{Binding SalientKernelSize, Mode=TwoWay, Converter={x:Static converters:IntToDoubleConverter.Instance}}"
+                                            BaselineValue="{Binding Baseline.SalientKernelSize, Converter={x:Static converters:IntToDoubleConverter.Instance}}" />
+
+                    <controls:NumericSlider Label="Min Non-Salient Kernel"
+                                            Description="Minimum kernel size in non-salient regions near salient boundaries (clamped &lt;= Max)"
+                                            InfoText="Sets the gentlest smoothing applied to non-subject areas right beside your focal point. Lower values leave a natural, crisp edge transition around the subject; higher values start loosening detail right next to the subject outline in LOD Abstraction."
+                                            Unit="px"
+                                            Minimum="1"
+                                            Maximum="35"
+                                            ValidMinimum="1"
+                                            Step="1"
+                                            IsInteger="True"
+                                            FormatString="F0"
+                                            Value="{Binding MinNonSalientKernelSize, Mode=TwoWay, Converter={x:Static converters:IntToDoubleConverter.Instance}}"
+                                            BaselineValue="{Binding Baseline.MinNonSalientKernelSize, Converter={x:Static converters:IntToDoubleConverter.Instance}}" />
+
+                    <controls:NumericSlider Label="Max Non-Salient Kernel"
+                                            Description="Maximum kernel size in non-salient background regions (clamped &gt;= Min)"
+                                            InfoText="Sets the upper limit on how broad and simplified far background washes can become. Lower values keep recognizable shapes across the background; higher values melt distant clutter into broad, dreamy washes in LOD Abstraction and the final painting."
+                                            Unit="px"
+                                            Minimum="1"
+                                            Maximum="45"
+                                            ValidMinimum="1"
+                                            Step="1"
+                                            IsInteger="True"
+                                            FormatString="F0"
+                                            Value="{Binding MaxNonSalientKernelSize, Mode=TwoWay, Converter={x:Static converters:IntToDoubleConverter.Instance}}"
+                                            BaselineValue="{Binding Baseline.MaxNonSalientKernelSize, Converter={x:Static converters:IntToDoubleConverter.Instance}}" />
+
+                    <controls:NumericSlider Label="Distance Kernel Scale"
+                                            Description="Multiplier mapping normalized saliency distance to kernel size"
+                                            InfoText="Controls how quickly background areas loosen into flat washes as you move away from the subject along the Distance Field. Higher values accelerate background abstraction toward Max Non-Salient Kernel sooner around the focal region."
+                                            Minimum="0"
+                                            Maximum="30"
+                                            ValidMinimum="0"
+                                            Step="0.25"
+                                            FormatString="F2"
+                                            Value="{Binding DistanceKernelScale, Mode=TwoWay}"
+                                            BaselineValue="{Binding Baseline.DistanceKernelScale}" />
                 </StackPanel>
+            </Border>
 
-                <ToggleSwitch Grid.Column="1"
-                              IsChecked="{Binding EnableLodAbstraction, Mode=TwoWay}"
-                              OnContent=""
-                              OffContent=""
-                              MinWidth="0"
-                              Padding="0"
-                              VerticalAlignment="Center"
-                              ToolTip.Tip="Enable or bypass Stage 5 LOD abstraction" />
+            <!-- Advanced Tier -->
+            <Expander Header="Advanced"
+                      IsExpanded="False"
+                      HorizontalAlignment="Stretch"
+                      Padding="10,8">
+                <StackPanel Spacing="4">
+                    <controls:NumericSlider Label="Distance Kernel Bias"
+                                            Description="Additive bias offset applied to distance-based kernel sizing"
+                                            InfoText="Shifts background smoothing stronger or lighter everywhere outside the main subject regardless of distance. Negative values hold onto mid-ground detail longer; positive values apply extra simplification right outside the focal silhouette."
+                                            Minimum="-5"
+                                            Maximum="5"
+                                            Step="0.05"
+                                            FormatString="F2"
+                                            Value="{Binding DistanceKernelBias, Mode=TwoWay}"
+                                            BaselineValue="{Binding Baseline.DistanceKernelBias}" />
 
-                <Button Grid.Column="2"
-                        Content="↺"
-                        Width="26"
-                        Height="26"
-                        Padding="0"
-                        FontSize="13"
-                        HorizontalContentAlignment="Center"
-                        VerticalContentAlignment="Center"
-                        Command="{Binding ResetStageCommand, RelativeSource={RelativeSource AncestorType=local:LodAbstractionInspectorView}}"
-                        CommandParameter="{x:Static models:PrimaryStageId.LodAbstraction}"
-                        ToolTip.Tip="Reset LOD Abstraction parameters to active baseline" />
-            </Grid>
-        </Border>
+                    <controls:NumericSlider Label="Cross-Segment Color Scale"
+                                            Description="Color difference threshold multiplier for cross-segment bilateral filtering"
+                                            InfoText="Controls how easily distant background washes are allowed to blur across region borders. Near 0 keeps every painted region border razor crisp; raising it lets far background regions soften gently across edges in LOD Abstraction and the final wash."
+                                            Minimum="0"
+                                            Maximum="2"
+                                            ValidMinimum="0"
+                                            Step="0.01"
+                                            FormatString="F2"
+                                            Value="{Binding CrossSegmentColorScale, Mode=TwoWay}"
+                                            BaselineValue="{Binding Baseline.CrossSegmentColorScale}" />
 
-        <!-- Parameters -->
-        <ScrollViewer Grid.Row="1"
-                      VerticalScrollBarVisibility="Auto"
-                      HorizontalScrollBarVisibility="Disabled">
-            <StackPanel Margin="12"
-                        Spacing="10"
-                        Opacity="{Binding EnableLodAbstraction, Converter={x:Static converters:BoolToOpacityConverter.Instance}}">
-                <!-- Basic Tier -->
-                <Border Classes="inspector-card">
-                    <StackPanel Spacing="4">
-                        <TextBlock Classes="section-label" Text="BASIC" />
-
-                        <controls:NumericSlider Label="Salient Kernel Size"
-                                                Description="Fixed bilateral filter kernel size inside salient regions"
-                                                InfoText="Sets how much detail softening is applied directly inside your main subject while keeping its crisp outlines intact. Small values keep sharp photographic texture; higher values paint the subject in smoother, cleaner tonal steps in LOD Abstraction and the final image."
-                                                Unit="px"
-                                                Minimum="1"
-                                                Maximum="25"
-                                                ValidMinimum="1"
-                                                Step="1"
-                                                IsInteger="True"
-                                                FormatString="F0"
-                                                Value="{Binding SalientKernelSize, Mode=TwoWay, Converter={x:Static converters:IntToDoubleConverter.Instance}}"
-                                                BaselineValue="5" />
-
-                        <controls:NumericSlider Label="Min Non-Salient Kernel"
-                                                Description="Minimum kernel size in non-salient regions near salient boundaries (clamped &lt;= Max)"
-                                                InfoText="Sets the gentlest smoothing applied to non-subject areas right beside your focal point. Lower values leave a natural, crisp edge transition around the subject; higher values start loosening detail right next to the subject outline in LOD Abstraction."
-                                                Unit="px"
-                                                Minimum="1"
-                                                Maximum="35"
-                                                ValidMinimum="1"
-                                                Step="1"
-                                                IsInteger="True"
-                                                FormatString="F0"
-                                                Value="{Binding MinNonSalientKernelSize, Mode=TwoWay, Converter={x:Static converters:IntToDoubleConverter.Instance}}"
-                                                BaselineValue="4" />
-
-                        <controls:NumericSlider Label="Max Non-Salient Kernel"
-                                                Description="Maximum kernel size in non-salient background regions (clamped &gt;= Min)"
-                                                InfoText="Sets the upper limit on how broad and simplified far background washes can become. Lower values keep recognizable shapes across the background; higher values melt distant clutter into broad, dreamy washes in LOD Abstraction and the final painting."
-                                                Unit="px"
-                                                Minimum="1"
-                                                Maximum="45"
-                                                ValidMinimum="1"
-                                                Step="1"
-                                                IsInteger="True"
-                                                FormatString="F0"
-                                                Value="{Binding MaxNonSalientKernelSize, Mode=TwoWay, Converter={x:Static converters:IntToDoubleConverter.Instance}}"
-                                                BaselineValue="9" />
-
-                        <controls:NumericSlider Label="Distance Kernel Scale"
-                                                Description="Multiplier mapping normalized saliency distance to kernel size"
-                                                InfoText="Controls how quickly background areas loosen into flat washes as you move away from the subject along the Distance Field. Higher values accelerate background abstraction toward Max Non-Salient Kernel sooner around the focal region."
-                                                Minimum="0"
-                                                Maximum="30"
-                                                ValidMinimum="0"
-                                                Step="0.25"
-                                                FormatString="F2"
-                                                Value="{Binding DistanceKernelScale, Mode=TwoWay}"
-                                                BaselineValue="10.0" />
-                    </StackPanel>
-                </Border>
-
-                <!-- Advanced Tier -->
-                <Expander Header="Advanced"
-                          IsExpanded="False"
-                          HorizontalAlignment="Stretch"
-                          Padding="10,8">
-                    <StackPanel Spacing="4">
-                        <controls:NumericSlider Label="Distance Kernel Bias"
-                                                Description="Additive bias offset applied to distance-based kernel sizing"
-                                                InfoText="Shifts background smoothing stronger or lighter everywhere outside the main subject regardless of distance. Negative values hold onto mid-ground detail longer; positive values apply extra simplification right outside the focal silhouette."
-                                                Minimum="-5"
-                                                Maximum="5"
-                                                Step="0.05"
-                                                FormatString="F2"
-                                                Value="{Binding DistanceKernelBias, Mode=TwoWay}"
-                                                BaselineValue="0.3" />
-
-                        <controls:NumericSlider Label="Cross-Segment Color Scale"
-                                                Description="Color difference threshold multiplier for cross-segment bilateral filtering"
-                                                InfoText="Controls how easily distant background washes are allowed to blur across region borders. Near 0 keeps every painted region border razor crisp; raising it lets far background regions soften gently across edges in LOD Abstraction and the final wash."
-                                                Minimum="0"
-                                                Maximum="2"
-                                                ValidMinimum="0"
-                                                Step="0.01"
-                                                FormatString="F2"
-                                                Value="{Binding CrossSegmentColorScale, Mode=TwoWay}"
-                                                BaselineValue="0.3" />
-
-                        <controls:NumericSlider Label="Salient Overlap Threshold"
-                                                Description="Minimum salient pixel fraction required for a region to be classified as salient"
-                                                InfoText="Decides how much of a painted region must fall inside SaliencyCut Mask to stay crisp as part of the main subject. Lower values protect borderline edge regions from blurring; higher values restrict sharp detail strictly to core subject shapes."
-                                                Minimum="0"
-                                                Maximum="1"
-                                                ValidMinimum="0"
-                                                ValidMaximum="1"
-                                                Step="0.01"
-                                                FormatString="F2"
-                                                Value="{Binding SalientOverlapThreshold, Mode=TwoWay}"
-                                                BaselineValue="0.5" />
-                    </StackPanel>
-                </Expander>
-            </StackPanel>
-        </ScrollViewer>
-    </Grid>
+                    <controls:NumericSlider Label="Salient Overlap Threshold"
+                                            Description="Minimum salient pixel fraction required for a region to be classified as salient"
+                                            InfoText="Decides how much of a painted region must fall inside SaliencyCut Mask to stay crisp as part of the main subject. Lower values protect borderline edge regions from blurring; higher values restrict sharp detail strictly to core subject shapes."
+                                            Minimum="0"
+                                            Maximum="1"
+                                            ValidMinimum="0"
+                                            ValidMaximum="1"
+                                            Step="0.01"
+                                            FormatString="F2"
+                                            Value="{Binding SalientOverlapThreshold, Mode=TwoWay}"
+                                            BaselineValue="{Binding Baseline.SalientOverlapThreshold}" />
+                </StackPanel>
+            </Expander>
+        </StackPanel>
+    </ScrollViewer>
 </UserControl>

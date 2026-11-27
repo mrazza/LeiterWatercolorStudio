@@ -44,12 +44,17 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     private string _primaryLabel = string.Empty;
     private string _compareLabel = string.Empty;
     private CompareMode _compareMode = CompareMode.Off;
+    private CompareMode _lastNonOffCompareMode = CompareMode.SplitWipe;
     private CompareReferenceKind _compareReferenceKind = CompareReferenceKind.Input;
     private PrimaryStageId? _pinnedStageId;
+    private bool _isHoldComparing;
     private double _wipePosition = 0.5;
     private double _zoom = 1.0;
     private double _panX;
     private double _panY;
+    private double _gridZoom = 1.0;
+    private double _gridPanX;
+    private double _gridPanY;
 
     private bool _isGridView;
     private bool _isDarkTheme = true;
@@ -62,6 +67,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     private string _progressText = string.Empty;
     private string _statusText = "Ready — Open an image to begin.";
     private string? _hoverHudText;
+    private string? _hoverHudDetailsText;
     private Color? _hoverSwatchColor;
     private bool _hasImage;
     private string _sourceFileDisplayText = "No image loaded";
@@ -72,11 +78,16 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     private string _segmentationStatsText = "Regions: — • Boundaries: —";
     private string _wetInWetStatsText = "Qualifying Boundaries: —";
     private string _stageTimingSummaryText = "—";
+    private IReadOnlyList<double>? _toneCurveHistogram;
+    private Bitmap? _referencePaletteThumbnail;
+    private string? _referenceImageName;
 
     private IReadOnlyMatrix<Rgb8>? _currentDisplayedMatrix;
+    private IReadOnlyMatrix<Rgb8>? _currentCompareMatrix;
     private CancellationTokenSource? _exportCts;
     private WatercolorResult? _cachedFullResResult;
     private WatercolorOptions? _cachedFullResOptions;
+    private bool _isViewingFullRes;
     private int _regionRandomSeed = 42;
     private bool _isSyncingStageState;
     private bool _isSyncingVisualizationMode;
@@ -128,8 +139,12 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
 
         Parameters.OptionsChanged += OnParametersOptionsChanged;
         Parameters.PropertyChanged += OnParametersPropertyChanged;
+        Parameters.ColorTransfer.PropertyChanged += OnBypassableStagePropertyChanged;
+        Parameters.LodAbstraction.PropertyChanged += OnBypassableStagePropertyChanged;
+        Parameters.WetInWet.PropertyChanged += OnBypassableStagePropertyChanged;
+        Parameters.HandTremor.PropertyChanged += OnBypassableStagePropertyChanged;
 
-        SelectedStage = Stages[^1];
+        SelectedStage = Stages[0];
         UpdateBaselineSummaryText();
     }
 
@@ -143,6 +158,12 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     /// Raised after a new image has been loaded so the viewport can fit it comfortably in view.
     /// </summary>
     public event EventHandler? ImageLoaded;
+
+    /// <summary>
+    /// Raised when selecting a sub-stage pill or artist look shortcut should expand and scroll
+    /// to a specific inspector section (e.g., <c>"EdgeDarkening"</c>, <c>"PaperGranulation"</c>).
+    /// </summary>
+    public event Action<string>? InspectorSectionFocusRequested;
 
     /// <summary>
     /// Gets the underlying pipeline execution engine.
@@ -251,6 +272,94 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     public string ActiveStageTitle => _selectedStage?.Title ?? "Input";
 
     /// <summary>
+    /// Gets the unified 1–8 header title for the pinned Stage Inspector header.
+    /// </summary>
+    public string ActiveStageHeaderTitle => ActiveStageId switch
+    {
+        PrimaryStageId.Input => "1. Input",
+        PrimaryStageId.ColorTransfer => "2. Color Transfer",
+        PrimaryStageId.Saliency => "3. Saliency",
+        PrimaryStageId.Segmentation => "4. Segmentation",
+        PrimaryStageId.LodAbstraction => "5. LOD Abstraction",
+        PrimaryStageId.WetInWet => "6. Wet-in-Wet",
+        PrimaryStageId.HandTremor => "7. Hand Tremor",
+        PrimaryStageId.Finishing => "8. Finishing",
+        _ => ActiveStageTitle,
+    };
+
+    /// <summary>
+    /// Gets the concise subtitle for the pinned Stage Inspector header.
+    /// </summary>
+    public string ActiveStageSubtitle => ActiveStageId switch
+    {
+        PrimaryStageId.Input => "Source metadata, baseline & look shortcuts",
+        PrimaryStageId.ColorTransfer => "CIELAB palette matching & color shift",
+        PrimaryStageId.Saliency => "EGBI, regional contrast & SaliencyCut",
+        PrimaryStageId.Segmentation => "Mean-shift filtering & region clustering",
+        PrimaryStageId.LodAbstraction => "Saliency-guided brushstroke abstraction",
+        PrimaryStageId.WetInWet => "Edge bleeding & capillary diffusion",
+        PrimaryStageId.HandTremor => "Boundary perturbation & paper gaps",
+        PrimaryStageId.Finishing => "Pigment washes, tone curve, grain & FXAA",
+        _ => string.Empty,
+    };
+
+    /// <summary>
+    /// Gets a quiet summary label for the sub-stage bar when the active stage has no sub-stages.
+    /// </summary>
+    public string ActiveStageSummary => ActiveStageId switch
+    {
+        PrimaryStageId.Input => HasImage
+            ? "Single-view stage — source photo before watercolor processing"
+            : "Open an image or try the built-in sample photo to begin",
+        PrimaryStageId.ColorTransfer => "Single-view stage — Reinhard CIELAB palette transfer",
+        PrimaryStageId.LodAbstraction => "Single-view stage — saliency-guided brushstroke abstraction",
+        PrimaryStageId.HandTremor => "Single-view stage — boundary perturbation & paper gaps",
+        _ => "Single-view stage — no sub-views",
+    };
+
+    /// <summary>
+    /// Gets whether the active stage supports an enable/bypass toggle in the pinned inspector header.
+    /// </summary>
+    public bool ActiveStageHasBypass => ActiveStageId is
+        PrimaryStageId.ColorTransfer or
+        PrimaryStageId.LodAbstraction or
+        PrimaryStageId.WetInWet or
+        PrimaryStageId.HandTremor;
+
+    /// <summary>
+    /// Gets or sets whether the active bypassable stage is enabled.
+    /// </summary>
+    public bool ActiveStageIsEnabled
+    {
+        get => ActiveStageId switch
+        {
+            PrimaryStageId.ColorTransfer => Parameters.ColorTransfer.EnableColorTransfer,
+            PrimaryStageId.LodAbstraction => Parameters.LodAbstraction.EnableLodAbstraction,
+            PrimaryStageId.WetInWet => Parameters.WetInWet.EnableWetInWet,
+            PrimaryStageId.HandTremor => Parameters.HandTremor.EnableHandTremor,
+            _ => true,
+        };
+        set
+        {
+            switch (ActiveStageId)
+            {
+                case PrimaryStageId.ColorTransfer:
+                    Parameters.ColorTransfer.EnableColorTransfer = value;
+                    break;
+                case PrimaryStageId.LodAbstraction:
+                    Parameters.LodAbstraction.EnableLodAbstraction = value;
+                    break;
+                case PrimaryStageId.WetInWet:
+                    Parameters.WetInWet.EnableWetInWet = value;
+                    break;
+                case PrimaryStageId.HandTremor:
+                    Parameters.HandTremor.EnableHandTremor = value;
+                    break;
+            }
+        }
+    }
+
+    /// <summary>
     /// Gets the active <see cref="PrimaryStageId"/>.
     /// </summary>
     public PrimaryStageId ActiveStageId => _selectedStage?.StageId ?? PrimaryStageId.Input;
@@ -344,6 +453,26 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         {
             if (SetProperty(ref _compareMode, value))
             {
+                if (value != CompareMode.Off)
+                {
+                    _lastNonOffCompareMode = value;
+                }
+
+                RefreshCompareBitmapOnly();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Gets or sets whether Hold-to-Compare is temporarily showing the reference image.
+    /// </summary>
+    public bool IsHoldComparing
+    {
+        get => _isHoldComparing;
+        set
+        {
+            if (SetProperty(ref _isHoldComparing, value))
+            {
                 RefreshCompareBitmapOnly();
             }
         }
@@ -376,7 +505,8 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
             {
                 SyncPinnedCardStates();
                 OnPropertyChanged(nameof(IsCurrentStagePinned));
-                if (CompareReferenceKind == CompareReferenceKind.PinnedStage && CompareMode != CompareMode.Off)
+                if (CompareReferenceKind == CompareReferenceKind.PinnedStage &&
+                    (CompareMode != CompareMode.Off || IsHoldComparing))
                 {
                     RefreshCompareBitmapOnly();
                 }
@@ -394,7 +524,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     }
 
     /// <summary>
-    /// Gets or sets the synchronized viewport zoom factor.
+    /// Gets or sets the single-viewport zoom factor.
     /// </summary>
     public double Zoom
     {
@@ -403,7 +533,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     }
 
     /// <summary>
-    /// Gets or sets the synchronized horizontal pan offset.
+    /// Gets or sets the single-viewport horizontal pan offset.
     /// </summary>
     public double PanX
     {
@@ -412,12 +542,39 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     }
 
     /// <summary>
-    /// Gets or sets the synchronized vertical pan offset.
+    /// Gets or sets the single-viewport vertical pan offset.
     /// </summary>
     public double PanY
     {
         get => _panY;
         set => SetProperty(ref _panY, double.IsFinite(value) ? value : 0.0);
+    }
+
+    /// <summary>
+    /// Gets or sets the independent 4×2 grid zoom factor (default <c>1.0</c> = Fit).
+    /// </summary>
+    public double GridZoom
+    {
+        get => _gridZoom;
+        set => SetProperty(ref _gridZoom, double.IsFinite(value) ? Math.Clamp(value, 0.1, 16.0) : 1.0);
+    }
+
+    /// <summary>
+    /// Gets or sets the independent 4×2 grid horizontal pan offset.
+    /// </summary>
+    public double GridPanX
+    {
+        get => _gridPanX;
+        set => SetProperty(ref _gridPanX, double.IsFinite(value) ? value : 0.0);
+    }
+
+    /// <summary>
+    /// Gets or sets the independent 4×2 grid vertical pan offset.
+    /// </summary>
+    public double GridPanY
+    {
+        get => _gridPanY;
+        set => SetProperty(ref _gridPanY, double.IsFinite(value) ? value : 0.0);
     }
 
     /// <summary>
@@ -488,12 +645,95 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
             if (SetProperty(ref _isAutoRunEnabled, value))
             {
                 Engine.IsAutoRunEnabled = value;
+                OnPropertyChanged(nameof(IsRunHighlighted));
                 if (value && Engine.HasImage && Engine.StaleStages.Count > 0)
                 {
                     _ = Engine.RunNowAsync();
                 }
             }
         }
+    }
+
+    /// <summary>
+    /// Gets whether any pipeline stage has unrendered parameter edits.
+    /// </summary>
+    public bool HasPendingChanges => Engine.HasImage && Engine.StaleStages.Count > 0;
+
+    /// <summary>
+    /// Gets whether the Run button should be highlighted with the primary accent style.
+    /// </summary>
+    public bool IsRunHighlighted => HasImage && (!IsAutoRunEnabled || HasPendingChanges);
+
+    /// <summary>
+    /// Gets whether a full-resolution render matching the current parameters is cached in memory.
+    /// </summary>
+    public bool HasCachedFullRes => _cachedFullResResult is not null;
+
+    /// <summary>
+    /// Gets or sets whether the viewport is currently displaying the cached full-resolution render.
+    /// </summary>
+    public bool IsViewingFullRes
+    {
+        get => _isViewingFullRes;
+        set
+        {
+            bool target = value && HasCachedFullRes;
+            if (SetProperty(ref _isViewingFullRes, target))
+            {
+                if (Engine.PreviewSize.Width > 0 &&
+                    Engine.NativeSize.Width > 0 &&
+                    Engine.PreviewSize.Width != Engine.NativeSize.Width)
+                {
+                    double ratio = target
+                        ? (double)Engine.PreviewSize.Width / Engine.NativeSize.Width
+                        : (double)Engine.NativeSize.Width / Engine.PreviewSize.Width;
+                    Zoom *= ratio;
+                }
+
+                OnPropertyChanged(nameof(FullResToggleLabel));
+                RefreshViewportDisplay();
+                if (target && Engine.NativeSize.Width > 0)
+                {
+                    StatusText = $"Viewing cached full resolution ({Engine.NativeSize.Width}×{Engine.NativeSize.Height}).";
+                }
+                else if (HasImage)
+                {
+                    StatusText = $"Viewing interactive preview ({PreviewResolutionText}).";
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Gets the label for the full-resolution preview toggle badge.
+    /// </summary>
+    public string FullResToggleLabel => IsViewingFullRes ? "Full Res (cached)" : "Preview Full-Res";
+
+    /// <summary>
+    /// Gets the pre-tone-curve Rec.709 luminance histogram for Stage 8's tone curve backdrop.
+    /// </summary>
+    public IReadOnlyList<double>? ToneCurveHistogram
+    {
+        get => _toneCurveHistogram;
+        private set => SetProperty(ref _toneCurveHistogram, value);
+    }
+
+    /// <summary>
+    /// Gets the thumbnail bitmap of the last extracted Stage 2 reference image.
+    /// </summary>
+    public Bitmap? ReferencePaletteThumbnail
+    {
+        get => _referencePaletteThumbnail;
+        private set => SetProperty(ref _referencePaletteThumbnail, value);
+    }
+
+    /// <summary>
+    /// Gets the filename of the last extracted Stage 2 reference image.
+    /// </summary>
+    public string? ReferenceImageName
+    {
+        get => _referenceImageName;
+        private set => SetProperty(ref _referenceImageName, value);
     }
 
     /// <summary>
@@ -530,12 +770,21 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     }
 
     /// <summary>
-    /// Gets the formatted hover pixel diagnostic HUD text.
+    /// Gets the compact 1-line hover pixel diagnostic HUD text.
     /// </summary>
     public string? HoverHudText
     {
         get => _hoverHudText;
         private set => SetProperty(ref _hoverHudText, value);
+    }
+
+    /// <summary>
+    /// Gets the secondary multi-line stage diagnostics for the hovered pixel.
+    /// </summary>
+    public string? HoverHudDetailsText
+    {
+        get => _hoverHudDetailsText;
+        private set => SetProperty(ref _hoverHudDetailsText, value);
     }
 
     /// <summary>
@@ -557,6 +806,8 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         {
             if (SetProperty(ref _hasImage, value))
             {
+                OnPropertyChanged(nameof(ActiveStageSummary));
+                OnPropertyChanged(nameof(IsRunHighlighted));
                 NotifyActionCanExecuteChanged();
             }
         }
@@ -675,29 +926,50 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     /// <summary>
     /// Samples full diagnostic pixel readouts at (<paramref name="x"/>, <paramref name="y"/>) and updates the hover HUD.
     /// </summary>
-    public void UpdateHoverPixel(int x, int y)
+    public void UpdateHoverPixel(int x, int y, bool isCompareSide = false)
     {
-        if (!Engine.HasImage || Engine.PreviewSource is null)
+        bool useFullRes = IsViewingFullRes && _cachedFullResResult is not null && Engine.NativeSource is not null;
+        IReadOnlyMatrix<Rgb8>? sourceMatrix = useFullRes ? Engine.NativeSource : Engine.PreviewSource;
+        WatercolorResult? activeResult = useFullRes ? _cachedFullResResult : Engine.LastResult;
+
+        if (!Engine.HasImage || sourceMatrix is null)
         {
             ClearHoverPixel();
             return;
         }
 
         StageViewId activeView = GetActiveStageViewId();
+        StageViewId sampledView = activeView;
+        IReadOnlyMatrix<Rgb8>? displayedMatrix = _currentDisplayedMatrix;
+
+        if (isCompareSide && (CompareMode != CompareMode.Off || IsHoldComparing))
+        {
+            sampledView = ResolveCompareStageViewId(activeView);
+            displayedMatrix = CompareReferenceKind == CompareReferenceKind.Input
+                ? sourceMatrix
+                : _currentCompareMatrix ?? sourceMatrix;
+        }
+
         if (!PixelInspectorReadout.TrySample(
                 x,
                 y,
-                activeView,
-                Engine.PreviewSource,
-                Engine.LastResult,
+                sampledView,
+                sourceMatrix,
+                activeResult,
                 out PixelInspectorReadout readout,
-                _currentDisplayedMatrix))
+                displayedMatrix))
         {
             ClearHoverPixel();
             return;
         }
 
-        HoverHudText = readout.FormatHudText();
+        string fullHud = readout.FormatHudText();
+        int newlineIndex = fullHud.IndexOf('\n');
+        string primaryLine = newlineIndex >= 0 ? fullHud[..newlineIndex] : fullHud;
+        HoverHudText = isCompareSide ? $"[Ref] {primaryLine}" : primaryLine;
+        HoverHudDetailsText = newlineIndex >= 0 && newlineIndex + 1 < fullHud.Length
+            ? fullHud[(newlineIndex + 1)..]
+            : null;
         HoverSwatchColor = Color.FromRgb(readout.Rgb.R, readout.Rgb.G, readout.Rgb.B);
     }
 
@@ -707,6 +979,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     public void ClearHoverPixel()
     {
         HoverHudText = null;
+        HoverHudDetailsText = null;
         HoverSwatchColor = null;
     }
 
@@ -731,6 +1004,13 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     }
 
     [RelayCommand]
+    private void LoadSampleImage()
+    {
+        SequentialMatrix<Rgb8> sample = CreateSampleLandscapeMatrix(768, 512);
+        LoadImageFromMatrix(sample, "sample_landscape.png");
+    }
+
+    [RelayCommand]
     private async Task ExtractReferencePaletteAsync()
     {
         string? path = await _fileDialogs.PickOpenImageAsync();
@@ -742,11 +1022,22 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         try
         {
             StatusText = $"Extracting palette from {Path.GetFileName(path)}...";
-            ColorTransferProfile profile = await Task.Run(() => PaletteExtractor.ExtractFromFile(path));
+            (ColorTransferProfile profile, SequentialMatrix<Rgb8> refMatrix) = await Task.Run(() =>
+            {
+                ColorTransferProfile extracted = PaletteExtractor.ExtractFromFile(path);
+                SequentialMatrix<Rgb8> loaded = ImageExtensions.LoadRgb8(path);
+                return (extracted, loaded);
+            });
             if (_disposed)
             {
                 return;
             }
+
+            WriteableBitmap nextThumb = MatrixBitmapConverter.BlitThumbnail(refMatrix, maxEdge: 120);
+            Bitmap? oldThumb = _referencePaletteThumbnail;
+            ReferencePaletteThumbnail = nextThumb;
+            ReferenceImageName = Path.GetFileName(path);
+            oldThumb?.Dispose();
 
             Parameters.ColorTransfer.SetCustomProfile(profile);
             PaletteSummaryText = $"{profile.Name} ({profile.Illuminant})";
@@ -790,6 +1081,12 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     {
         Parameters.ResetStage(stageId);
         StatusText = $"Reset {PipelineStageRegistry.GetStage(stageId).DisplayName} parameters.";
+    }
+
+    [RelayCommand(CanExecute = nameof(CanResetActiveStage))]
+    private void ResetActiveStage()
+    {
+        ResetStage(ActiveStageId);
     }
 
     private static bool CanResetStage(PrimaryStageId stageId) => stageId != PrimaryStageId.Input;
@@ -865,7 +1162,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
             return;
         }
 
-        PinnedStageId = PinnedStageId == SelectedStage.StageId ? null : SelectedStage.StageId;
+        SetPinnedStage(PinnedStageId == SelectedStage.StageId ? null : SelectedStage.StageId);
     }
 
     [RelayCommand]
@@ -876,8 +1173,22 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
             return;
         }
 
-        PinnedStageId = PinnedStageId == card.StageId ? null : card.StageId;
+        SetPinnedStage(PinnedStageId == card.StageId ? null : card.StageId);
     }
+
+    [RelayCommand]
+    private void ToggleCompare()
+    {
+        CompareMode = CompareMode == CompareMode.Off ? _lastNonOffCompareMode : CompareMode.Off;
+    }
+
+    [RelayCommand(CanExecute = nameof(CanToggleFullResPreview))]
+    private void ToggleFullResPreview()
+    {
+        IsViewingFullRes = !IsViewingFullRes;
+    }
+
+    private bool CanToggleFullResPreview() => HasCachedFullRes;
 
     [RelayCommand]
     private void ToggleGridView()
@@ -895,6 +1206,47 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     private void ToggleInspector()
     {
         IsInspectorOpen = !IsInspectorOpen;
+    }
+
+    [RelayCommand]
+    private void ApplyLookShortcut(string? lookKey)
+    {
+        if (string.IsNullOrWhiteSpace(lookKey))
+        {
+            return;
+        }
+
+        IsInspectorOpen = true;
+        switch (lookKey)
+        {
+            case "looser-wash":
+                SelectPrimaryStage(PrimaryStageId.LodAbstraction);
+                StatusText = "Jumped to 5. LOD Abstraction for looser brushstroke washes.";
+                break;
+            case "paper-tooth":
+                SelectSubStage(StageViewId.FinishingPaperGranulation);
+                InspectorSectionFocusRequested?.Invoke("PaperGranulation");
+                StatusText = "Jumped to 8. Finishing → Paper Granulation for stronger paper tooth.";
+                break;
+            case "crisper-edges":
+                SelectSubStage(StageViewId.FinishingEdgeDarkening);
+                InspectorSectionFocusRequested?.Invoke("EdgeDarkening");
+                StatusText = "Jumped to 8. Finishing → Edge Darkening for crisper pigment borders.";
+                break;
+            case "richer-color":
+                SelectPrimaryStage(PrimaryStageId.ColorTransfer);
+                StatusText = "Jumped to 2. Color Transfer for richer palette & pigment shift.";
+                break;
+            case "focus-subject":
+                SelectSubStage(StageViewId.SaliencyRcMap);
+                InspectorSectionFocusRequested?.Invoke("Saliency");
+                StatusText = "Jumped to 3. Saliency to refine subject vs. background focus.";
+                break;
+            case "paper-gaps":
+                SelectPrimaryStage(PrimaryStageId.HandTremor);
+                StatusText = "Jumped to 7. Hand Tremor for dry-brush paper gaps & edge wobble.";
+                break;
+        }
     }
 
     [RelayCommand]
@@ -1002,12 +1354,11 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         {
             WatercolorOptions canonical = Parameters.BuildOptions();
             WatercolorResult result = await RunFullResolutionInternalAsync(canonical, cts.Token);
-            _cachedFullResOptions = canonical;
-            _cachedFullResResult = result;
+            SetCachedFullRes(canonical, result);
 
             double totalMs = result.StepTimings.Values.Sum(static t => t.Elapsed.TotalMilliseconds);
             ProgressText = $"Full-res done ({totalMs:0} ms)";
-            StatusText = $"Full-resolution render complete ({Engine.NativeSize.Width}×{Engine.NativeSize.Height}).";
+            StatusText = $"Full-resolution render complete ({Engine.NativeSize.Width}×{Engine.NativeSize.Height}) — toggle 'Preview Full-Res' to inspect.";
         }
         catch (OperationCanceledException)
         {
@@ -1222,7 +1573,13 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         {
             if (sub.ViewId == viewId)
             {
+                bool alreadySelected = ReferenceEquals(SelectedSubStage, sub);
                 SelectedSubStage = sub;
+                if (alreadySelected)
+                {
+                    RequestInspectorSectionFocusIfApplicable(viewId);
+                }
+
                 return;
             }
         }
@@ -1233,6 +1590,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
             SyncVisualizationModesForActiveView();
             RefreshSelectedStageCardBitmap();
             RefreshViewportDisplay();
+            RequestInspectorSectionFocusIfApplicable(viewId);
         }
     }
 
@@ -1279,6 +1637,13 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
 
         Parameters.OptionsChanged -= OnParametersOptionsChanged;
         Parameters.PropertyChanged -= OnParametersPropertyChanged;
+        Parameters.ColorTransfer.PropertyChanged -= OnBypassableStagePropertyChanged;
+        Parameters.LodAbstraction.PropertyChanged -= OnBypassableStagePropertyChanged;
+        Parameters.WetInWet.PropertyChanged -= OnBypassableStagePropertyChanged;
+        Parameters.HandTremor.PropertyChanged -= OnBypassableStagePropertyChanged;
+
+        _referencePaletteThumbnail?.Dispose();
+        _referencePaletteThumbnail = null;
 
         ClearViewportBitmaps();
         foreach (StageCardViewModel card in Stages)
@@ -1297,6 +1662,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         ClearViewportBitmaps();
         ClearAllStageCardBitmaps();
         ClearHoverPixel();
+        ToneCurveHistogram = null;
 
         Engine.LoadImage(matrix, sourcePath);
 
@@ -1320,6 +1686,11 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         finally
         {
             _isLoadingImage = false;
+        }
+
+        if (SelectedStage is null || SelectedStage.StageId == PrimaryStageId.Input)
+        {
+            SelectedStage = Stages[^1];
         }
 
         UpdateInputStageCardBitmap();
@@ -1368,7 +1739,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
                 : WatercolorOptions.Default;
 
             Parameters.SwitchBaseline(mode, baseline);
-            StatusText = $"Switched baseline to {BaselineSummaryText}.";
+            StatusText = $"Switched baseline to {BaselineSummaryText} (Ctrl+Z to undo).";
         }
         finally
         {
@@ -1433,11 +1804,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
             _isSyncingStageState = false;
         }
 
-        OnPropertyChanged(nameof(ActiveStageTitle));
-        OnPropertyChanged(nameof(ActiveStageId));
-        OnPropertyChanged(nameof(CanResetActiveStage));
-        OnPropertyChanged(nameof(IsCurrentStagePinned));
-
+        NotifyActiveStagePropertiesChanged();
         SyncVisualizationModesForActiveView();
         RefreshViewportDisplay();
     }
@@ -1471,10 +1838,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
                     }
 
                     ShowSubStageDrawer = parent.HasSubStages && SubStages.Count > 0;
-                    OnPropertyChanged(nameof(ActiveStageTitle));
-                    OnPropertyChanged(nameof(ActiveStageId));
-                    OnPropertyChanged(nameof(CanResetActiveStage));
-                    OnPropertyChanged(nameof(IsCurrentStagePinned));
+                    NotifyActiveStagePropertiesChanged();
                 }
             }
 
@@ -1496,6 +1860,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         SyncVisualizationModesForActiveView();
         RefreshSelectedStageCardBitmap();
         RefreshViewportDisplay();
+        RequestInspectorSectionFocusIfApplicable(subStage.ViewId);
     }
 
     private void HandleVisualizationModeChanged(VisualizationMode mode)
@@ -1685,9 +2050,12 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
             }
 
             StageTimingSummaryText = $"{e.TotalElapsed.TotalMilliseconds:0} ms ({cachedCount} cached, {executedCount} run)";
+            ToneCurveHistogram = StageVisualizers.ComputeLuminanceHistogram(e.Result.DensityAdjusted ?? Engine.PreviewSource);
 
             ApplyResultToStageCards(e.Result, e.EffectiveOptions);
             RefreshViewportDisplay();
+            OnPropertyChanged(nameof(HasPendingChanges));
+            OnPropertyChanged(nameof(IsRunHighlighted));
         });
     }
 
@@ -1756,6 +2124,9 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
                     }
                 }
             }
+
+            OnPropertyChanged(nameof(HasPendingChanges));
+            OnPropertyChanged(nameof(IsRunHighlighted));
         });
     }
 
@@ -1963,7 +2334,11 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
 
     private void RefreshViewportDisplay()
     {
-        if (!Engine.HasImage || Engine.PreviewSource is null)
+        bool useFullRes = IsViewingFullRes && _cachedFullResResult is not null && Engine.NativeSource is not null;
+        IReadOnlyMatrix<Rgb8>? sourceMatrix = useFullRes ? Engine.NativeSource : Engine.PreviewSource;
+        WatercolorResult? activeResult = useFullRes ? _cachedFullResResult : Engine.LastResult;
+
+        if (!Engine.HasImage || sourceMatrix is null)
         {
             ClearViewportBitmaps();
             return;
@@ -1971,28 +2346,30 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
 
         StageViewId activeView = GetActiveStageViewId();
         StageViewDescriptor activeDescriptor = PipelineStageRegistry.GetView(activeView);
-        WatercolorOptions effectiveOptions = Engine.LastRenderedEffectiveOptions ?? Parameters.BuildOptions();
+        WatercolorOptions effectiveOptions = useFullRes
+            ? (_cachedFullResOptions ?? Parameters.BuildOptions())
+            : (Engine.LastRenderedEffectiveOptions ?? Parameters.BuildOptions());
 
         IReadOnlyMatrix<Rgb8>? primaryMatrix;
         if (activeView == StageViewId.Input)
         {
-            primaryMatrix = Engine.PreviewSource;
-            PrimaryLabel = activeDescriptor.DisplayName;
+            primaryMatrix = sourceMatrix;
+            PrimaryLabel = useFullRes ? $"{activeDescriptor.DisplayName} (Full Res)" : activeDescriptor.DisplayName;
         }
-        else if (Engine.LastResult is WatercolorResult result)
+        else if (activeResult is WatercolorResult result)
         {
             primaryMatrix = StageVisualizers.RenderView(
                 activeView,
                 SelectedVisualizationMode,
-                Engine.PreviewSource,
+                sourceMatrix,
                 result,
                 effectiveOptions,
                 _regionRandomSeed);
-            PrimaryLabel = activeDescriptor.DisplayName;
+            PrimaryLabel = useFullRes ? $"{activeDescriptor.DisplayName} (Full Res)" : activeDescriptor.DisplayName;
         }
         else
         {
-            primaryMatrix = Engine.PreviewSource;
+            primaryMatrix = sourceMatrix;
             PrimaryLabel = $"{activeDescriptor.DisplayName} (Pending)";
         }
 
@@ -2003,21 +2380,28 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
 
     private void RefreshCompareBitmapOnly()
     {
-        if (CompareMode == CompareMode.Off || !Engine.HasImage || Engine.PreviewSource is null)
+        bool needsCompareBitmap = CompareMode != CompareMode.Off || IsHoldComparing;
+        bool useFullRes = IsViewingFullRes && _cachedFullResResult is not null && Engine.NativeSource is not null;
+        IReadOnlyMatrix<Rgb8>? sourceMatrix = useFullRes ? Engine.NativeSource : Engine.PreviewSource;
+
+        if (!needsCompareBitmap || !Engine.HasImage || sourceMatrix is null)
         {
+            _currentCompareMatrix = null;
             CompareLabel = string.Empty;
             DisposeCompareBitmap();
             return;
         }
 
         StageViewId activeView = GetActiveStageViewId();
-        WatercolorOptions effectiveOptions = Engine.LastRenderedEffectiveOptions ?? Parameters.BuildOptions();
+        WatercolorOptions effectiveOptions = useFullRes
+            ? (_cachedFullResOptions ?? Parameters.BuildOptions())
+            : (Engine.LastRenderedEffectiveOptions ?? Parameters.BuildOptions());
         IReadOnlyMatrix<Rgb8>? compareMatrix = null;
 
         switch (CompareReferenceKind)
         {
             case CompareReferenceKind.Input:
-                compareMatrix = Engine.PreviewSource;
+                compareMatrix = sourceMatrix;
                 CompareLabel = "Input";
                 break;
 
@@ -2026,7 +2410,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
                 StageViewId previousView = PipelineStageRegistry.GetPreviousView(activeView);
                 StageViewDescriptor prevDesc = PipelineStageRegistry.GetView(previousView);
                 CompareLabel = prevDesc.DisplayName;
-                compareMatrix = RenderCompareView(previousView, effectiveOptions);
+                compareMatrix = RenderCompareView(previousView, effectiveOptions, useFullRes);
                 break;
             }
 
@@ -2038,7 +2422,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
                     StageViewId pinnedView = pinnedCard?.ActiveViewId ?? PipelineStageRegistry.GetStage(pinnedId).DefaultView;
                     StageViewDescriptor pinnedDesc = PipelineStageRegistry.GetView(pinnedView);
                     CompareLabel = $"Pinned: {pinnedDesc.DisplayName}";
-                    compareMatrix = RenderCompareView(pinnedView, effectiveOptions);
+                    compareMatrix = RenderCompareView(pinnedView, effectiveOptions, useFullRes);
                 }
                 else
                 {
@@ -2050,6 +2434,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
             }
         }
 
+        _currentCompareMatrix = compareMatrix;
         if (compareMatrix is null)
         {
             DisposeCompareBitmap();
@@ -2069,19 +2454,25 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         }
     }
 
-    private IReadOnlyMatrix<Rgb8>? RenderCompareView(StageViewId viewId, WatercolorOptions effectiveOptions)
+    private IReadOnlyMatrix<Rgb8>? RenderCompareView(
+        StageViewId viewId,
+        WatercolorOptions effectiveOptions,
+        bool useFullRes = false)
     {
-        if (Engine.PreviewSource is null)
+        IReadOnlyMatrix<Rgb8>? sourceMatrix = useFullRes ? Engine.NativeSource : Engine.PreviewSource;
+        WatercolorResult? activeResult = useFullRes ? _cachedFullResResult : Engine.LastResult;
+
+        if (sourceMatrix is null)
         {
             return null;
         }
 
         if (viewId == StageViewId.Input)
         {
-            return Engine.PreviewSource;
+            return sourceMatrix;
         }
 
-        if (Engine.LastResult is null)
+        if (activeResult is null)
         {
             return null;
         }
@@ -2089,8 +2480,8 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         return StageVisualizers.RenderView(
             viewId,
             GetVisualizationModeForView(viewId),
-            Engine.PreviewSource,
-            Engine.LastResult,
+            sourceMatrix,
+            activeResult,
             effectiveOptions,
             _regionRandomSeed);
     }
@@ -2119,6 +2510,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     private void ClearViewportBitmaps()
     {
         _currentDisplayedMatrix = null;
+        _currentCompareMatrix = null;
         PrimaryLabel = string.Empty;
         CompareLabel = string.Empty;
         DisposePrimaryBitmap();
@@ -2216,8 +2608,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     private async Task<WatercolorResult> RenderAndCacheFullResolutionAsync(WatercolorOptions canonical, CancellationToken ct)
     {
         WatercolorResult result = await RunFullResolutionInternalAsync(canonical, ct);
-        _cachedFullResOptions = canonical;
-        _cachedFullResResult = result;
+        SetCachedFullRes(canonical, result);
         return result;
     }
 
@@ -2236,10 +2627,239 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
             ct);
     }
 
+    private void SetCachedFullRes(WatercolorOptions canonical, WatercolorResult result)
+    {
+        _cachedFullResOptions = canonical;
+        _cachedFullResResult = result;
+        OnPropertyChanged(nameof(HasCachedFullRes));
+        ToggleFullResPreviewCommand.NotifyCanExecuteChanged();
+    }
+
     private void InvalidateFullResCache()
     {
+        bool hadCache = _cachedFullResResult is not null;
+        bool wasViewing = _isViewingFullRes;
+
         _cachedFullResResult = null;
         _cachedFullResOptions = null;
+
+        if (wasViewing)
+        {
+            if (Engine.PreviewSize.Width > 0 &&
+                Engine.NativeSize.Width > 0 &&
+                Engine.PreviewSize.Width != Engine.NativeSize.Width)
+            {
+                Zoom *= (double)Engine.NativeSize.Width / Engine.PreviewSize.Width;
+            }
+
+            _isViewingFullRes = false;
+            OnPropertyChanged(nameof(IsViewingFullRes));
+            OnPropertyChanged(nameof(FullResToggleLabel));
+        }
+
+        if (hadCache || wasViewing)
+        {
+            OnPropertyChanged(nameof(HasCachedFullRes));
+            ToggleFullResPreviewCommand.NotifyCanExecuteChanged();
+        }
+
+        if (wasViewing && !_isLoadingImage)
+        {
+            RefreshViewportDisplay();
+            StatusText = "Parameter edited — reverted from full-res cache to interactive preview.";
+        }
+    }
+
+    private void SetPinnedStage(PrimaryStageId? nextStage)
+    {
+        PinnedStageId = nextStage;
+        if (nextStage is PrimaryStageId pinned)
+        {
+            string stageName = PipelineStageRegistry.GetStage(pinned).DisplayName;
+            if (CompareReferenceKind != CompareReferenceKind.PinnedStage)
+            {
+                CompareReferenceKind = CompareReferenceKind.PinnedStage;
+            }
+
+            StatusText = CompareMode == CompareMode.Off
+                ? $"Pinned '{stageName}' as A/B reference — press C or \\ to compare."
+                : $"Pinned '{stageName}' as A/B comparison reference.";
+        }
+        else
+        {
+            StatusText = "Cleared pinned A/B comparison reference.";
+        }
+    }
+
+    private void OnBypassableStagePropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is
+            nameof(Core.Parameters.Stages.ColorTransferStageViewModel.EnableColorTransfer) or
+            nameof(Core.Parameters.Stages.LodAbstractionStageViewModel.EnableLodAbstraction) or
+            nameof(Core.Parameters.Stages.WetInWetStageViewModel.EnableWetInWet) or
+            nameof(Core.Parameters.Stages.HandTremorStageViewModel.EnableHandTremor))
+        {
+            OnPropertyChanged(nameof(ActiveStageIsEnabled));
+        }
+    }
+
+    private void NotifyActiveStagePropertiesChanged()
+    {
+        OnPropertyChanged(nameof(ActiveStageTitle));
+        OnPropertyChanged(nameof(ActiveStageHeaderTitle));
+        OnPropertyChanged(nameof(ActiveStageSubtitle));
+        OnPropertyChanged(nameof(ActiveStageSummary));
+        OnPropertyChanged(nameof(ActiveStageHasBypass));
+        OnPropertyChanged(nameof(ActiveStageIsEnabled));
+        OnPropertyChanged(nameof(ActiveStageId));
+        OnPropertyChanged(nameof(CanResetActiveStage));
+        OnPropertyChanged(nameof(IsCurrentStagePinned));
+        ResetActiveStageCommand.NotifyCanExecuteChanged();
+    }
+
+    private StageViewId ResolveCompareStageViewId(StageViewId activeView)
+    {
+        return CompareReferenceKind switch
+        {
+            CompareReferenceKind.Input => StageViewId.Input,
+            CompareReferenceKind.PreviousStage => PipelineStageRegistry.GetPreviousView(activeView),
+            CompareReferenceKind.PinnedStage when _pinnedStageId is PrimaryStageId pinnedId =>
+                FindStageCard(pinnedId)?.ActiveViewId ?? PipelineStageRegistry.GetStage(pinnedId).DefaultView,
+            _ => activeView,
+        };
+    }
+
+    private void RequestInspectorSectionFocusIfApplicable(StageViewId viewId)
+    {
+        string? sectionKey = viewId switch
+        {
+            StageViewId.FinishingEdgeDarkening => "EdgeDarkening",
+            StageViewId.FinishingTurbulenceFlow => "TurbulenceFlow",
+            StageViewId.FinishingToneCurve => "ToneCurve",
+            StageViewId.FinishingPaperGranulation => "PaperGranulation",
+            StageViewId.FinishingFinalFxaa => "Fxaa",
+            _ => null,
+        };
+
+        if (sectionKey is not null)
+        {
+            InspectorSectionFocusRequested?.Invoke(sectionKey);
+        }
+    }
+
+    private static SequentialMatrix<Rgb8> CreateSampleLandscapeMatrix(int width, int height)
+    {
+        var matrix = new SequentialMatrix<Rgb8>(width, height);
+        for (int y = 0; y < height; y++)
+        {
+            double ny = y / (double)(height - 1);
+            for (int x = 0; x < width; x++)
+            {
+                double nx = x / (double)(width - 1);
+
+                // Sky gradient (warm horizon to crisp cerulean)
+                double r = 92.0 + 138.0 * Math.Pow(Math.Clamp(ny / 0.56, 0.0, 1.0), 1.4);
+                double g = 148.0 + 78.0 * Math.Pow(Math.Clamp(ny / 0.56, 0.0, 1.0), 1.2);
+                double b = 216.0 - 24.0 * Math.Clamp(ny / 0.56, 0.0, 1.0);
+
+                // Soft sunlit clouds
+                double cloudBand = Math.Exp(-Math.Pow((ny - 0.19) / 0.09, 2.0)) *
+                                   (0.5 + 0.5 * Math.Sin(nx * 11.5 + 0.8) * Math.Cos(nx * 5.2));
+                if (ny < 0.45 && cloudBand > 0.35)
+                {
+                    double w = Math.Clamp((cloudBand - 0.35) * 1.4, 0.0, 0.85);
+                    r = r * (1 - w) + 250 * w;
+                    g = g * (1 - w) + 244 * w;
+                    b = b * (1 - w) + 236 * w;
+                }
+
+                // Distant misty hills
+                double farHillY = 0.43 + 0.045 * Math.Sin(nx * 6.2 + 0.4) + 0.02 * Math.Cos(nx * 14.0);
+                if (ny >= farHillY)
+                {
+                    r = 104 + 14 * Math.Sin(nx * 18.0);
+                    g = 122 + 12 * Math.Cos(nx * 12.0);
+                    b = 154;
+                }
+
+                // Mid-ground sunlit olive/sage hills
+                double midHillY = 0.50 + 0.04 * Math.Cos(nx * 5.0 - 0.6) + 0.018 * Math.Sin(nx * 17.0);
+                if (ny >= midHillY)
+                {
+                    double sun = 0.85 + 0.15 * Math.Sin(nx * 24.0 + ny * 14.0);
+                    r = 84 * sun;
+                    g = 128 * sun;
+                    b = 76 * sun;
+                }
+
+                // Foreground grassy bank + reflective canal water
+                double waterTop = 0.68 + 0.015 * Math.Sin(nx * 9.0);
+                if (ny >= waterTop)
+                {
+                    double ripple = Math.Sin(ny * 140.0 + Math.Sin(nx * 20.0) * 2.5);
+                    double reflection = Math.Exp(-Math.Pow((nx - 0.54) / 0.14, 2.0)) * 0.45;
+                    r = 66 + 44 * reflection + 10 * ripple;
+                    g = 112 + 32 * reflection + 12 * ripple;
+                    b = 148 + 18 * reflection + 14 * ripple;
+                }
+
+                // Riverside cottage (terracotta roof + cream plaster wall + timber windows)
+                bool inWall = nx is >= 0.44 and <= 0.65 && ny is >= 0.48 and <= 0.67;
+                double roofSlope = 0.48 - 0.095 * (1.0 - Math.Abs((nx - 0.545) / 0.125));
+                bool inRoof = nx is >= 0.42 and <= 0.67 && ny >= roofSlope && ny < 0.485;
+                if (inRoof)
+                {
+                    double tile = 0.92 + 0.08 * Math.Sin(nx * 180.0);
+                    r = 188 * tile;
+                    g = 86 * tile;
+                    b = 58 * tile;
+                }
+                else if (inWall)
+                {
+                    bool isDoor = nx is >= 0.525 and <= 0.565 && ny >= 0.56;
+                    bool isLeftWin = nx is >= 0.468 and <= 0.502 && ny is >= 0.525 and <= 0.585;
+                    bool isRightWin = nx is >= 0.588 and <= 0.622 && ny is >= 0.525 and <= 0.585;
+                    if (isDoor || isLeftWin || isRightWin)
+                    {
+                        r = isDoor ? 76 : 44;
+                        g = isDoor ? 52 : 64;
+                        b = isDoor ? 38 : 82;
+                    }
+                    else
+                    {
+                        double shade = nx > 0.58 ? 0.88 : 1.0;
+                        r = 242 * shade;
+                        g = 230 * shade;
+                        b = 204 * shade;
+                    }
+                }
+
+                // Cypress trees flanking cottage + warm wildflower dots
+                double dTree1 = Math.Pow((nx - 0.35) / 0.032, 2.0) + Math.Pow((ny - 0.50) / 0.16, 2.0);
+                double dTree2 = Math.Pow((nx - 0.72) / 0.045, 2.0) + Math.Pow((ny - 0.52) / 0.14, 2.0);
+                if (dTree1 < 1.0 || dTree2 < 1.0)
+                {
+                    double leaf = 0.85 + 0.15 * Math.Sin(nx * 90.0 + ny * 70.0);
+                    r = 38 * leaf;
+                    g = 82 * leaf;
+                    b = 46 * leaf;
+                }
+
+                if (ny >= 0.60 && ny < waterTop && Math.Sin(nx * 95.0) * Math.Cos(ny * 110.0) > 0.84)
+                {
+                    r = 224;
+                    g = 88;
+                    b = 104;
+                }
+
+                matrix[x, y] = new Rgb8(
+                    (byte)Math.Clamp((int)Math.Round(r), 0, 255),
+                    (byte)Math.Clamp((int)Math.Round(g), 0, 255),
+                    (byte)Math.Clamp((int)Math.Round(b), 0, 255));
+            }
+        }
+
+        return matrix;
     }
 
     private CancellationTokenSource ReplaceExportCts()

@@ -346,4 +346,124 @@ public class MainWindowIntegrationTests
         Assert.Equal(expectedVisible, vm.ShowSubStageDrawer);
         Assert.Equal(expectedCount, vm.SubStages.Count);
     }
+
+    [AvaloniaFact]
+    public async Task MainWindow_SamplePhoto_IndependentGridZoom_HoldCompare_AndFullResPreviewToggle()
+    {
+        var vm = new MainWindowViewModel(
+            fileDialogs: null,
+            uiDispatcher: action => Dispatcher.UIThread.Post(action),
+            debounceInterval: TimeSpan.FromMilliseconds(10));
+        vm.PreviewCap = PreviewResolutionCap.Px512;
+
+        var window = new MainWindow
+        {
+            Width = 1440,
+            Height = 900,
+            DataContext = vm,
+        };
+
+        try
+        {
+            window.Show();
+            TestAppHelpers.PumpUi();
+
+            // Empty launch defaults to 1. Input, and toolbar fits on 1 single row at 1440x900
+            Assert.False(vm.HasImage);
+            Assert.Equal(PrimaryStageId.Input, vm.ActiveStageId);
+            Assert.Equal("1. Input", vm.ActiveStageHeaderTitle);
+
+            Border toolbar = window
+                .GetVisualDescendants()
+                .OfType<Border>()
+                .First(b => b.Classes.Contains("studio-toolbar"));
+            Assert.True(toolbar.Bounds.Height <= 46.0, $"Expected single-row toolbar <= 46px at 1440px wide, got {toolbar.Bounds.Height:F1}px.");
+
+            // Try Sample Photo loads procedural 768x512 landscape and renders pipeline
+            await TestAppHelpers.WaitForRenderAsync(vm, () => vm.LoadSampleImageCommand.Execute(null));
+            Assert.True(vm.HasImage);
+            Assert.Equal(PrimaryStageId.Finishing, vm.ActiveStageId);
+            Assert.Equal("8. Finishing", vm.ActiveStageHeaderTitle);
+            Assert.NotNull(vm.ToneCurveHistogram);
+            Assert.NotEmpty(vm.ToneCurveHistogram!);
+
+            // Independent GridZoom vs Single Zoom
+            vm.Zoom = 2.4;
+            vm.PanX = 45.0;
+            Assert.Equal(1.0, vm.GridZoom, 4);
+            Assert.Equal(0.0, vm.GridPanX, 4);
+
+            vm.IsGridView = true;
+            TestAppHelpers.PumpUi();
+            StageGridView stageGrid = window.FindControl<StageGridView>("StageGrid")!;
+            Assert.Equal(1.0, stageGrid.Zoom, 4);
+
+            stageGrid.ZoomAroundCenter(1.5);
+            TestAppHelpers.PumpUi();
+            Assert.Equal(1.5, vm.GridZoom, 4);
+            Assert.Equal(2.4, vm.Zoom, 4);
+
+            vm.IsGridView = false;
+            TestAppHelpers.PumpUi();
+
+            // Toggle Compare via C key, verify toolbar stays single-row in SideBySide + PinnedStage, and test Hold-to-Compare
+            ZoomPanViewport viewport = window.FindControl<ZoomPanViewport>("Viewport")!;
+            viewport.Focus();
+            TestAppHelpers.PumpUi();
+
+            Assert.Equal(CompareMode.Off, vm.CompareMode);
+            window.KeyPressQwerty(PhysicalKey.C, RawInputModifiers.None);
+            TestAppHelpers.PumpUi();
+            Assert.Equal(CompareMode.SplitWipe, vm.CompareMode);
+            Assert.True(toolbar.Bounds.Height <= 46.0, $"Expected single-row toolbar <= 46px in SplitWipe, got {toolbar.Bounds.Height:F1}px.");
+
+            vm.CompareMode = CompareMode.SideBySide;
+            vm.CompareReferenceKind = CompareReferenceKind.PinnedStage;
+            TestAppHelpers.PumpUi();
+            Assert.True(toolbar.Bounds.Height <= 46.0, $"Expected single-row toolbar <= 46px in SideBySide+PinnedStage, got {toolbar.Bounds.Height:F1}px.");
+
+            vm.CompareMode = CompareMode.SplitWipe;
+            vm.CompareReferenceKind = CompareReferenceKind.Input;
+            TestAppHelpers.PumpUi();
+
+            window.KeyPressQwerty(PhysicalKey.C, RawInputModifiers.None);
+            TestAppHelpers.PumpUi();
+            Assert.Equal(CompareMode.Off, vm.CompareMode);
+
+            vm.IsHoldComparing = true;
+            TestAppHelpers.PumpUi();
+            Assert.NotNull(vm.CompareBitmap);
+            vm.IsHoldComparing = false;
+            TestAppHelpers.PumpUi();
+
+            // Artist Look Shortcut jumps to requested stage/section
+            vm.ApplyLookShortcutCommand.Execute("paper-tooth");
+            TestAppHelpers.PumpUi();
+            Assert.Equal(PrimaryStageId.Finishing, vm.ActiveStageId);
+            Assert.Equal(StageViewId.FinishingPaperGranulation, vm.SelectedSubStage?.ViewId);
+
+            // Full-Resolution preview toggle & cache invalidation on edit
+            Assert.False(vm.HasCachedFullRes);
+            await vm.RenderFullResolutionCommand.ExecuteAsync(null);
+            TestAppHelpers.PumpUi();
+
+            Assert.True(vm.HasCachedFullRes);
+            Assert.False(vm.IsViewingFullRes);
+            Assert.Equal("Preview Full-Res", vm.FullResToggleLabel);
+
+            vm.ToggleFullResPreviewCommand.Execute(null);
+            TestAppHelpers.PumpUi();
+            Assert.True(vm.IsViewingFullRes);
+            Assert.Equal("Full Res (cached)", vm.FullResToggleLabel);
+
+            await TestAppHelpers.WaitForRenderAsync(vm, () => vm.Parameters.HandTremor.EnableHandTremor = false);
+            Assert.False(vm.HasCachedFullRes);
+            Assert.False(vm.IsViewingFullRes);
+        }
+        finally
+        {
+            window.Close();
+            vm.Dispose();
+        }
+    }
 }

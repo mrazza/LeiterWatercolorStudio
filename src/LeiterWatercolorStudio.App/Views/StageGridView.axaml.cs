@@ -84,6 +84,12 @@ public partial class StageGridView : UserControl
         AvaloniaProperty.Register<StageGridView, ICommand?>(nameof(ActivateStageCommand));
 
     /// <summary>
+    /// Identifies the <see cref="TogglePinStageCommand"/> styled property.
+    /// </summary>
+    public static readonly StyledProperty<ICommand?> TogglePinStageCommandProperty =
+        AvaloniaProperty.Register<StageGridView, ICommand?>(nameof(TogglePinStageCommand));
+
+    /// <summary>
     /// Identifies the <see cref="ZoomText"/> direct property.
     /// </summary>
     public static readonly DirectProperty<StageGridView, string> ZoomTextProperty =
@@ -175,6 +181,15 @@ public partial class StageGridView : UserControl
     }
 
     /// <summary>
+    /// Gets or sets the command invoked when a tile's pin button is clicked.
+    /// </summary>
+    public ICommand? TogglePinStageCommand
+    {
+        get => GetValue(TogglePinStageCommandProperty);
+        set => SetValue(TogglePinStageCommandProperty, value);
+    }
+
+    /// <summary>
     /// Gets the formatted zoom percentage string for display in the grid toolbar.
     /// </summary>
     public string ZoomText => FormatZoomText(Zoom);
@@ -193,6 +208,24 @@ public partial class StageGridView : UserControl
         Zoom = 1.0;
         PanX = 0.0;
         PanY = 0.0;
+    }
+
+    /// <summary>
+    /// Zooms all synchronized grid tiles around each tile's center.
+    /// </summary>
+    public void ZoomAroundCenter(double targetZoom)
+    {
+        double oldZoom = Zoom;
+        double newZoom = CoerceZoom(this, targetZoom);
+        if (Math.Abs(newZoom - oldZoom) < 1e-9 || oldZoom <= 0.0)
+        {
+            return;
+        }
+
+        double ratio = newZoom / oldZoom;
+        Zoom = newZoom;
+        PanX *= ratio;
+        PanY *= ratio;
     }
 
     /// <inheritdoc />
@@ -307,6 +340,11 @@ public partial class StageGridView : UserControl
             return;
         }
 
+        if (e.Source is Visual sourceVisual && sourceVisual.FindAncestorOfType<Button>(includeSelf: true) is not null)
+        {
+            return;
+        }
+
         PointerPointProperties props = e.GetCurrentPoint(tile).Properties;
         if (props.IsLeftButtonPressed)
         {
@@ -406,8 +444,46 @@ public partial class StageGridView : UserControl
         e.Handled = true;
     }
 
+    private void OnPinButtonClick(object? sender, RoutedEventArgs e)
+    {
+        if (sender is not Button button || button.DataContext is not StageCardViewModel card)
+        {
+            return;
+        }
+
+        e.Handled = true;
+        ICommand? command = TogglePinStageCommand;
+        if (command is null)
+        {
+            card.IsPinned = !card.IsPinned;
+            return;
+        }
+
+        if (command is IRelayCommand<StageCardViewModel> cardCommand && cardCommand.CanExecute(card))
+        {
+            cardCommand.Execute(card);
+        }
+        else if (command is IRelayCommand<PrimaryStageId> idCommand && idCommand.CanExecute(card.StageId))
+        {
+            idCommand.Execute(card.StageId);
+        }
+        else if (command.CanExecute(card))
+        {
+            command.Execute(card);
+        }
+        else if (command.CanExecute(card.StageId))
+        {
+            command.Execute(card.StageId);
+        }
+    }
+
     private void OnTileDoubleTapped(object? sender, TappedEventArgs e)
     {
+        if (e.Source is Visual sourceVisual && sourceVisual.FindAncestorOfType<Button>(includeSelf: true) is not null)
+        {
+            e.Handled = true;
+            return;
+        }
         if (_doubleClickHandledOnPress)
         {
             _doubleClickHandledOnPress = false;

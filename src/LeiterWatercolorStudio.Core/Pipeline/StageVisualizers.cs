@@ -113,6 +113,63 @@ public static class StageVisualizers
         };
     }
 
+    /// <summary>
+    /// Computes a peak-normalized Rec.709 luminance histogram in <c>[0.0, 1.0]</c> for <paramref name="image"/>.
+    /// Large images are deterministically stride-subsampled for fast UI updates.
+    /// </summary>
+    /// <param name="image">The source RGB image, or <see langword="null"/>.</param>
+    /// <param name="binCount">The number of histogram bins (default <c>64</c>; must be at least <c>1</c>).</param>
+    /// <returns>
+    /// A <see cref="double"/> array of length <paramref name="binCount"/> with heights normalized to <c>[0.0, 1.0]</c>,
+    /// or an empty array when <paramref name="image"/> is <see langword="null"/> or empty.
+    /// </returns>
+    public static double[] ComputeLuminanceHistogram(IReadOnlyMatrix<Rgb8>? image, int binCount = 64)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(binCount, 1);
+
+        if (image is null || image.Count == 0)
+        {
+            return [];
+        }
+
+        const int maxTargetSamples = 65_536;
+        int width = image.Width;
+        int height = image.Height;
+        int step = image.Count <= maxTargetSamples
+            ? 1
+            : Math.Max(1, (int)Math.Floor(Math.Sqrt((double)image.Count / maxTargetSamples)));
+
+        var counts = new int[binCount];
+        int maxCount = 0;
+
+        for (int y = 0; y < height; y += step)
+        {
+            for (int x = 0; x < width; x += step)
+            {
+                Rgb8 px = image[x, y];
+                double luma = ((0.2126 * px.R) + (0.7152 * px.G) + (0.0722 * px.B)) / 255.0;
+                int bin = Math.Clamp((int)(luma * binCount), 0, binCount - 1);
+                int count = ++counts[bin];
+                if (count > maxCount)
+                {
+                    maxCount = count;
+                }
+            }
+        }
+
+        var histogram = new double[binCount];
+        if (maxCount > 0)
+        {
+            double invMax = 1.0 / maxCount;
+            for (int i = 0; i < binCount; i++)
+            {
+                histogram[i] = counts[i] * invMax;
+            }
+        }
+
+        return histogram;
+    }
+
     private static Matrix<Rgb8> RenderRegions(
         IReadOnlyMatrix<Rgb8> colorBasis,
         RegionGraph graph,

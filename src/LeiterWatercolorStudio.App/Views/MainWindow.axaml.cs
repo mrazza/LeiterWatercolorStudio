@@ -25,6 +25,7 @@ public partial class MainWindow : Window
 
     private MainWindowViewModel? _attachedViewModel;
     private bool _isSpacePanMode;
+    private double _savedInspectorWidth = 340.0;
 
     /// <summary>
     /// Initializes a new instance of <see cref="MainWindow"/>.
@@ -35,6 +36,7 @@ public partial class MainWindow : Window
         UpdateActiveInspectorVisibility(PrimaryStageId.Input);
 
         DataContextChanged += OnDataContextChanged;
+        Deactivated += OnWindowDeactivated;
 
         // Subscribe ONLY to NumericSlider and ToneCurveEditor drag events (PerlinNoiseEditor
         // wraps NumericSlider and re-emits its own drag events, so subscribing to both would double-trigger).
@@ -43,15 +45,21 @@ public partial class MainWindow : Window
         InspectorHost.AddHandler(ToneCurveEditor.DragStartedEvent, OnInspectorDragStarted);
         InspectorHost.AddHandler(ToneCurveEditor.DragCompletedEvent, OnInspectorDragCompleted);
 
+        HoldCompareButton.AddHandler(PointerPressedEvent, OnHoldComparePointerPressed, RoutingStrategies.Tunnel | RoutingStrategies.Bubble, handledEventsToo: true);
+        HoldCompareButton.AddHandler(PointerReleasedEvent, OnHoldComparePointerReleased, RoutingStrategies.Tunnel | RoutingStrategies.Bubble, handledEventsToo: true);
+        HoldCompareButton.AddHandler(PointerCaptureLostEvent, OnHoldComparePointerCaptureLost, RoutingStrategies.Tunnel | RoutingStrategies.Bubble, handledEventsToo: true);
+
         AddHandler(KeyDownEvent, OnWindowKeyDown, RoutingStrategies.Tunnel);
         AddHandler(KeyUpEvent, OnWindowKeyUp, RoutingStrategies.Tunnel);
-        AddHandler(DragDrop.DragOverEvent, OnWindowDragOver);
-        AddHandler(DragDrop.DropEvent, OnWindowDrop);
+        AddHandler(DragDrop.DragOverEvent, OnWindowDragOver, RoutingStrategies.Tunnel | RoutingStrategies.Bubble, handledEventsToo: true);
+        AddHandler(DragDrop.DragLeaveEvent, OnWindowDragLeave, RoutingStrategies.Tunnel | RoutingStrategies.Bubble, handledEventsToo: true);
+        AddHandler(DragDrop.DropEvent, OnWindowDrop, RoutingStrategies.Tunnel | RoutingStrategies.Bubble, handledEventsToo: true);
     }
 
     /// <inheritdoc />
     protected override void OnClosed(EventArgs e)
     {
+        Deactivated -= OnWindowDeactivated;
         DetachViewModel();
         if (DataContext is IDisposable disposable)
         {
@@ -71,8 +79,10 @@ public partial class MainWindow : Window
             vm.PropertyChanged += OnViewModelPropertyChanged;
             vm.ViewportRefreshRequested += OnViewportRefreshRequested;
             vm.ImageLoaded += OnViewModelImageLoaded;
+            vm.InspectorSectionFocusRequested += OnInspectorSectionFocusRequested;
             ApplyThemeVariant(vm.IsDarkTheme);
             UpdateActiveInspectorVisibility(vm.ActiveStageId);
+            UpdateInspectorColumnLayout(vm.IsInspectorOpen);
         }
         else
         {
@@ -90,6 +100,7 @@ public partial class MainWindow : Window
         _attachedViewModel.PropertyChanged -= OnViewModelPropertyChanged;
         _attachedViewModel.ViewportRefreshRequested -= OnViewportRefreshRequested;
         _attachedViewModel.ImageLoaded -= OnViewModelImageLoaded;
+        _attachedViewModel.InspectorSectionFocusRequested -= OnInspectorSectionFocusRequested;
         _attachedViewModel = null;
     }
 
@@ -107,6 +118,50 @@ public partial class MainWindow : Window
         else if (e.PropertyName == nameof(MainWindowViewModel.ActiveStageId))
         {
             UpdateActiveInspectorVisibility(vm.ActiveStageId);
+        }
+        else if (e.PropertyName == nameof(MainWindowViewModel.IsInspectorOpen))
+        {
+            UpdateInspectorColumnLayout(vm.IsInspectorOpen);
+        }
+        else if (e.PropertyName == nameof(MainWindowViewModel.CompareMode) &&
+                 vm.CompareMode == CompareMode.SideBySide &&
+                 vm.HasImage)
+        {
+            Dispatcher.UIThread.Post(() => Viewport.FitToViewIfNeeded(), DispatcherPriority.Loaded);
+        }
+    }
+
+    private void UpdateInspectorColumnLayout(bool isOpen)
+    {
+        if (WorkspaceGrid is null || WorkspaceGrid.ColumnDefinitions.Count < 3)
+        {
+            return;
+        }
+
+        ColumnDefinition inspectorColumn = WorkspaceGrid.ColumnDefinitions[2];
+        if (isOpen)
+        {
+            inspectorColumn.MinWidth = 280;
+            inspectorColumn.MaxWidth = 460;
+            inspectorColumn.Width = new GridLength(Math.Clamp(_savedInspectorWidth, 280.0, 460.0), GridUnitType.Pixel);
+        }
+        else
+        {
+            if (inspectorColumn.Width.IsAbsolute && inspectorColumn.Width.Value >= 280.0)
+            {
+                _savedInspectorWidth = Math.Clamp(inspectorColumn.Width.Value, 280.0, 460.0);
+            }
+
+            inspectorColumn.MinWidth = 0;
+            inspectorColumn.Width = new GridLength(0, GridUnitType.Pixel);
+        }
+    }
+
+    private void OnInspectorSectionFocusRequested(string sectionKey)
+    {
+        if (sectionKey is "EdgeDarkening" or "TurbulenceFlow" or "ToneCurve" or "PaperGranulation" or "Fxaa")
+        {
+            Dispatcher.UIThread.Post(() => FinishingInspector.FocusSection(sectionKey), DispatcherPriority.Loaded);
         }
     }
 
@@ -160,7 +215,7 @@ public partial class MainWindow : Window
     {
         if (DataContext is MainWindowViewModel vm)
         {
-            vm.UpdateHoverPixel(e.X, e.Y);
+            vm.UpdateHoverPixel(e.X, e.Y, e.IsCompareSide);
         }
     }
 
@@ -169,6 +224,47 @@ public partial class MainWindow : Window
         if (DataContext is MainWindowViewModel vm)
         {
             vm.ClearHoverPixel();
+        }
+    }
+
+    private void OnHoldComparePointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (DataContext is MainWindowViewModel vm &&
+            vm.HasImage &&
+            e.GetCurrentPoint(HoldCompareButton).Properties.IsLeftButtonPressed)
+        {
+            vm.IsHoldComparing = true;
+        }
+    }
+
+    private void OnHoldComparePointerReleased(object? sender, PointerReleasedEventArgs e)
+    {
+        if (DataContext is MainWindowViewModel vm)
+        {
+            vm.IsHoldComparing = false;
+        }
+    }
+
+    private void OnHoldComparePointerCaptureLost(object? sender, PointerCaptureLostEventArgs e)
+    {
+        if (DataContext is MainWindowViewModel vm)
+        {
+            vm.IsHoldComparing = false;
+        }
+    }
+
+    private void OnWindowDeactivated(object? sender, EventArgs e)
+    {
+        if (DataContext is MainWindowViewModel vm && vm.IsHoldComparing)
+        {
+            vm.IsHoldComparing = false;
+        }
+
+        if (_isSpacePanMode)
+        {
+            _isSpacePanMode = false;
+            Viewport.SetSpacePanOverride(false);
+            Viewport.Cursor = DefaultCursor;
         }
     }
 
@@ -210,19 +306,25 @@ public partial class MainWindow : Window
 
     private void OnWindowDragOver(object? sender, DragEventArgs e)
     {
+        bool hasFile = e.DataTransfer.Contains(DataFormat.File);
+        WindowDropOverlay.IsVisible = hasFile;
         if (e.Handled)
         {
             return;
         }
 
-        e.DragEffects = e.DataTransfer.Contains(DataFormat.File)
-            ? DragDropEffects.Copy
-            : DragDropEffects.None;
+        e.DragEffects = hasFile ? DragDropEffects.Copy : DragDropEffects.None;
         e.Handled = true;
+    }
+
+    private void OnWindowDragLeave(object? sender, DragEventArgs e)
+    {
+        WindowDropOverlay.IsVisible = false;
     }
 
     private async void OnWindowDrop(object? sender, DragEventArgs e)
     {
+        WindowDropOverlay.IsVisible = false;
         if (e.Handled || DataContext is not MainWindowViewModel vm)
         {
             return;
@@ -313,9 +415,50 @@ public partial class MainWindow : Window
                 return;
             }
 
+            if (e.Key == Key.P)
+            {
+                if (vm.PinCurrentStageCommand.CanExecute(null))
+                {
+                    vm.PinCurrentStageCommand.Execute(null);
+                    e.Handled = true;
+                }
+
+                return;
+            }
+
+            if (e.Key == Key.I)
+            {
+                if (vm.ToggleInspectorCommand.CanExecute(null))
+                {
+                    vm.ToggleInspectorCommand.Execute(null);
+                    e.Handled = true;
+                }
+
+                return;
+            }
+
+            if (e.Key == Key.C)
+            {
+                if (vm.ToggleCompareCommand.CanExecute(null))
+                {
+                    vm.ToggleCompareCommand.Execute(null);
+                    e.Handled = true;
+                }
+
+                return;
+            }
+
+            if (e.Key is Key.OemPipe or Key.OemBackslash && !vm.IsGridView && vm.HasImage)
+            {
+                vm.IsHoldComparing = true;
+                e.Handled = true;
+                return;
+            }
+
             if (e.Key == Key.Space && !vm.IsGridView && vm.HasImage)
             {
                 _isSpacePanMode = true;
+                Viewport.SetSpacePanOverride(true);
                 Viewport.Cursor = HandCursor;
                 if (!Viewport.IsFocused)
                 {
@@ -328,9 +471,18 @@ public partial class MainWindow : Window
 
     private void OnWindowKeyUp(object? sender, KeyEventArgs e)
     {
+        if (e.Key is Key.OemPipe or Key.OemBackslash &&
+            DataContext is MainWindowViewModel vm &&
+            vm.IsHoldComparing)
+        {
+            vm.IsHoldComparing = false;
+            e.Handled = true;
+        }
+
         if (e.Key == Key.Space && _isSpacePanMode)
         {
             _isSpacePanMode = false;
+            Viewport.SetSpacePanOverride(false);
             Viewport.Cursor = DefaultCursor;
         }
     }
@@ -370,9 +522,7 @@ public partial class MainWindow : Window
             case Key.D1 or Key.NumPad1 when !hasShift:
                 if (vm.IsGridView)
                 {
-                    vm.Zoom = 1.0;
-                    vm.PanX = 0.0;
-                    vm.PanY = 0.0;
+                    StageGrid.ResetView();
                 }
                 else
                 {
@@ -381,10 +531,26 @@ public partial class MainWindow : Window
 
                 return true;
             case Key.OemPlus or Key.Add when !hasShift:
-                vm.Zoom = Math.Clamp(vm.Zoom * ShortcutZoomStep, ZoomPanViewport.MinZoom, ZoomPanViewport.MaxZoom);
+                if (vm.IsGridView)
+                {
+                    StageGrid.ZoomAroundCenter(vm.GridZoom * ShortcutZoomStep);
+                }
+                else
+                {
+                    Viewport.ZoomAroundCenter(vm.Zoom * ShortcutZoomStep);
+                }
+
                 return true;
             case Key.OemMinus or Key.Subtract when !hasShift:
-                vm.Zoom = Math.Clamp(vm.Zoom / ShortcutZoomStep, ZoomPanViewport.MinZoom, ZoomPanViewport.MaxZoom);
+                if (vm.IsGridView)
+                {
+                    StageGrid.ZoomAroundCenter(vm.GridZoom / ShortcutZoomStep);
+                }
+                else
+                {
+                    Viewport.ZoomAroundCenter(vm.Zoom / ShortcutZoomStep);
+                }
+
                 return true;
             default:
                 return false;

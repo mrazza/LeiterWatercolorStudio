@@ -198,5 +198,10 @@ public abstract class StageViewModelBase : ObservableObject
         return next;
     }
 
+    /// <summary>
+    /// Resets all parameters in this view model to its active baseline configuration.
+    /// </summary>
+    public abstract void ResetToBaseline();
+
     internal void ReleaseSuppression() => _suppressionDepth--;
 }

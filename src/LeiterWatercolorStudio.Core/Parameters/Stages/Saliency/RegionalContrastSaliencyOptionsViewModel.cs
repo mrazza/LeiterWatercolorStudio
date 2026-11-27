@@ -7,16 +7,24 @@ namespace LeiterWatercolorStudio.Core.Parameters.Stages.Saliency;
 /// </summary>
 public sealed class RegionalContrastSaliencyOptionsViewModel : StageViewModelBase
 {
+    private RegionalContrastSaliencyOptions _baseline;
     private bool _enableSmoothing;
     private bool _computeBorderRegions;
     private double _centerPriorWeight;
 
     internal RegionalContrastSaliencyOptionsViewModel(RegionalContrastSaliencyOptions initial)
     {
+        initial.Validate();
+        _baseline = initial;
         _enableSmoothing = initial.EnableSmoothing;
         _computeBorderRegions = initial.ComputeBorderRegions;
         _centerPriorWeight = initial.CenterPriorWeight;
     }
+
+    /// <summary>
+    /// Gets the baseline <see cref="RegionalContrastSaliencyOptions"/> used for per-parameter resets.
+    /// </summary>
+    public RegionalContrastSaliencyOptions Baseline => _baseline;
 
     /// <summary>
     /// Gets or sets whether feature-space saliency smoothing is enabled.
@@ -46,6 +54,16 @@ public sealed class RegionalContrastSaliencyOptionsViewModel : StageViewModelBas
     }
 
     /// <summary>
+    /// Updates <see cref="Baseline"/> without modifying current parameter values or raising a parameter edit.
+    /// </summary>
+    public void SetBaseline(RegionalContrastSaliencyOptions baseline)
+    {
+        ArgumentNullException.ThrowIfNull(baseline);
+        baseline.Validate();
+        SetProperty(ref _baseline, baseline, nameof(Baseline));
+    }
+
+    /// <summary>
     /// Loads properties from <paramref name="options"/>.
     /// </summary>
     public void LoadFrom(RegionalContrastSaliencyOptions options)
@@ -58,6 +76,20 @@ public sealed class RegionalContrastSaliencyOptionsViewModel : StageViewModelBas
             SetProperty(ref _enableSmoothing, options.EnableSmoothing, nameof(EnableSmoothing));
             SetProperty(ref _computeBorderRegions, options.ComputeBorderRegions, nameof(ComputeBorderRegions));
             SetProperty(ref _centerPriorWeight, options.CenterPriorWeight, nameof(CenterPriorWeight));
+        }
+    }
+
+    /// <inheritdoc />
+    public override void ResetToBaseline()
+    {
+        bool changed = _enableSmoothing != _baseline.EnableSmoothing
+            || _computeBorderRegions != _baseline.ComputeBorderRegions
+            || _centerPriorWeight != _baseline.CenterPriorWeight;
+
+        LoadFrom(_baseline);
+        if (changed)
+        {
+            RaiseParameterChanged(isImmediate: true);
         }
     }
 

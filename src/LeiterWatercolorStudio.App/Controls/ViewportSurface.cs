@@ -11,13 +11,60 @@ namespace LeiterWatercolorStudio.App.Controls;
 /// </summary>
 public sealed class ViewportSurface : Control
 {
-    private static readonly IBrush CanvasBackgroundBrush = new SolidColorBrush(Color.Parse("#14161B"));
-    private static readonly IBrush ImageMatBrush = new SolidColorBrush(Color.Parse("#1B1F27"));
-    private static readonly IPen ImageBorderPen = new Pen(new SolidColorBrush(Color.Parse("#33FFFFFF")), 1.0);
-    private static readonly IPen DividerPen = new Pen(new SolidColorBrush(Color.Parse("#2D3442")), 2.0);
-    private static readonly IPen PixelGridPen = new Pen(new SolidColorBrush(Color.FromArgb(30, 255, 255, 255)), 1.0);
+    private static readonly IBrush FallbackCanvasBackgroundBrush = new SolidColorBrush(Color.Parse("#14161B"));
+    private static readonly IBrush FallbackImageMatBrush = new SolidColorBrush(Color.Parse("#1B1F27"));
+    private static readonly IBrush FallbackImageBorderBrush = new SolidColorBrush(Color.Parse("#33FFFFFF"));
+    private static readonly IBrush FallbackDividerBrush = new SolidColorBrush(Color.Parse("#2D3442"));
+    private static readonly IBrush FallbackPixelGridBrush = new SolidColorBrush(Color.FromArgb(30, 255, 255, 255));
+
+    private IBrush _canvasBackgroundBrush = FallbackCanvasBackgroundBrush;
+    private IBrush _imageMatBrush = FallbackImageMatBrush;
+    private IPen _imageBorderPen = new Pen(FallbackImageBorderBrush, 1.0);
+    private IPen _dividerPen = new Pen(FallbackDividerBrush, 2.0);
+    private IPen _pixelGridPen = new Pen(FallbackPixelGridBrush, 1.0);
+
+    /// <summary>
+    /// Initializes a new instance of <see cref="ViewportSurface"/>.
+    /// </summary>
+    public ViewportSurface()
+    {
+        ActualThemeVariantChanged += OnActualThemeVariantChanged;
+    }
 
     internal ZoomPanViewport? Owner { get; set; }
+
+    /// <inheritdoc />
+    protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnAttachedToVisualTree(e);
+        UpdateThemeBrushes();
+    }
+
+    private void OnActualThemeVariantChanged(object? sender, EventArgs e)
+    {
+        UpdateThemeBrushes();
+        InvalidateVisual();
+    }
+
+    private void UpdateThemeBrushes()
+    {
+        _canvasBackgroundBrush = ResolveBrush("StudioViewportMatBrush", FallbackCanvasBackgroundBrush);
+        _imageMatBrush = ResolveBrush("StudioViewportImageFrameBrush", FallbackImageMatBrush);
+        _imageBorderPen = new Pen(ResolveBrush("StudioViewportImageBorderBrush", FallbackImageBorderBrush), 1.0);
+        _dividerPen = new Pen(ResolveBrush("StudioViewportDividerBrush", FallbackDividerBrush), 2.0);
+        _pixelGridPen = new Pen(ResolveBrush("StudioViewportPixelGridBrush", FallbackPixelGridBrush), 1.0);
+    }
+
+    private IBrush ResolveBrush(string resourceKey, IBrush fallback)
+    {
+        if (this.TryFindResource(resourceKey, ActualThemeVariant, out object? resource) &&
+            resource is IBrush brush)
+        {
+            return brush;
+        }
+
+        return fallback;
+    }
 
     /// <inheritdoc />
     public override void Render(DrawingContext context)
@@ -25,7 +72,7 @@ public sealed class ViewportSurface : Control
         base.Render(context);
 
         Rect bounds = new(Bounds.Size);
-        context.FillRectangle(CanvasBackgroundBrush, bounds);
+        context.FillRectangle(_canvasBackgroundBrush, bounds);
 
         if (Owner is null || Owner.IsEmpty || (Owner.PrimaryBitmap is null && Owner.CompareBitmap is null))
         {
@@ -38,6 +85,13 @@ public sealed class ViewportSurface : Control
         WriteableBitmap? primary = Owner.PrimaryBitmap;
         WriteableBitmap? compare = Owner.CompareBitmap;
 
+        if (Owner.IsHoldComparing)
+        {
+            PixelSize? referenceSize = primary?.PixelSize ?? compare?.PixelSize;
+            DrawPaneBitmap(context, bounds, compare ?? primary, referenceSize, zoom, panX, panY);
+            return;
+        }
+
         switch (Owner.CompareMode)
         {
             case CompareMode.SideBySide:
@@ -46,7 +100,7 @@ public sealed class ViewportSurface : Control
                 DrawPaneBitmap(context, leftPane, compare, primary?.PixelSize, zoom, panX, panY);
                 DrawPaneBitmap(context, rightPane, primary, primary?.PixelSize, zoom, panX, panY);
                 context.DrawLine(
-                    DividerPen,
+                    _dividerPen,
                     new Point(dividerX + 1.0, 0),
                     new Point(dividerX + 1.0, Bounds.Height));
                 break;
@@ -85,7 +139,7 @@ public sealed class ViewportSurface : Control
         }
     }
 
-    private static void DrawPaneBitmap(
+    private void DrawPaneBitmap(
         DrawingContext context,
         Rect paneRect,
         WriteableBitmap? bitmap,
@@ -113,7 +167,7 @@ public sealed class ViewportSurface : Control
             double destY = paneRect.Y + paneRect.Height * 0.5 + panY - destHeight * 0.5;
             Rect destRect = new(destX, destY, destWidth, destHeight);
 
-            context.FillRectangle(ImageMatBrush, destRect);
+            context.FillRectangle(_imageMatBrush, destRect);
 
             if (bitmap is not null && bitmap.PixelSize.Width > 0 && bitmap.PixelSize.Height > 0)
             {
@@ -121,7 +175,7 @@ public sealed class ViewportSurface : Control
                 context.DrawImage(bitmap, srcRect, destRect);
             }
 
-            context.DrawRectangle(ImageBorderPen, destRect);
+            context.DrawRectangle(_imageBorderPen, destRect);
 
             if (zoom >= ZoomPanViewport.PixelGridThresholdZoom && bitmap is not null)
             {
@@ -130,7 +184,7 @@ public sealed class ViewportSurface : Control
         }
     }
 
-    private static void DrawPixelGrid(
+    private void DrawPixelGrid(
         DrawingContext context,
         Rect paneRect,
         Rect destRect,
@@ -148,7 +202,7 @@ public sealed class ViewportSurface : Control
             for (int x = startX; x <= endX; x++)
             {
                 double sx = destRect.Left + x * zoom;
-                context.DrawLine(PixelGridPen, new Point(sx, top), new Point(sx, bottom));
+                context.DrawLine(_pixelGridPen, new Point(sx, top), new Point(sx, bottom));
             }
         }
 
@@ -162,7 +216,7 @@ public sealed class ViewportSurface : Control
             for (int y = startY; y <= endY; y++)
             {
                 double sy = destRect.Top + y * zoom;
-                context.DrawLine(PixelGridPen, new Point(left, sy), new Point(right, sy));
+                context.DrawLine(_pixelGridPen, new Point(left, sy), new Point(right, sy));
             }
         }
     }

@@ -4,7 +4,6 @@
              xmlns:controls="using:LeiterWatercolorStudio.App.Controls"
              xmlns:converters="using:LeiterWatercolorStudio.App.Converters"
              xmlns:local="using:LeiterWatercolorStudio.App.Views.Inspectors"
-             xmlns:models="clr-namespace:LeiterWatercolorStudio.Core.Models;assembly=LeiterWatercolorStudio.Core"
              xmlns:stages="clr-namespace:LeiterWatercolorStudio.Core.Parameters.Stages;assembly=LeiterWatercolorStudio.Core"
              x:Class="LeiterWatercolorStudio.App.Views.Inspectors.FinishingInspectorView"
              x:DataType="stages:FinishingStageViewModel">
@@ -20,381 +19,407 @@
         </Style>
     </UserControl.Styles>
 
-    <Grid RowDefinitions="Auto,*">
-        <!-- Stage Header -->
-        <Border Grid.Row="0"
-                BorderBrush="#3364748B"
-                BorderThickness="0,0,0,1"
-                Padding="12,10">
-            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
-                <StackPanel Grid.Column="0" Spacing="1" VerticalAlignment="Center">
-                    <TextBlock Text="Finishing"
-                               FontSize="14"
-                               FontWeight="SemiBold"
-                               TextTrimming="CharacterEllipsis" />
-                    <TextBlock Text="Pigment washes, tone curve, grain &amp; FXAA"
-                               FontSize="11"
-                               Opacity="0.65"
-                               TextTrimming="CharacterEllipsis" />
+    <ScrollViewer VerticalScrollBarVisibility="Auto"
+                  HorizontalScrollBarVisibility="Disabled">
+        <StackPanel Margin="12" Spacing="10">
+            <!-- 1. Edge Darkening -->
+            <Expander x:Name="EdgeDarkeningExpander"
+                      Classes="substage-card"
+                      IsExpanded="True">
+                <Expander.Header>
+                    <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                        <CheckBox IsChecked="{Binding EnableEdgeDarkening, Mode=TwoWay}"
+                                  MinWidth="0"
+                                  Padding="0"
+                                  VerticalAlignment="Center"
+                                  ToolTip.Tip="Enable or bypass pigment edge darkening" />
+                        <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                            <TextBlock Classes="substage-title"
+                                       Text="Edge Darkening"
+                                       ToolTip.Tip="Spatial gradient pigment accumulation along wash boundaries" />
+                            <controls:SettingInfoIcon Header="Edge Darkening"
+                                                      Text="Mimics real watercolor pigment pooling along the drying rim of every brushstroke, creating crisp dark outlines around shapes in Edge Darkening, Combined Pigment, and Final FXAA. Uncheck to remove dried edge rings cleanly." />
+                        </StackPanel>
+                    </StackPanel>
+                </Expander.Header>
+
+                <StackPanel Spacing="6"
+                            IsEnabled="{Binding EnableEdgeDarkening}"
+                            Opacity="{Binding EnableEdgeDarkening, Converter={x:Static converters:BoolToOpacityConverter.Instance}}">
+                    <controls:NumericSlider Label="Edge Intensity"
+                                            Description="Pigment density multiplier along detected color boundaries"
+                                            InfoText="Controls how dark and prominent the dried pigment outline appears around every brushstroke. Near 0 gives soft, outline-free washes; higher values draw strong inky rims visible in Edge Darkening, Combined Pigment, and Final FXAA."
+                                            Minimum="0"
+                                            Maximum="5"
+                                            ValidMinimum="0"
+                                            Step="0.05"
+                                            FormatString="F2"
+                                            Value="{Binding EdgeIntensity, Mode=TwoWay}"
+                                            BaselineValue="{Binding EdgeDarkeningBaseline.Intensity}" />
+
+                    <controls:NumericSlider Label="Edge Blur Sigma"
+                                            Description="Gaussian smoothing sigma applied to the edge gradient map"
+                                            InfoText="Controls whether the dried pigment rim looks like a razor-thin pen line or a wider, feathery watercolor backrun halo. 0 keeps razor-sharp edge rings; raising it softens and widens the darkened edge glow in Edge Darkening and Combined Pigment."
+                                            Unit="px"
+                                            Minimum="0"
+                                            Maximum="5"
+                                            ValidMinimum="0"
+                                            Step="0.05"
+                                            FormatString="F2"
+                                            Value="{Binding EdgeBlurSigma, Mode=TwoWay}"
+                                            BaselineValue="{Binding EdgeDarkeningBaseline.BlurSigma}" />
+
+                    <Expander Header="Advanced"
+                              IsExpanded="False"
+                              HorizontalAlignment="Stretch"
+                              Padding="8,6">
+                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
+                            <StackPanel Grid.Column="0"
+                                        Orientation="Horizontal"
+                                        Spacing="3"
+                                        VerticalAlignment="Center">
+                                <TextBlock Text="Gradient Operator"
+                                           FontSize="12"
+                                           VerticalAlignment="Center"
+                                           ToolTip.Tip="3x3 spatial derivative kernel (Sobel vs Scharr) used to detect pigment boundaries" />
+                                <controls:SettingInfoIcon Header="Gradient Operator"
+                                                          Text="Picks the edge-finder filter used for dark pigment outlines in Edge Darkening. Sobel gives classic balanced border lines; Scharr gives slightly stronger, more uniform darkening along tilted diagonal edges." />
+                            </StackPanel>
+                            <ComboBox Grid.Column="1"
+                                      HorizontalAlignment="Stretch"
+                                      ItemsSource="{x:Static local:FinishingInspectorView.AvailableGradientOperators}"
+                                      SelectedItem="{Binding EdgeGradientOperator, Mode=TwoWay}">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate x:DataType="alg:GradientOperator">
+                                        <TextBlock Text="{Binding Converter={x:Static converters:EnumDisplayNameConverter.Instance}}"
+                                                   TextTrimming="CharacterEllipsis" />
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                            </ComboBox>
+                        </Grid>
+                    </Expander>
                 </StackPanel>
+            </Expander>
 
-                <Button Grid.Column="1"
-                        Content="↺"
-                        Width="26"
-                        Height="26"
-                        Padding="0"
-                        FontSize="13"
-                        HorizontalContentAlignment="Center"
-                        VerticalContentAlignment="Center"
-                        Command="{Binding ResetStageCommand, RelativeSource={RelativeSource AncestorType=local:FinishingInspectorView}}"
-                        CommandParameter="{x:Static models:PrimaryStageId.Finishing}"
-                        ToolTip.Tip="Reset all Finishing sub-stage parameters to active baseline" />
-            </Grid>
-        </Border>
-
-        <!-- Sub-Stage Accordion Cards -->
-        <ScrollViewer Grid.Row="1"
-                      VerticalScrollBarVisibility="Auto"
-                      HorizontalScrollBarVisibility="Disabled">
-            <StackPanel Margin="12" Spacing="10">
-                <!-- 1. Edge Darkening -->
-                <Expander Classes="substage-card" IsExpanded="True">
-                    <Expander.Header>
-                        <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                            <CheckBox IsChecked="{Binding EnableEdgeDarkening, Mode=TwoWay}"
-                                      MinWidth="0"
-                                      Padding="0"
-                                      VerticalAlignment="Center"
-                                      ToolTip.Tip="Enable or bypass pigment edge darkening" />
-                            <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
-                                <TextBlock Classes="substage-title"
-                                           Text="Edge Darkening"
-                                           ToolTip.Tip="Spatial gradient pigment accumulation along wash boundaries" />
-                                <controls:SettingInfoIcon Header="Edge Darkening"
-                                                          Text="Mimics real watercolor pigment pooling along the drying rim of every brushstroke, creating crisp dark outlines around shapes in Edge Darkening, Combined Pigment, and Final FXAA. Uncheck to remove dried edge rings cleanly." />
-                            </StackPanel>
+            <!-- 2. Turbulence Flow -->
+            <Expander x:Name="TurbulenceFlowExpander"
+                      Classes="substage-card"
+                      IsExpanded="False">
+                <Expander.Header>
+                    <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                        <CheckBox IsChecked="{Binding EnableTurbulenceFlow, Mode=TwoWay}"
+                                  MinWidth="0"
+                                  Padding="0"
+                                  VerticalAlignment="Center"
+                                  ToolTip.Tip="Enable or bypass turbulence wash variation" />
+                        <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                            <TextBlock Classes="substage-title"
+                                       Text="Turbulence Flow"
+                                       ToolTip.Tip="Low-frequency Perlin noise density modulation simulating organic water pooling" />
+                            <controls:SettingInfoIcon Header="Turbulence Flow"
+                                                      Text="Breaks up flat painted areas with soft, cloudy lighter and darker patches—just like water drying unevenly across a wash—visible in Turbulence Flow, Combined Pigment, and Final FXAA. Uncheck for perfectly uniform flat washes." />
                         </StackPanel>
-                    </Expander.Header>
-
-                    <StackPanel Spacing="6"
-                                Opacity="{Binding EnableEdgeDarkening, Converter={x:Static converters:BoolToOpacityConverter.Instance}}">
-                        <controls:NumericSlider Label="Edge Intensity"
-                                                Description="Pigment density multiplier along detected color boundaries"
-                                                InfoText="Controls how dark and prominent the dried pigment outline appears around every brushstroke. Near 0 gives soft, outline-free washes; higher values draw strong inky rims visible in Edge Darkening, Combined Pigment, and Final FXAA."
-                                                Minimum="0"
-                                                Maximum="5"
-                                                ValidMinimum="0"
-                                                Step="0.05"
-                                                FormatString="F2"
-                                                Value="{Binding EdgeIntensity, Mode=TwoWay}"
-                                                BaselineValue="1.8" />
-
-                        <controls:NumericSlider Label="Edge Blur Sigma"
-                                                Description="Gaussian smoothing sigma applied to the edge gradient map"
-                                                InfoText="Controls whether the dried pigment rim looks like a razor-thin pen line or a wider, feathery watercolor backrun halo. 0 keeps razor-sharp edge rings; raising it softens and widens the darkened edge glow in Edge Darkening and Combined Pigment."
-                                                Unit="px"
-                                                Minimum="0"
-                                                Maximum="5"
-                                                ValidMinimum="0"
-                                                Step="0.05"
-                                                FormatString="F2"
-                                                Value="{Binding EdgeBlurSigma, Mode=TwoWay}"
-                                                BaselineValue="0.8" />
-
-                        <Expander Header="Advanced"
-                                  IsExpanded="False"
-                                  HorizontalAlignment="Stretch"
-                                  Padding="8,6">
-                            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
-                                <StackPanel Grid.Column="0"
-                                            Orientation="Horizontal"
-                                            Spacing="3"
-                                            VerticalAlignment="Center">
-                                    <TextBlock Text="Gradient Operator"
-                                               FontSize="12"
-                                               VerticalAlignment="Center"
-                                               ToolTip.Tip="3x3 spatial derivative kernel (Sobel vs Scharr) used to detect pigment boundaries" />
-                                    <controls:SettingInfoIcon Header="Gradient Operator"
-                                                              Text="Picks the edge-finder filter used for dark pigment outlines in Edge Darkening. Sobel gives classic balanced border lines; Scharr gives slightly stronger, more uniform darkening along tilted diagonal edges." />
-                                </StackPanel>
-                                <ComboBox Grid.Column="1"
-                                          HorizontalAlignment="Stretch"
-                                          ItemsSource="{x:Static local:FinishingInspectorView.AvailableGradientOperators}"
-                                          SelectedItem="{Binding EdgeGradientOperator, Mode=TwoWay}">
-                                    <ComboBox.ItemTemplate>
-                                        <DataTemplate x:DataType="alg:GradientOperator">
-                                            <TextBlock Text="{Binding Converter={x:Static converters:EnumDisplayNameConverter.Instance}}"
-                                                       TextTrimming="CharacterEllipsis" />
-                                        </DataTemplate>
-                                    </ComboBox.ItemTemplate>
-                                </ComboBox>
-                            </Grid>
-                        </Expander>
                     </StackPanel>
-                </Expander>
+                </Expander.Header>
 
-                <!-- 2. Turbulence Flow -->
-                <Expander Classes="substage-card" IsExpanded="True">
-                    <Expander.Header>
-                        <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                            <CheckBox IsChecked="{Binding EnableTurbulenceFlow, Mode=TwoWay}"
-                                      MinWidth="0"
-                                      Padding="0"
-                                      VerticalAlignment="Center"
-                                      ToolTip.Tip="Enable or bypass turbulence wash variation" />
-                            <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
-                                <TextBlock Classes="substage-title"
-                                           Text="Turbulence Flow"
-                                           ToolTip.Tip="Low-frequency Perlin noise density modulation simulating organic water pooling" />
-                                <controls:SettingInfoIcon Header="Turbulence Flow"
-                                                          Text="Breaks up flat painted areas with soft, cloudy lighter and darker patches—just like water drying unevenly across a wash—visible in Turbulence Flow, Combined Pigment, and Final FXAA. Uncheck for perfectly uniform flat washes." />
-                            </StackPanel>
+                <StackPanel Spacing="6"
+                            IsEnabled="{Binding EnableTurbulenceFlow}"
+                            Opacity="{Binding EnableTurbulenceFlow, Converter={x:Static converters:BoolToOpacityConverter.Instance}}">
+                    <controls:NumericSlider Label="Turbulence Intensity"
+                                            Description="Pigment density multiplier for low-frequency wash variation"
+                                            InfoText="Controls how strong the cloudy mottling effect is across painted areas. Low values add subtle organic breathing to skies and walls; high values create bold watery blooms and patchy pigment pools in Turbulence Flow, Combined Pigment, and Final FXAA."
+                                            Minimum="0"
+                                            Maximum="2"
+                                            ValidMinimum="0"
+                                            Step="0.01"
+                                            FormatString="F2"
+                                            Value="{Binding TurbulenceIntensity, Mode=TwoWay}"
+                                            BaselineValue="{Binding TurbulenceFlowBaseline.Intensity}" />
+
+                    <Expander Header="Advanced"
+                              IsExpanded="False"
+                              HorizontalAlignment="Stretch"
+                              Padding="8,6">
+                        <controls:PerlinNoiseEditor DataContext="{Binding TurbulenceNoise}"
+                                                    Title="Turbulence Noise"
+                                                    Description="Perlin noise pattern generating organic cloudy pigment pooling across washes."
+                                                    InfoText="Controls the shape and size of cloudy pigment washes in Turbulence Flow and Combined Pigment. Low Frequency forms wide gentle clouds; higher Octaves and Persistence add richer painterly marbling inside flat regions." />
+                    </Expander>
+                </StackPanel>
+            </Expander>
+
+            <!-- 3. Tone Curve -->
+            <Expander x:Name="ToneCurveExpander"
+                      Classes="substage-card"
+                      IsExpanded="False">
+                <Expander.Header>
+                    <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                        <CheckBox IsChecked="{Binding EnableToneCurve, Mode=TwoWay}"
+                                  MinWidth="0"
+                                  Padding="0"
+                                  VerticalAlignment="Center"
+                                  ToolTip.Tip="Enable or bypass piecewise tone curve adjustment" />
+                        <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                            <TextBlock Classes="substage-title"
+                                       Text="Tone Curve"
+                                       ToolTip.Tip="Piecewise Hermite S-curve shaping final pigment brightness and shadow/highlight roll-off" />
+                            <controls:SettingInfoIcon Header="Tone Curve"
+                                                      Text="Shapes the overall brightness curve of your painting after pigment effects combine, softly lifting crushed blacks and rolling off harsh white glare like real translucent paint on paper. Drag the graph handles or use the four sliders below to tune Tone Curve and Final FXAA." />
                         </StackPanel>
-                    </Expander.Header>
-
-                    <StackPanel Spacing="6"
-                                Opacity="{Binding EnableTurbulenceFlow, Converter={x:Static converters:BoolToOpacityConverter.Instance}}">
-                        <controls:NumericSlider Label="Turbulence Intensity"
-                                                Description="Pigment density multiplier for low-frequency wash variation"
-                                                InfoText="Controls how strong the cloudy mottling effect is across painted areas. Low values add subtle organic breathing to skies and walls; high values create bold watery blooms and patchy pigment pools in Turbulence Flow, Combined Pigment, and Final FXAA."
-                                                Minimum="0"
-                                                Maximum="2"
-                                                ValidMinimum="0"
-                                                Step="0.01"
-                                                FormatString="F2"
-                                                Value="{Binding TurbulenceIntensity, Mode=TwoWay}"
-                                                BaselineValue="0.35" />
-
-                        <Expander Header="Advanced"
-                                  IsExpanded="False"
-                                  HorizontalAlignment="Stretch"
-                                  Padding="8,6">
-                            <controls:PerlinNoiseEditor DataContext="{Binding TurbulenceNoise}"
-                                                        Title="Turbulence Noise"
-                                                        Description="Perlin noise pattern generating organic cloudy pigment pooling across washes."
-                                                        InfoText="Controls the shape and size of cloudy pigment washes in Turbulence Flow and Combined Pigment. Low Frequency forms wide gentle clouds; higher Octaves and Persistence add richer painterly marbling inside flat regions." />
-                        </Expander>
                     </StackPanel>
-                </Expander>
+                </Expander.Header>
 
-                <!-- 3. Tone Curve -->
-                <Expander Classes="substage-card" IsExpanded="True">
-                    <Expander.Header>
-                        <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                            <CheckBox IsChecked="{Binding EnableToneCurve, Mode=TwoWay}"
-                                      MinWidth="0"
-                                      Padding="0"
-                                      VerticalAlignment="Center"
-                                      ToolTip.Tip="Enable or bypass piecewise tone curve adjustment" />
-                            <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
-                                <TextBlock Classes="substage-title"
-                                           Text="Tone Curve"
-                                           ToolTip.Tip="Piecewise Hermite S-curve shaping final pigment brightness and shadow/highlight roll-off" />
-                                <controls:SettingInfoIcon Header="Tone Curve"
-                                                          Text="Shapes the overall brightness curve of your painting after pigment effects combine, softly lifting crushed blacks and rolling off harsh white glare like real translucent paint on paper. Drag the graph handles or use the four sliders below to tune Tone Curve and Final FXAA." />
-                            </StackPanel>
+                <StackPanel Spacing="6"
+                            IsEnabled="{Binding EnableToneCurve}"
+                            Opacity="{Binding EnableToneCurve, Converter={x:Static converters:BoolToOpacityConverter.Instance}}">
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+                        <WrapPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                            <Button Classes="studio-chip"
+                                    Margin="0,0,4,4"
+                                    Content="Linear"
+                                    Tag="Linear"
+                                    Click="OnToneCurvePresetClick"
+                                    ToolTip.Tip="1:1 identity curve (0.00 / 1.00 / 0.25 / 0.75)" />
+                            <Button Classes="studio-chip"
+                                    Margin="0,0,4,4"
+                                    Content="Soft Wash"
+                                    Tag="SoftWash"
+                                    Click="OnToneCurvePresetClick"
+                                    ToolTip.Tip="Gentle lifted shadows and cushioned highlights (0.08 / 0.94 / 0.20 / 0.80)" />
+                            <Button Classes="studio-chip"
+                                    Margin="0,0,4,4"
+                                    Content="High Contrast"
+                                    Tag="HighContrast"
+                                    Click="OnToneCurvePresetClick"
+                                    ToolTip.Tip="Snappier S-curve contrast (0.02 / 0.98 / 0.28 / 0.72)" />
+                            <Button Classes="studio-chip"
+                                    Margin="0,0,4,4"
+                                    Content="Lifted Paper"
+                                    Tag="LiftedPaper"
+                                    Click="OnToneCurvePresetClick"
+                                    ToolTip.Tip="Airy high-key paper wash (0.12 / 0.92 / 0.18 / 0.84)" />
+                        </WrapPanel>
+
+                        <Button x:Name="PART_ResetToneCurveButton"
+                                Grid.Column="1"
+                                Classes="studio-icon-btn"
+                                Width="24"
+                                Height="24"
+                                MinHeight="24"
+                                Content="↺"
+                                FontSize="12"
+                                VerticalAlignment="Top"
+                                Click="OnResetToneCurveClick"
+                                ToolTip.Tip="Reset Tone Curve to active baseline" />
+                    </Grid>
+
+                    <controls:ToneCurveEditor x:Name="PART_ToneCurveEditor"
+                                              Height="170"
+                                              MinTone="{Binding MinTone, Mode=TwoWay}"
+                                              MaxTone="{Binding MaxTone, Mode=TwoWay}"
+                                              ShadowKnee="{Binding ShadowKnee, Mode=TwoWay}"
+                                              HighlightKnee="{Binding HighlightKnee, Mode=TwoWay}"
+                                              BaselineMinTone="{Binding ToneCurveBaseline.MinTone}"
+                                              BaselineMaxTone="{Binding ToneCurveBaseline.MaxTone}"
+                                              BaselineShadowKnee="{Binding ToneCurveBaseline.ShadowKnee}"
+                                              BaselineHighlightKnee="{Binding ToneCurveBaseline.HighlightKnee}"
+                                              IsInteractive="{Binding EnableToneCurve}" />
+
+                    <controls:NumericSlider Label="Min Tone"
+                                            Description="Output minimum tone floor mapped from input 0.0"
+                                            InfoText="Sets how dark the deepest shadows are allowed to get. At 0, blacks stay pitch dark; raising Min Tone gently lifts shadows into rich charcoal or muted ink grays in Tone Curve, Paper Granulation, and Final FXAA—helpful for airy, luminous washes."
+                                            Minimum="0"
+                                            Maximum="0.99"
+                                            ValidMinimum="0"
+                                            ValidMaximum="{Binding MaxTone}"
+                                            IsValidMaximumExclusive="True"
+                                            Step="0.01"
+                                            FormatString="F2"
+                                            Value="{Binding MinTone, Mode=TwoWay}"
+                                            BaselineValue="{Binding ToneCurveBaseline.MinTone}" />
+
+                    <controls:NumericSlider Label="Max Tone"
+                                            Description="Output maximum tone ceiling mapped from input 1.0"
+                                            InfoText="Sets how bright the lightest highlights can reach. At 1.0, pure highlights glow bright paper white; lowering Max Tone subtly tones down stark highlights into warm cream paper values across Tone Curve and the final painting."
+                                            Minimum="0.01"
+                                            Maximum="1.0"
+                                            ValidMinimum="{Binding MinTone}"
+                                            IsValidMinimumExclusive="True"
+                                            ValidMaximum="1"
+                                            Step="0.01"
+                                            FormatString="F2"
+                                            Value="{Binding MaxTone, Mode=TwoWay}"
+                                            BaselineValue="{Binding ToneCurveBaseline.MaxTone}" />
+
+                    <controls:NumericSlider Label="Shadow Knee"
+                                            Description="Input breakpoint transitioning from shadow toe easing to linear midtones"
+                                            InfoText="Controls how far up into dark tones the soft shadow roll-off extends before midtones start. Low values preserve snappy contrast in dark crevices; higher values ease more of the shadows smoothly toward Min Tone in Tone Curve and Final FXAA."
+                                            Minimum="0.01"
+                                            Maximum="0.98"
+                                            ValidMinimum="0"
+                                            IsValidMinimumExclusive="True"
+                                            ValidMaximum="{Binding HighlightKnee}"
+                                            IsValidMaximumExclusive="True"
+                                            Step="0.01"
+                                            FormatString="F2"
+                                            Value="{Binding ShadowKnee, Mode=TwoWay}"
+                                            BaselineValue="{Binding ToneCurveBaseline.ShadowKnee}" />
+
+                    <controls:NumericSlider Label="Highlight Knee"
+                                            Description="Input breakpoint transitioning from linear midtones to highlight shoulder easing"
+                                            InfoText="Controls where bright highlights start rolling off softly toward Max Tone. Lower values cushion a wider highlight range into silky watercolor whites; higher values keep upper midtones crisp right up near the brightest whites."
+                                            Minimum="0.02"
+                                            Maximum="0.99"
+                                            ValidMinimum="{Binding ShadowKnee}"
+                                            IsValidMinimumExclusive="True"
+                                            ValidMaximum="1"
+                                            IsValidMaximumExclusive="True"
+                                            Step="0.01"
+                                            FormatString="F2"
+                                            Value="{Binding HighlightKnee, Mode=TwoWay}"
+                                            BaselineValue="{Binding ToneCurveBaseline.HighlightKnee}" />
+                </StackPanel>
+            </Expander>
+
+            <!-- 4. Paper Granulation -->
+            <Expander x:Name="PaperGranulationExpander"
+                      Classes="substage-card"
+                      IsExpanded="False">
+                <Expander.Header>
+                    <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                        <CheckBox IsChecked="{Binding EnablePaperGranulation, Mode=TwoWay}"
+                                  MinWidth="0"
+                                  Padding="0"
+                                  VerticalAlignment="Center"
+                                  ToolTip.Tip="Enable or bypass paper granulation and fiber micro-warp" />
+                        <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                            <TextBlock Classes="substage-title"
+                                       Text="Paper Granulation"
+                                       ToolTip.Tip="Synthetic paper height-field pigment settling and fiber micro-warp" />
+                            <controls:SettingInfoIcon Header="Paper Granulation"
+                                                      Text="Simulates textured cold-pressed watercolor paper where pigment settles darker inside microscopic paper valleys while wobbling slightly across paper fibers, visible in Paper Granulation and Final FXAA. Uncheck for smooth hot-pressed paper without tooth." />
                         </StackPanel>
-                    </Expander.Header>
-
-                    <StackPanel Spacing="6"
-                                Opacity="{Binding EnableToneCurve, Converter={x:Static converters:BoolToOpacityConverter.Instance}}">
-                        <controls:ToneCurveEditor Height="170"
-                                                  MinTone="{Binding MinTone, Mode=TwoWay}"
-                                                  MaxTone="{Binding MaxTone, Mode=TwoWay}"
-                                                  ShadowKnee="{Binding ShadowKnee, Mode=TwoWay}"
-                                                  HighlightKnee="{Binding HighlightKnee, Mode=TwoWay}"
-                                                  IsInteractive="{Binding EnableToneCurve}" />
-
-                        <controls:NumericSlider Label="Min Tone"
-                                                Description="Output minimum tone floor mapped from input 0.0"
-                                                InfoText="Sets how dark the deepest shadows are allowed to get. At 0, blacks stay pitch dark; raising Min Tone gently lifts shadows into rich charcoal or muted ink grays in Tone Curve, Paper Granulation, and Final FXAA—helpful for airy, luminous washes."
-                                                Minimum="0"
-                                                Maximum="0.99"
-                                                ValidMinimum="0"
-                                                ValidMaximum="{Binding MaxTone}"
-                                                IsValidMaximumExclusive="True"
-                                                Step="0.01"
-                                                FormatString="F2"
-                                                Value="{Binding MinTone, Mode=TwoWay}"
-                                                BaselineValue="0.05" />
-
-                        <controls:NumericSlider Label="Max Tone"
-                                                Description="Output maximum tone ceiling mapped from input 1.0"
-                                                InfoText="Sets how bright the lightest highlights can reach. At 1.0, pure highlights glow bright paper white; lowering Max Tone subtly tones down stark highlights into warm cream paper values across Tone Curve and the final painting."
-                                                Minimum="0.01"
-                                                Maximum="1.0"
-                                                ValidMinimum="{Binding MinTone}"
-                                                IsValidMinimumExclusive="True"
-                                                ValidMaximum="1"
-                                                Step="0.01"
-                                                FormatString="F2"
-                                                Value="{Binding MaxTone, Mode=TwoWay}"
-                                                BaselineValue="0.96" />
-
-                        <controls:NumericSlider Label="Shadow Knee"
-                                                Description="Input breakpoint transitioning from shadow toe easing to linear midtones"
-                                                InfoText="Controls how far up into dark tones the soft shadow roll-off extends before midtones start. Low values preserve snappy contrast in dark crevices; higher values ease more of the shadows smoothly toward Min Tone in Tone Curve and Final FXAA."
-                                                Minimum="0.01"
-                                                Maximum="0.98"
-                                                ValidMinimum="0"
-                                                IsValidMinimumExclusive="True"
-                                                ValidMaximum="{Binding HighlightKnee}"
-                                                IsValidMaximumExclusive="True"
-                                                Step="0.01"
-                                                FormatString="F2"
-                                                Value="{Binding ShadowKnee, Mode=TwoWay}"
-                                                BaselineValue="0.15" />
-
-                        <controls:NumericSlider Label="Highlight Knee"
-                                                Description="Input breakpoint transitioning from linear midtones to highlight shoulder easing"
-                                                InfoText="Controls where bright highlights start rolling off softly toward Max Tone. Lower values cushion a wider highlight range into silky watercolor whites; higher values keep upper midtones crisp right up near the brightest whites."
-                                                Minimum="0.02"
-                                                Maximum="0.99"
-                                                ValidMinimum="{Binding ShadowKnee}"
-                                                IsValidMinimumExclusive="True"
-                                                ValidMaximum="1"
-                                                IsValidMaximumExclusive="True"
-                                                Step="0.01"
-                                                FormatString="F2"
-                                                Value="{Binding HighlightKnee, Mode=TwoWay}"
-                                                BaselineValue="0.85" />
                     </StackPanel>
-                </Expander>
+                </Expander.Header>
 
-                <!-- 4. Paper Granulation -->
-                <Expander Classes="substage-card" IsExpanded="True">
-                    <Expander.Header>
-                        <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                            <CheckBox IsChecked="{Binding EnablePaperGranulation, Mode=TwoWay}"
-                                      MinWidth="0"
-                                      Padding="0"
-                                      VerticalAlignment="Center"
-                                      ToolTip.Tip="Enable or bypass paper granulation and fiber micro-warp" />
-                            <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
-                                <TextBlock Classes="substage-title"
-                                           Text="Paper Granulation"
-                                           ToolTip.Tip="Synthetic paper height-field pigment settling and fiber micro-warp" />
-                                <controls:SettingInfoIcon Header="Paper Granulation"
-                                                          Text="Simulates textured cold-pressed watercolor paper where pigment settles darker inside microscopic paper valleys while wobbling slightly across paper fibers, visible in Paper Granulation and Final FXAA. Uncheck for smooth hot-pressed paper without tooth." />
-                            </StackPanel>
+                <StackPanel Spacing="6"
+                            IsEnabled="{Binding EnablePaperGranulation}"
+                            Opacity="{Binding EnablePaperGranulation, Converter={x:Static converters:BoolToOpacityConverter.Instance}}">
+                    <controls:NumericSlider Label="Density Strength"
+                                            Description="Pigment settling strength in paper valleys vs peaks"
+                                            InfoText="Controls how strongly visible the bumpy watercolor paper texture appears inside washes. At 0, only the fiber warp applies without dark/light grain shading; higher values deepen pigment settling into paper hollows across Paper Granulation and Final FXAA."
+                                            Minimum="0"
+                                            Maximum="2"
+                                            ValidMinimum="0"
+                                            Step="0.01"
+                                            FormatString="F2"
+                                            Value="{Binding DensityStrength, Mode=TwoWay}"
+                                            BaselineValue="{Binding PaperGranulationBaseline.DensityStrength}" />
+
+                    <controls:NumericSlider Label="Warp Amplitude"
+                                            Description="Spatial micro-warp displacement along paper height gradients"
+                                            InfoText="Sets how much crisp paint edges get tiny fibrous wiggles as pigment catches along paper hills and valleys. At 0, edges look clean; higher values give soft fuzzy paper-tooth edges across Paper Granulation and Final FXAA."
+                                            Unit="px"
+                                            Minimum="0"
+                                            Maximum="4"
+                                            ValidMinimum="0"
+                                            Step="0.05"
+                                            FormatString="F2"
+                                            Value="{Binding WarpAmplitude, Mode=TwoWay}"
+                                            BaselineValue="{Binding PaperGranulationBaseline.WarpAmplitude}" />
+
+                    <Expander Header="Advanced"
+                              IsExpanded="False"
+                              HorizontalAlignment="Stretch"
+                              Padding="8,6">
+                        <controls:PerlinNoiseEditor DataContext="{Binding GrainNoise}"
+                                                    Title="Grain Noise"
+                                                    Description="Procedural paper height-map noise defining fiber grain frequency and roughness."
+                                                    InfoText="Synthesizes the virtual watercolor paper surface texture used by Paper Granulation and Final FXAA. Higher Frequency creates fine, tight cold-pressed tooth; lower Frequency acts like coarse rough-press paper with broad bumpy valleys." />
+                    </Expander>
+                </StackPanel>
+            </Expander>
+
+            <!-- 5. FXAA Anti-Aliasing -->
+            <Expander x:Name="FxaaExpander"
+                      Classes="substage-card"
+                      IsExpanded="False">
+                <Expander.Header>
+                    <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                        <CheckBox IsChecked="{Binding EnableFxaa, Mode=TwoWay}"
+                                  MinWidth="0"
+                                  Padding="0"
+                                  VerticalAlignment="Center"
+                                  ToolTip.Tip="Enable or bypass final FXAA anti-aliasing" />
+                        <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                            <TextBlock Classes="substage-title"
+                                       Text="FXAA Anti-Aliasing"
+                                       ToolTip.Tip="Fast Approximate Anti-Aliasing pass smoothing jagged high-contrast pixel edges" />
+                            <controls:SettingInfoIcon Header="FXAA Anti-Aliasing"
+                                                      Text="Gently smooths out pixelated staircase jaggedness on diagonal brush lines in Final FXAA without softening your paper grain. Uncheck if you prefer crisp, unsmoothed pixel rendering." />
                         </StackPanel>
-                    </Expander.Header>
-
-                    <StackPanel Spacing="6"
-                                Opacity="{Binding EnablePaperGranulation, Converter={x:Static converters:BoolToOpacityConverter.Instance}}">
-                        <controls:NumericSlider Label="Density Strength"
-                                                Description="Pigment settling strength in paper valleys vs peaks"
-                                                InfoText="Controls how strongly visible the bumpy watercolor paper texture appears inside washes. At 0, only the fiber warp applies without dark/light grain shading; higher values deepen pigment settling into paper hollows across Paper Granulation and Final FXAA."
-                                                Minimum="0"
-                                                Maximum="2"
-                                                ValidMinimum="0"
-                                                Step="0.01"
-                                                FormatString="F2"
-                                                Value="{Binding DensityStrength, Mode=TwoWay}"
-                                                BaselineValue="0.3" />
-
-                        <controls:NumericSlider Label="Warp Amplitude"
-                                                Description="Spatial micro-warp displacement along paper height gradients"
-                                                InfoText="Sets how much crisp paint edges get tiny fibrous wiggles as pigment catches along paper hills and valleys. At 0, edges look clean; higher values give soft fuzzy paper-tooth edges across Paper Granulation and Final FXAA."
-                                                Unit="px"
-                                                Minimum="0"
-                                                Maximum="4"
-                                                ValidMinimum="0"
-                                                Step="0.05"
-                                                FormatString="F2"
-                                                Value="{Binding WarpAmplitude, Mode=TwoWay}"
-                                                BaselineValue="0.6" />
-
-                        <Expander Header="Advanced"
-                                  IsExpanded="False"
-                                  HorizontalAlignment="Stretch"
-                                  Padding="8,6">
-                            <controls:PerlinNoiseEditor DataContext="{Binding GrainNoise}"
-                                                        Title="Grain Noise"
-                                                        Description="Procedural paper height-map noise defining fiber grain frequency and roughness."
-                                                        InfoText="Synthesizes the virtual watercolor paper surface texture used by Paper Granulation and Final FXAA. Higher Frequency creates fine, tight cold-pressed tooth; lower Frequency acts like coarse rough-press paper with broad bumpy valleys." />
-                        </Expander>
                     </StackPanel>
-                </Expander>
+                </Expander.Header>
 
-                <!-- 5. FXAA Anti-Aliasing -->
-                <Expander Classes="substage-card" IsExpanded="True">
-                    <Expander.Header>
-                        <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                            <CheckBox IsChecked="{Binding EnableFxaa, Mode=TwoWay}"
-                                      MinWidth="0"
-                                      Padding="0"
-                                      VerticalAlignment="Center"
-                                      ToolTip.Tip="Enable or bypass final FXAA anti-aliasing" />
-                            <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
-                                <TextBlock Classes="substage-title"
-                                           Text="FXAA Anti-Aliasing"
-                                           ToolTip.Tip="Fast Approximate Anti-Aliasing pass smoothing jagged high-contrast pixel edges" />
-                                <controls:SettingInfoIcon Header="FXAA Anti-Aliasing"
-                                                          Text="Gently smooths out pixelated staircase jaggedness on diagonal brush lines in Final FXAA without softening your paper grain. Uncheck if you prefer crisp, unsmoothed pixel rendering." />
-                            </StackPanel>
+                <StackPanel Spacing="6"
+                            IsEnabled="{Binding EnableFxaa}"
+                            Opacity="{Binding EnableFxaa, Converter={x:Static converters:BoolToOpacityConverter.Instance}}">
+                    <controls:NumericSlider Label="Subpixel Blend Strength"
+                                            Description="Strength of subpixel anti-aliasing blending"
+                                            InfoText="Controls how strongly FXAA softens thin jagged edges and fine pixel aliasing in Final FXAA. Low values preserve extra crisp micro-detail and paper grain; higher values smooth staircase pixels more thoroughly."
+                                            Minimum="0"
+                                            Maximum="1"
+                                            ValidMinimum="0"
+                                            ValidMaximum="1"
+                                            Step="0.01"
+                                            FormatString="F2"
+                                            Value="{Binding SubpixelBlendStrength, Mode=TwoWay}"
+                                            BaselineValue="{Binding FxaaBaseline.SubpixelBlendStrength}" />
+
+                    <Expander Header="Advanced"
+                              IsExpanded="False"
+                              HorizontalAlignment="Stretch"
+                              Padding="8,6">
+                        <StackPanel Spacing="4">
+                            <controls:NumericSlider Label="Relative Contrast Threshold"
+                                                    Description="Relative edge contrast sensitivity threshold in (0.0, 1.0]"
+                                                    InfoText="Sets how sensitive FXAA is to faint versus bold edges in Final FXAA. Lower values anti-alias even gentle midtone edges; higher values save smoothing only for sharp, high-contrast outlines so delicate textures stay intact."
+                                                    Minimum="0.01"
+                                                    Maximum="1.0"
+                                                    ValidMinimum="0"
+                                                    IsValidMinimumExclusive="True"
+                                                    ValidMaximum="1"
+                                                    Step="0.005"
+                                                    FormatString="F3"
+                                                    Value="{Binding RelativeContrastThreshold, Mode=TwoWay}"
+                                                    BaselineValue="{Binding FxaaBaseline.RelativeContrastThreshold}" />
+
+                            <controls:NumericSlider Label="Absolute Contrast Threshold"
+                                                    Description="Minimum luminance contrast floor preventing noise processing in shadows"
+                                                    InfoText="Prevents FXAA from mistaking faint paper grain or dark shadow variations for jagged edges in Final FXAA. Raising this leaves subtle dark textures untouched while still smoothing clear outlines."
+                                                    Minimum="0"
+                                                    Maximum="0.5"
+                                                    ValidMinimum="0"
+                                                    Step="0.001"
+                                                    FormatString="F4"
+                                                    Value="{Binding AbsoluteContrastThreshold, Mode=TwoWay}"
+                                                    BaselineValue="{Binding FxaaBaseline.AbsoluteContrastThreshold}" />
+
+                            <controls:NumericSlider Label="Max Span Search Steps"
+                                                    Description="Maximum tangent search steps along a detected edge span"
+                                                    InfoText="Sets how far along a line FXAA traces to straighten long gentle diagonal curves in Final FXAA. Low values handle short curves quickly; higher values produce silkier smoothing along shallow slanted strokes."
+                                                    Minimum="1"
+                                                    Maximum="64"
+                                                    ValidMinimum="1"
+                                                    Step="1"
+                                                    IsInteger="True"
+                                                    FormatString="F0"
+                                                    Value="{Binding MaxSpanSearchSteps, Mode=TwoWay, Converter={x:Static converters:IntToDoubleConverter.Instance}}"
+                                                    BaselineValue="{Binding FxaaBaseline.MaxSpanSearchSteps, Converter={x:Static converters:IntToDoubleConverter.Instance}}" />
                         </StackPanel>
-                    </Expander.Header>
-
-                    <StackPanel Spacing="6"
-                                Opacity="{Binding EnableFxaa, Converter={x:Static converters:BoolToOpacityConverter.Instance}}">
-                        <controls:NumericSlider Label="Subpixel Blend Strength"
-                                                Description="Strength of subpixel anti-aliasing blending"
-                                                InfoText="Controls how strongly FXAA softens thin jagged edges and fine pixel aliasing in Final FXAA. Low values preserve extra crisp micro-detail and paper grain; higher values smooth staircase pixels more thoroughly."
-                                                Minimum="0"
-                                                Maximum="1"
-                                                ValidMinimum="0"
-                                                ValidMaximum="1"
-                                                Step="0.01"
-                                                FormatString="F2"
-                                                Value="{Binding SubpixelBlendStrength, Mode=TwoWay}"
-                                                BaselineValue="0.75" />
-
-                        <Expander Header="Advanced"
-                                  IsExpanded="False"
-                                  HorizontalAlignment="Stretch"
-                                  Padding="8,6">
-                            <StackPanel Spacing="4">
-                                <controls:NumericSlider Label="Relative Contrast Threshold"
-                                                        Description="Relative edge contrast sensitivity threshold in (0.0, 1.0]"
-                                                        InfoText="Sets how sensitive FXAA is to faint versus bold edges in Final FXAA. Lower values anti-alias even gentle midtone edges; higher values save smoothing only for sharp, high-contrast outlines so delicate textures stay intact."
-                                                        Minimum="0.01"
-                                                        Maximum="1.0"
-                                                        ValidMinimum="0"
-                                                        IsValidMinimumExclusive="True"
-                                                        ValidMaximum="1"
-                                                        Step="0.005"
-                                                        FormatString="F3"
-                                                        Value="{Binding RelativeContrastThreshold, Mode=TwoWay}"
-                                                        BaselineValue="0.125" />
-
-                                <controls:NumericSlider Label="Absolute Contrast Threshold"
-                                                        Description="Minimum luminance contrast floor preventing noise processing in shadows"
-                                                        InfoText="Prevents FXAA from mistaking faint paper grain or dark shadow variations for jagged edges in Final FXAA. Raising this leaves subtle dark textures untouched while still smoothing clear outlines."
-                                                        Minimum="0"
-                                                        Maximum="0.5"
-                                                        ValidMinimum="0"
-                                                        Step="0.001"
-                                                        FormatString="F4"
-                                                        Value="{Binding AbsoluteContrastThreshold, Mode=TwoWay}"
-                                                        BaselineValue="0.0625" />
-
-                                <controls:NumericSlider Label="Max Span Search Steps"
-                                                        Description="Maximum tangent search steps along a detected edge span"
-                                                        InfoText="Sets how far along a line FXAA traces to straighten long gentle diagonal curves in Final FXAA. Low values handle short curves quickly; higher values produce silkier smoothing along shallow slanted strokes."
-                                                        Minimum="1"
-                                                        Maximum="64"
-                                                        ValidMinimum="1"
-                                                        Step="1"
-                                                        IsInteger="True"
-                                                        FormatString="F0"
-                                                        Value="{Binding MaxSpanSearchSteps, Mode=TwoWay, Converter={x:Static converters:IntToDoubleConverter.Instance}}"
-                                                        BaselineValue="8" />
-                            </StackPanel>
-                        </Expander>
-                    </StackPanel>
-                </Expander>
-            </StackPanel>
-        </ScrollViewer>
-    </Grid>
+                    </Expander>
+                </StackPanel>
+            </Expander>
+        </StackPanel>
+    </ScrollViewer>
 </UserControl>

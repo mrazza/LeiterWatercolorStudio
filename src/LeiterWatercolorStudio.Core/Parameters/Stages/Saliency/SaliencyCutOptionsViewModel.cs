@@ -10,6 +10,7 @@ public sealed class SaliencyCutOptionsViewModel : StageViewModelBase
 {
     private const int DefaultWorkingDimension = 1024;
 
+    private SaliencyCutOptions _baseline;
     private int _maxOuterIterations;
     private int _trimapBandRadius;
     private bool _useMaxWorkingDimension;
@@ -17,11 +18,24 @@ public sealed class SaliencyCutOptionsViewModel : StageViewModelBase
 
     internal SaliencyCutOptionsViewModel(SaliencyCutOptions initial)
     {
+        initial.Validate();
+        _baseline = initial;
         _maxOuterIterations = initial.MaxOuterIterations;
         _trimapBandRadius = initial.TrimapBandRadius;
         _useMaxWorkingDimension = initial.MaxWorkingDimension.HasValue;
         _maxWorkingDimension = initial.MaxWorkingDimension ?? DefaultWorkingDimension;
     }
+
+    /// <summary>
+    /// Gets the baseline <see cref="SaliencyCutOptions"/> used for per-parameter resets.
+    /// </summary>
+    public SaliencyCutOptions Baseline => _baseline;
+
+    /// <summary>
+    /// Gets the non-nullable baseline working dimension value for slider binding
+    /// (falling back to <c>1024</c> when <see cref="SaliencyCutOptions.MaxWorkingDimension"/> is <see langword="null"/>).
+    /// </summary>
+    public int BaselineMaxWorkingDimension => _baseline.MaxWorkingDimension ?? DefaultWorkingDimension;
 
     /// <summary>
     /// Gets or sets the maximum number of trimap refinement iterations (<c>&gt;= 1</c>).
@@ -60,6 +74,19 @@ public sealed class SaliencyCutOptionsViewModel : StageViewModelBase
     }
 
     /// <summary>
+    /// Updates <see cref="Baseline"/> without modifying current parameter values or raising a parameter edit.
+    /// </summary>
+    public void SetBaseline(SaliencyCutOptions baseline)
+    {
+        ArgumentNullException.ThrowIfNull(baseline);
+        baseline.Validate();
+        if (SetProperty(ref _baseline, baseline, nameof(Baseline)))
+        {
+            OnPropertyChanged(nameof(BaselineMaxWorkingDimension));
+        }
+    }
+
+    /// <summary>
     /// Loads outer SaliencyCut properties from <paramref name="options"/>.
     /// </summary>
     public void LoadFrom(SaliencyCutOptions options)
@@ -76,6 +103,27 @@ public sealed class SaliencyCutOptionsViewModel : StageViewModelBase
             {
                 SetProperty(ref _maxWorkingDimension, dim, nameof(MaxWorkingDimension));
             }
+        }
+    }
+
+    /// <inheritdoc />
+    public override void ResetToBaseline()
+    {
+        int targetWorkingDim = BaselineMaxWorkingDimension;
+        bool changed = _maxOuterIterations != _baseline.MaxOuterIterations
+            || _trimapBandRadius != _baseline.TrimapBandRadius
+            || _useMaxWorkingDimension != _baseline.MaxWorkingDimension.HasValue
+            || _maxWorkingDimension != targetWorkingDim;
+
+        using (SuppressNotifications())
+        {
+            LoadFrom(_baseline);
+            SetProperty(ref _maxWorkingDimension, targetWorkingDim, nameof(MaxWorkingDimension));
+        }
+
+        if (changed)
+        {
+            RaiseParameterChanged(isImmediate: true);
         }
     }
 

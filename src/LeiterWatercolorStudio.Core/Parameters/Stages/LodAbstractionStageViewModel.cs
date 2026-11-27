@@ -9,6 +9,8 @@ namespace LeiterWatercolorStudio.Core.Parameters.Stages;
 /// </summary>
 public sealed class LodAbstractionStageViewModel : StageViewModelBase
 {
+    private bool _baselineEnableLodAbstraction;
+    private LodAbstractionOptions _baseline;
     private bool _enableLodAbstraction;
     private int _salientKernelSize;
     private int _minNonSalientKernelSize;
@@ -24,6 +26,8 @@ public sealed class LodAbstractionStageViewModel : StageViewModelBase
     public LodAbstractionStageViewModel()
     {
         WatercolorOptions defaults = WatercolorOptions.Default;
+        _baselineEnableLodAbstraction = defaults.EnableLodAbstraction;
+        _baseline = defaults.LodAbstraction;
         _enableLodAbstraction = defaults.EnableLodAbstraction;
         _salientKernelSize = defaults.LodAbstraction.SalientKernelSize;
         _minNonSalientKernelSize = defaults.LodAbstraction.MinNonSalientKernelSize;
@@ -33,6 +37,16 @@ public sealed class LodAbstractionStageViewModel : StageViewModelBase
         _crossSegmentColorScale = defaults.LodAbstraction.CrossSegmentColorScale;
         _salientOverlapThreshold = defaults.LodAbstraction.SalientOverlapThreshold;
     }
+
+    /// <summary>
+    /// Gets the baseline <see cref="LodAbstractionOptions"/> used for per-parameter resets.
+    /// </summary>
+    public LodAbstractionOptions Baseline => _baseline;
+
+    /// <summary>
+    /// Gets the baseline enabled state for Stage 3b LOD abstraction.
+    /// </summary>
+    public bool BaselineEnableLodAbstraction => _baselineEnableLodAbstraction;
 
     /// <summary>
     /// Gets or sets whether Stage 3b LOD abstraction is enabled.
@@ -147,6 +161,23 @@ public sealed class LodAbstractionStageViewModel : StageViewModelBase
     }
 
     /// <summary>
+    /// Updates <see cref="Baseline"/> without modifying current parameter values or raising a parameter edit.
+    /// </summary>
+    public void SetBaseline(LodAbstractionOptions baseline) =>
+        SetBaseline(_baselineEnableLodAbstraction, baseline);
+
+    /// <summary>
+    /// Updates <see cref="BaselineEnableLodAbstraction"/> and <see cref="Baseline"/> without modifying current parameter values.
+    /// </summary>
+    public void SetBaseline(bool enableLodAbstraction, LodAbstractionOptions baseline)
+    {
+        ArgumentNullException.ThrowIfNull(baseline);
+        baseline.Validate();
+        SetProperty(ref _baselineEnableLodAbstraction, enableLodAbstraction, nameof(BaselineEnableLodAbstraction));
+        SetProperty(ref _baseline, baseline, nameof(Baseline));
+    }
+
+    /// <summary>
     /// Loads Stage 3b parameters from pipeline options without transient coupling distortion.
     /// </summary>
     public void LoadFrom(bool enableLodAbstraction, LodAbstractionOptions options)
@@ -164,6 +195,25 @@ public sealed class LodAbstractionStageViewModel : StageViewModelBase
             SetProperty(ref _distanceKernelBias, options.DistanceKernelBias, nameof(DistanceKernelBias));
             SetProperty(ref _crossSegmentColorScale, options.CrossSegmentColorScale, nameof(CrossSegmentColorScale));
             SetProperty(ref _salientOverlapThreshold, options.SalientOverlapThreshold, nameof(SalientOverlapThreshold));
+        }
+    }
+
+    /// <inheritdoc />
+    public override void ResetToBaseline()
+    {
+        bool changed = _enableLodAbstraction != _baselineEnableLodAbstraction
+            || _salientKernelSize != _baseline.SalientKernelSize
+            || _minNonSalientKernelSize != _baseline.MinNonSalientKernelSize
+            || _maxNonSalientKernelSize != _baseline.MaxNonSalientKernelSize
+            || _distanceKernelScale != _baseline.DistanceKernelScale
+            || _distanceKernelBias != _baseline.DistanceKernelBias
+            || _crossSegmentColorScale != _baseline.CrossSegmentColorScale
+            || _salientOverlapThreshold != _baseline.SalientOverlapThreshold;
+
+        LoadFrom(_baselineEnableLodAbstraction, _baseline);
+        if (changed)
+        {
+            RaiseParameterChanged(isImmediate: true);
         }
     }
 

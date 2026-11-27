@@ -19,7 +19,7 @@
                                  Grid.Column="0"
                                  Width="6"
                                  Height="6"
-                                 Fill="#38BDF8"
+                                 Fill="{DynamicResource StudioModifiedDotBrush}"
                                  Margin="0,0,5,0"
                                  VerticalAlignment="Center"
                                  IsVisible="False" />
@@ -40,8 +40,8 @@
 
             <TextBox x:Name="PART_ValueTextBox"
                      Grid.Column="1"
-                     MinWidth="60"
-                     Width="66"
+                     MinWidth="68"
+                     Width="74"
                      Height="24"
                      MinHeight="24"
                      Padding="6,2"
@@ -74,14 +74,27 @@
                     ToolTip.Tip="Reset to baseline (or double-click label / track)" />
         </Grid>
 
-        <Slider x:Name="PART_Slider"
-                Minimum="0"
-                Maximum="1"
-                Value="0"
-                SmallChange="0.01"
-                LargeChange="0.1"
-                MinHeight="20"
-                Margin="0,-3,0,0" />
+        <Grid Margin="0,-3,0,0"
+              MinHeight="20">
+            <Canvas x:Name="PART_BaselineTickCanvas"
+                    IsHitTestVisible="False">
+                <Border x:Name="PART_BaselineTick"
+                        Width="2"
+                        Height="12"
+                        CornerRadius="1"
+                        Background="{DynamicResource StudioSliderBaselineTickBrush}"
+                        Opacity="0.85"
+                        IsVisible="False" />
+            </Canvas>
+
+            <Slider x:Name="PART_Slider"
+                    Minimum="0"
+                    Maximum="1"
+                    Value="0"
+                    SmallChange="0.01"
+                    LargeChange="0.1"
+                    MinHeight="20" />
+        </Grid>
 
         <TextBlock x:Name="PART_ValidationErrorText"
                    Classes="validation-error"

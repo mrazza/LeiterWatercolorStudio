@@ -9,8 +9,8 @@
     <UserControl.Styles>
         <!-- Grid tile card styles -->
         <Style Selector="Border.grid-tile">
-            <Setter Property="Background" Value="#171C26" />
-            <Setter Property="BorderBrush" Value="#2A3242" />
+            <Setter Property="Background" Value="{DynamicResource StudioGridTileBgBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource StudioGridTileBorderBrush}" />
             <Setter Property="BorderThickness" Value="1.5" />
             <Setter Property="Transitions">
                 <Transitions>
@@ -19,53 +19,81 @@
             </Setter>
         </Style>
         <Style Selector="Border.grid-tile:pointerover">
-            <Setter Property="BorderBrush" Value="#475569" />
+            <Setter Property="BorderBrush" Value="{DynamicResource StudioMutedBrush}" />
         </Style>
         <Style Selector="Border.grid-tile.bypassed">
-            <Setter Property="BorderBrush" Value="#252B38" />
+            <Setter Property="BorderBrush" Value="{DynamicResource StudioBorderBrush}" />
         </Style>
         <Style Selector="Border.grid-tile.bypassed Border.tile-viewport">
             <Setter Property="Opacity" Value="0.48" />
         </Style>
         <Style Selector="Border.grid-tile.cached">
-            <Setter Property="BorderBrush" Value="#059669" />
+            <Setter Property="BorderBrush" Value="{DynamicResource StudioCachedBrush}" />
         </Style>
         <Style Selector="Border.grid-tile.stale">
-            <Setter Property="BorderBrush" Value="#D97706" />
+            <Setter Property="BorderBrush" Value="{DynamicResource StudioStaleBrush}" />
         </Style>
         <Style Selector="Border.grid-tile.running">
-            <Setter Property="BorderBrush" Value="#38BDF8" />
+            <Setter Property="BorderBrush" Value="{DynamicResource StudioStatusRunningBorderBrush}" />
         </Style>
         <Style Selector="Border.grid-tile.selected">
-            <Setter Property="BorderBrush" Value="#60A5FA" />
+            <Setter Property="BorderBrush" Value="{DynamicResource StudioAccentBrush}" />
             <Setter Property="BorderThickness" Value="2" />
         </Style>
         <Style Selector="Border.grid-tile.selected:pointerover">
-            <Setter Property="BorderBrush" Value="#93C5FD" />
+            <Setter Property="BorderBrush" Value="{DynamicResource StudioAccentHoverBrush}" />
         </Style>
 
         <!-- Status dots -->
         <Style Selector="Ellipse.status-dot">
-            <Setter Property="Fill" Value="#64748B" />
+            <Setter Property="Fill" Value="{DynamicResource StudioMutedBrush}" />
         </Style>
         <Style Selector=".bypassed Ellipse.status-dot">
-            <Setter Property="Fill" Value="#6B7280" />
+            <Setter Property="Fill" Value="{DynamicResource StudioStatusBypassedFgBrush}" />
         </Style>
         <Style Selector=".cached Ellipse.status-dot">
-            <Setter Property="Fill" Value="#10B981" />
+            <Setter Property="Fill" Value="{DynamicResource StudioCachedBrush}" />
         </Style>
         <Style Selector=".stale Ellipse.status-dot">
-            <Setter Property="Fill" Value="#F59E0B" />
+            <Setter Property="Fill" Value="{DynamicResource StudioStaleBrush}" />
         </Style>
         <Style Selector=".running Ellipse.status-dot">
-            <Setter Property="Fill" Value="#38BDF8" />
+            <Setter Property="Fill" Value="{DynamicResource StudioStatusRunningBorderBrush}" />
+        </Style>
+
+        <!-- Clickable grid pin button -->
+        <Style Selector="Button.grid-pin-btn">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="2" />
+            <Setter Property="Width" Value="18" />
+            <Setter Property="Height" Value="18" />
+            <Setter Property="CornerRadius" Value="4" />
+            <Setter Property="Opacity" Value="0.32" />
+            <Setter Property="Cursor" Value="Hand" />
+        </Style>
+        <Style Selector="Border.grid-tile:pointerover Button.grid-pin-btn">
+            <Setter Property="Opacity" Value="0.82" />
+        </Style>
+        <Style Selector="Button.grid-pin-btn:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource StudioPinHoverBgBrush}" />
+        </Style>
+        <Style Selector="Button.grid-pin-btn Path.pin-glyph">
+            <Setter Property="Fill" Value="{DynamicResource StudioMutedBrush}" />
+        </Style>
+        <Style Selector="Button.grid-pin-btn.pinned">
+            <Setter Property="Opacity" Value="1" />
+            <Setter Property="Background" Value="{DynamicResource StudioPinPinnedBgBrush}" />
+        </Style>
+        <Style Selector="Button.grid-pin-btn.pinned Path.pin-glyph">
+            <Setter Property="Fill" Value="{DynamicResource StudioPinPinnedFgBrush}" />
         </Style>
 
         <!-- Reset button hover -->
         <Style Selector="Button.grid-toolbar-btn">
-            <Setter Property="Background" Value="#232B3A" />
-            <Setter Property="Foreground" Value="#E2E8F0" />
-            <Setter Property="BorderBrush" Value="#334155" />
+            <Setter Property="Background" Value="{DynamicResource StudioCardBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource StudioForegroundBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource StudioBorderBrush}" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="CornerRadius" Value="5" />
             <Setter Property="Padding" Value="9,3" />
@@ -73,17 +101,17 @@
             <Setter Property="Cursor" Value="Hand" />
         </Style>
         <Style Selector="Button.grid-toolbar-btn:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background" Value="#2E384B" />
-            <Setter Property="BorderBrush" Value="#475569" />
+            <Setter Property="Background" Value="{DynamicResource StudioHoverBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource StudioMutedBrush}" />
         </Style>
     </UserControl.Styles>
 
-    <Border Background="#11151C">
+    <Border Background="{DynamicResource StudioGridBgBrush}">
         <Grid RowDefinitions="Auto,*">
             <!-- Synchronized Grid Header Toolbar -->
             <Border Grid.Row="0"
-                    Background="#161B24"
-                    BorderBrush="#252C38"
+                    Background="{DynamicResource StudioGridHeaderBgBrush}"
+                    BorderBrush="{DynamicResource StudioGridHeaderBorderBrush}"
                     BorderThickness="0,0,0,1"
                     Padding="12,6">
                 <Grid ColumnDefinitions="*,Auto">
@@ -94,11 +122,11 @@
                         <TextBlock Text="ALL STAGES (4×2)"
                                    FontSize="11"
                                    FontWeight="Bold"
-                                   Foreground="#94A3B8"
+                                   Foreground="{DynamicResource StudioSecondaryForegroundBrush}"
                                    VerticalAlignment="Center" />
                         <TextBlock Text="• Scroll any tile to zoom, drag to pan in lockstep, double-click to inspect"
                                    FontSize="11"
-                                   Foreground="#64748B"
+                                   Foreground="{DynamicResource StudioMutedBrush}"
                                    TextTrimming="CharacterEllipsis"
                                    VerticalAlignment="Center" />
                     </StackPanel>
@@ -107,8 +135,8 @@
                                 Orientation="Horizontal"
                                 Spacing="6"
                                 VerticalAlignment="Center">
-                        <Border Background="#1E2532"
-                                BorderBrush="#2D3748"
+                        <Border Background="{DynamicResource StudioSurfaceAltBrush}"
+                                BorderBrush="{DynamicResource StudioBorderBrush}"
                                 BorderThickness="1"
                                 CornerRadius="5"
                                 Padding="8,3"
@@ -116,10 +144,11 @@
                             <TextBlock Text="{Binding #Root.ZoomText}"
                                        FontSize="11"
                                        FontWeight="SemiBold"
-                                       Foreground="#CBD5E1" />
+                                       Foreground="{DynamicResource StudioSecondaryForegroundBrush}" />
                         </Border>
                         <Button Classes="grid-toolbar-btn"
                                 Content="Reset View"
+                                ToolTip.Tip="Fit all 8 tiles to view (Ctrl+0 / Ctrl+1)"
                                 Click="OnResetViewClick" />
                     </StackPanel>
                 </Grid>
@@ -156,8 +185,8 @@
                             <Grid RowDefinitions="Auto,*">
                                 <!-- Tile Header -->
                                 <Border Grid.Row="0"
-                                        Background="#1C222E"
-                                        BorderBrush="#273041"
+                                        Background="{DynamicResource StudioGridTileHeaderBgBrush}"
+                                        BorderBrush="{DynamicResource StudioGridTileBorderBrush}"
                                         BorderThickness="0,0,0,1"
                                         Padding="8,5">
                                     <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="6">
@@ -166,12 +195,12 @@
                                                 Width="17"
                                                 Height="17"
                                                 CornerRadius="4"
-                                                Background="#273042"
+                                                Background="{DynamicResource StudioSurfaceAltBrush}"
                                                 VerticalAlignment="Center">
                                             <TextBlock Text="{Binding ShortcutText}"
                                                        FontSize="10"
                                                        FontWeight="Bold"
-                                                       Foreground="#E2E8F0"
+                                                       Foreground="{DynamicResource StudioSecondaryForegroundBrush}"
                                                        HorizontalAlignment="Center"
                                                        VerticalAlignment="Center" />
                                         </Border>
@@ -181,11 +210,11 @@
                                                    Text="{Binding Title}"
                                                    FontSize="12"
                                                    FontWeight="SemiBold"
-                                                   Foreground="#F1F5F9"
+                                                   Foreground="{DynamicResource StudioForegroundBrush}"
                                                    TextTrimming="CharacterEllipsis"
                                                    VerticalAlignment="Center" />
 
-                                        <!-- Status Badges & Pin -->
+                                        <!-- Status Badges & Clickable Pin -->
                                         <StackPanel Grid.Column="2"
                                                     Orientation="Horizontal"
                                                     Spacing="4"
@@ -194,60 +223,59 @@
                                                      Width="7"
                                                      Height="7"
                                                      VerticalAlignment="Center" />
-                                            <Border Background="#0C4A6E"
+                                            <Border Background="{DynamicResource StudioStatusRunningBgBrush}"
                                                     CornerRadius="4"
                                                     Padding="5,1"
                                                     IsVisible="{Binding IsRunning}">
                                                 <TextBlock Text="Running"
                                                            FontSize="9.5"
                                                            FontWeight="SemiBold"
-                                                           Foreground="#7DD3FC" />
+                                                           Foreground="{DynamicResource StudioStatusRunningFgBrush}" />
                                             </Border>
-                                            <Border Background="#451A03"
+                                            <Border Background="{DynamicResource StudioStatusStaleBgBrush}"
                                                     CornerRadius="4"
                                                     Padding="5,1"
                                                     IsVisible="{Binding IsStale}">
                                                 <TextBlock Text="Stale"
                                                            FontSize="9.5"
                                                            FontWeight="SemiBold"
-                                                           Foreground="#FCD34D" />
+                                                           Foreground="{DynamicResource StudioStatusStaleFgBrush}" />
                                             </Border>
-                                            <Border Background="#064E3B"
+                                            <Border Background="{DynamicResource StudioStatusCachedBgBrush}"
                                                     CornerRadius="4"
                                                     Padding="5,1"
                                                     IsVisible="{Binding IsFromCache}">
                                                 <TextBlock Text="Cached"
                                                            FontSize="9.5"
                                                            FontWeight="SemiBold"
-                                                           Foreground="#6EE7B7" />
+                                                           Foreground="{DynamicResource StudioStatusCachedFgBrush}" />
                                             </Border>
-                                            <Border Background="#272C36"
+                                            <Border Background="{DynamicResource StudioStatusBypassedBgBrush}"
                                                     CornerRadius="4"
                                                     Padding="5,1"
                                                     IsVisible="{Binding IsBypassed}">
                                                 <TextBlock Text="Bypassed"
                                                            FontSize="9.5"
                                                            FontWeight="SemiBold"
-                                                           Foreground="#9CA3AF" />
+                                                           Foreground="{DynamicResource StudioStatusBypassedFgBrush}" />
                                             </Border>
-                                            <Border Background="#3B2F13"
-                                                    CornerRadius="4"
-                                                    Padding="4,2"
-                                                    IsVisible="{Binding IsPinned}"
-                                                    ToolTip.Tip="Pinned for A/B compare">
-                                                <Path Fill="#FBBF24"
+                                            <Button Classes="grid-pin-btn"
+                                                    Classes.pinned="{Binding IsPinned}"
+                                                    Click="OnPinButtonClick"
+                                                    ToolTip.Tip="Pin or unpin stage for A/B comparison">
+                                                <Path Classes="pin-glyph"
                                                       Width="9"
                                                       Height="9"
                                                       Stretch="Uniform"
                                                       Data="M16,12V4H17V2H7V4H8V12L6,14V16H11.2V22H12.8V16H18V14L16,12Z" />
-                                            </Border>
+                                            </Button>
                                         </StackPanel>
 
                                         <!-- Timing Readout -->
                                         <TextBlock Grid.Column="3"
                                                    Text="{Binding TimingText}"
                                                    FontSize="11"
-                                                   Foreground="#94A3B8"
+                                                   Foreground="{DynamicResource StudioMutedBrush}"
                                                    VerticalAlignment="Center" />
                                     </Grid>
                                 </Border>
@@ -255,13 +283,13 @@
                                 <!-- Clipped Synchronized Transform Viewport -->
                                 <Border Grid.Row="1"
                                         Classes="tile-viewport"
-                                        Background="#0D1016"
+                                        Background="{DynamicResource StudioGridTileViewportBgBrush}"
                                         ClipToBounds="True">
                                     <Panel>
                                         <TextBlock Text="No Preview"
                                                    IsVisible="{Binding !HasDisplayBitmap}"
                                                    FontSize="11"
-                                                   Foreground="#475569"
+                                                   Foreground="{DynamicResource StudioMutedBrush}"
                                                    HorizontalAlignment="Center"
                                                    VerticalAlignment="Center" />
                                         <Image Classes="tile-image"

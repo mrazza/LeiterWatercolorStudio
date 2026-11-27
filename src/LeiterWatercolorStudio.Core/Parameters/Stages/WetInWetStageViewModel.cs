@@ -8,6 +8,8 @@ namespace LeiterWatercolorStudio.Core.Parameters.Stages;
 /// </summary>
 public sealed class WetInWetStageViewModel : StageViewModelBase
 {
+    private bool _baselineEnableWetInWet;
+    private WetInWetOptions _baseline;
     private bool _enableWetInWet;
     private WetInWetMode _mode;
     private double _colorGradientThreshold;
@@ -29,6 +31,8 @@ public sealed class WetInWetStageViewModel : StageViewModelBase
     {
         WatercolorOptions defaults = WatercolorOptions.Default;
         WetInWetOptions wet = defaults.WetInWet;
+        _baselineEnableWetInWet = defaults.EnableWetInWet;
+        _baseline = wet;
         _enableWetInWet = defaults.EnableWetInWet;
         _mode = wet.Mode;
         _colorGradientThreshold = wet.ColorGradientThreshold;
@@ -45,12 +49,57 @@ public sealed class WetInWetStageViewModel : StageViewModelBase
     }
 
     /// <summary>
+    /// Gets the boundary filtering modes exposed to UI selectors (excluding redundant <see cref="WetInWetMode.Disabled"/>,
+    /// which is superseded by <see cref="EnableWetInWet"/>).
+    /// </summary>
+    public static IReadOnlyList<WetInWetMode> SelectableFilteringModes { get; } =
+    [
+        WetInWetMode.Default,
+        WetInWetMode.ExcludeSalientBoundaries,
+        WetInWetMode.ExcludeSalientRegions,
+    ];
+
+    /// <summary>
+    /// Gets the baseline <see cref="WetInWetOptions"/> used for per-parameter resets.
+    /// </summary>
+    public WetInWetOptions Baseline => _baseline;
+
+    /// <summary>
+    /// Gets the baseline enabled state for Stage 4 wet-in-wet bleeding.
+    /// </summary>
+    public bool BaselineEnableWetInWet => _baselineEnableWetInWet;
+
+    /// <summary>
+    /// Gets whether wet-in-wet bleeding is effectively active (<see cref="EnableWetInWet"/> is <see langword="true"/>
+    /// and <see cref="Mode"/> is not <see cref="WetInWetMode.Disabled"/>).
+    /// </summary>
+    public bool IsWetInWetActive => _enableWetInWet && _mode != WetInWetMode.Disabled;
+
+    /// <summary>
     /// Gets or sets whether Stage 4 wet-in-wet edge bleeding is enabled.
+    /// Turning this on while <see cref="Mode"/> is <see cref="WetInWetMode.Disabled"/> restores a non-disabled filtering mode.
     /// </summary>
     public bool EnableWetInWet
     {
         get => _enableWetInWet;
-        set => SetToggle(ref _enableWetInWet, value);
+        set
+        {
+            if (value && !_enableWetInWet && _mode == WetInWetMode.Disabled)
+            {
+                WetInWetMode fallbackMode = _baseline.Mode != WetInWetMode.Disabled
+                    ? _baseline.Mode
+                    : WetInWetMode.Default;
+                using (SuppressNotifications())
+                {
+                    SetProperty(ref _mode, fallbackMode, nameof(Mode));
+                }
+            }
+
+            if (SetToggle(ref _enableWetInWet, value))
+            {
+                OnPropertyChanged(nameof(IsWetInWetActive));
+            }
+        }
     }
 
     /// <summary>
@@ -59,7 +108,13 @@ public sealed class WetInWetStageViewModel : StageViewModelBase
     public WetInWetMode Mode
     {
         get => _mode;
-        set => SetEnum(ref _mode, value);
+        set
+        {
+            if (SetEnum(ref _mode, value))
+            {
+                OnPropertyChanged(nameof(IsWetInWetActive));
+            }
+        }
     }
 
     /// <summary>
@@ -179,6 +234,23 @@ public sealed class WetInWetStageViewModel : StageViewModelBase
     }
 
     /// <summary>
+    /// Updates <see cref="Baseline"/> without modifying current parameter values or raising a parameter edit.
+    /// </summary>
+    public void SetBaseline(WetInWetOptions baseline) =>
+        SetBaseline(_baselineEnableWetInWet, baseline);
+
+    /// <summary>
+    /// Updates <see cref="BaselineEnableWetInWet"/> and <see cref="Baseline"/> without modifying current parameter values.
+    /// </summary>
+    public void SetBaseline(bool enableWetInWet, WetInWetOptions baseline)
+    {
+        ArgumentNullException.ThrowIfNull(baseline);
+        baseline.Validate();
+        SetProperty(ref _baselineEnableWetInWet, enableWetInWet, nameof(BaselineEnableWetInWet));
+        SetProperty(ref _baseline, baseline, nameof(Baseline));
+    }
+
+    /// <summary>
     /// Loads Stage 4 parameters from pipeline options.
     /// </summary>
     public void LoadFrom(bool enableWetInWet, WetInWetOptions options)
@@ -186,6 +258,7 @@ public sealed class WetInWetStageViewModel : StageViewModelBase
         ArgumentNullException.ThrowIfNull(options);
         options.Validate();
 
+        bool wasActive = IsWetInWetActive;
         using (SuppressNotifications())
         {
             SetProperty(ref _enableWetInWet, enableWetInWet, nameof(EnableWetInWet));
@@ -201,6 +274,35 @@ public sealed class WetInWetStageViewModel : StageViewModelBase
             SetProperty(ref _ellipticalMajorRadius, options.EllipticalFilter.MajorRadius, nameof(EllipticalMajorRadius));
             SetProperty(ref _ellipticalMinorRadius, options.EllipticalFilter.MinorRadius, nameof(EllipticalMinorRadius));
             SetProperty(ref _ellipticalSigmaScale, options.EllipticalFilter.SigmaScale, nameof(EllipticalSigmaScale));
+        }
+
+        if (wasActive != IsWetInWetActive)
+        {
+            OnPropertyChanged(nameof(IsWetInWetActive));
+        }
+    }
+
+    /// <inheritdoc />
+    public override void ResetToBaseline()
+    {
+        bool changed = _enableWetInWet != _baselineEnableWetInWet
+            || _mode != _baseline.Mode
+            || _colorGradientThreshold != _baseline.ColorGradientThreshold
+            || _salientHueThresholdDegrees != _baseline.SalientHueThresholdDegrees
+            || _nonSalientHueThresholdDegrees != _baseline.NonSalientHueThresholdDegrees
+            || _minIntensityDifference != _baseline.MinIntensityDifference
+            || _salientOverlapThreshold != _baseline.SalientOverlapThreshold
+            || _scatterRadius != _baseline.ScatterRadius
+            || _seedProbability != _baseline.SeedProbability
+            || _seed != _baseline.Seed
+            || _ellipticalMajorRadius != _baseline.EllipticalFilter.MajorRadius
+            || _ellipticalMinorRadius != _baseline.EllipticalFilter.MinorRadius
+            || _ellipticalSigmaScale != _baseline.EllipticalFilter.SigmaScale;
+
+        LoadFrom(_baselineEnableWetInWet, _baseline);
+        if (changed)
+        {
+            RaiseParameterChanged(isImmediate: true);
         }
     }
 
