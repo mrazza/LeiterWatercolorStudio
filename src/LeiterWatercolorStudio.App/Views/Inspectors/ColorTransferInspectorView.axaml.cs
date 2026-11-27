@@ -3,8 +3,10 @@ using System.Globalization;
 using System.Windows.Input;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Data.Converters;
 using Avalonia.Interactivity;
 using Avalonia.Media;
+using Avalonia.Media.Imaging;
 using Leiter.Algorithms.Color;
 using Leiter.Pixels;
 using Leiter.Pixels.ColorSpaces;
@@ -16,7 +18,7 @@ using LeiterWatercolorStudio.Core.Parameters.Stages;
 namespace LeiterWatercolorStudio.App.Views.Inspectors;
 
 /// <summary>
-/// Inspector panel for Stage 1 (Color Transfer), supporting Auto, Built-In, and Custom CIELAB palette controls.
+/// Inspector panel for Stage 2 (Color Transfer), supporting Auto, Built-In, and Custom CIELAB palette controls.
 /// </summary>
 public partial class ColorTransferInspectorView : UserControl
 {
@@ -33,6 +35,26 @@ public partial class ColorTransferInspectorView : UserControl
         AvaloniaProperty.Register<ColorTransferInspectorView, ICommand?>(nameof(ExtractPaletteCommand), null);
 
     /// <summary>
+    /// Identifies the <see cref="ReferenceThumbnail"/> styled property.
+    /// </summary>
+    public static readonly StyledProperty<Bitmap?> ReferenceThumbnailProperty =
+        AvaloniaProperty.Register<ColorTransferInspectorView, Bitmap?>(nameof(ReferenceThumbnail), null);
+
+    /// <summary>
+    /// Identifies the <see cref="ReferenceImageName"/> styled property.
+    /// </summary>
+    public static readonly StyledProperty<string?> ReferenceImageNameProperty =
+        AvaloniaProperty.Register<ColorTransferInspectorView, string?>(nameof(ReferenceImageName), null);
+
+    /// <summary>
+    /// Identifies the <see cref="HasReferencePreview"/> direct property.
+    /// </summary>
+    public static readonly DirectProperty<ColorTransferInspectorView, bool> HasReferencePreviewProperty =
+        AvaloniaProperty.RegisterDirect<ColorTransferInspectorView, bool>(
+            nameof(HasReferencePreview),
+            o => o.HasReferencePreview);
+
+    /// <summary>
     /// Gets all available <see cref="PaletteMode"/> options for UI selectors.
     /// </summary>
     public static IReadOnlyList<PaletteMode> PaletteModes { get; } = Enum.GetValues<PaletteMode>();
@@ -42,8 +64,15 @@ public partial class ColorTransferInspectorView : UserControl
     /// </summary>
     public static IReadOnlyList<Illuminant> Illuminants { get; } = Enum.GetValues<Illuminant>();
 
+    /// <summary>
+    /// Matches <see cref="PaletteMode.Auto"/> for conditional copy actions.
+    /// </summary>
+    public static IValueConverter IsAutoModeConverter { get; } =
+        new FuncValueConverter<PaletteMode, bool>(mode => mode == PaletteMode.Auto);
+
     private readonly Border[] _swatchBorders;
     private ColorTransferStageViewModel? _subscribedViewModel;
+    private bool _hasReferencePreview;
 
     /// <summary>
     /// Initializes a new instance of <see cref="ColorTransferInspectorView"/>.
@@ -62,11 +91,13 @@ public partial class ColorTransferInspectorView : UserControl
         ];
 
         PART_EditAsCustomCopyButton.Click += OnEditAsCustomCopyClick;
+        PART_CopyMatchedToCustomButton.Click += OnEditAsCustomCopyClick;
         UpdatePalettePreview();
+        UpdateHasReferencePreview();
     }
 
     /// <summary>
-    /// Gets or sets the command invoked when resetting Stage 1 to the active baseline.
+    /// Gets or sets the command invoked when resetting Stage 2 to the active baseline.
     /// </summary>
     public ICommand? ResetStageCommand
     {
@@ -83,6 +114,33 @@ public partial class ColorTransferInspectorView : UserControl
         set => SetValue(ExtractPaletteCommandProperty, value);
     }
 
+    /// <summary>
+    /// Gets or sets the preview thumbnail bitmap for the most recently extracted reference image.
+    /// </summary>
+    public Bitmap? ReferenceThumbnail
+    {
+        get => GetValue(ReferenceThumbnailProperty);
+        set => SetValue(ReferenceThumbnailProperty, value);
+    }
+
+    /// <summary>
+    /// Gets or sets the file name of the most recently extracted reference image.
+    /// </summary>
+    public string? ReferenceImageName
+    {
+        get => GetValue(ReferenceImageNameProperty);
+        set => SetValue(ReferenceImageNameProperty, value);
+    }
+
+    /// <summary>
+    /// Gets whether a reference palette thumbnail or image name is currently available to display.
+    /// </summary>
+    public bool HasReferencePreview
+    {
+        get => _hasReferencePreview;
+        private set => SetAndRaise(HasReferencePreviewProperty, ref _hasReferencePreview, value);
+    }
+
     /// <inheritdoc />
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
     {
@@ -91,6 +149,11 @@ public partial class ColorTransferInspectorView : UserControl
         if (change.Property == DataContextProperty)
         {
             UpdateViewModelSubscription(change.NewValue as ColorTransferStageViewModel);
+        }
+        else if (change.Property == ReferenceThumbnailProperty ||
+                 change.Property == ReferenceImageNameProperty)
+        {
+            UpdateHasReferencePreview();
         }
     }
 
@@ -106,6 +169,11 @@ public partial class ColorTransferInspectorView : UserControl
     {
         base.OnDetachedFromVisualTree(e);
         UpdateViewModelSubscription(null);
+    }
+
+    private void UpdateHasReferencePreview()
+    {
+        HasReferencePreview = ReferenceThumbnail is not null || !string.IsNullOrWhiteSpace(ReferenceImageName);
     }
 
     private void UpdateViewModelSubscription(ColorTransferStageViewModel? next)
@@ -181,6 +249,7 @@ public partial class ColorTransferInspectorView : UserControl
             PART_ActivePaletteMetaText.Text = string.Empty;
             PART_ActiveSwatchStrip.IsVisible = false;
             PART_EditAsCustomCopyButton.IsEnabled = false;
+            PART_CopyMatchedToCustomButton.IsEnabled = false;
             return;
         }
 
@@ -192,8 +261,9 @@ public partial class ColorTransferInspectorView : UserControl
             _ => "Auto",
         };
 
-        PART_EditAsCustomCopyButton.IsEnabled =
-            vm.PaletteMode == PaletteMode.BuiltIn || vm.ActiveMatchedPalette is not null;
+        bool canCopyToCustom = vm.PaletteMode == PaletteMode.BuiltIn || vm.ActiveMatchedPalette is not null;
+        PART_EditAsCustomCopyButton.IsEnabled = canCopyToCustom;
+        PART_CopyMatchedToCustomButton.IsEnabled = canCopyToCustom;
 
         ColorTransferProfile? previewProfile = ResolvePreviewProfile(vm);
         if (previewProfile is null)
@@ -202,7 +272,7 @@ public partial class ColorTransferInspectorView : UserControl
                 ? "Auto (pending render)"
                 : "Invalid custom statistics";
             PART_ActivePaletteMetaText.Text = vm.PaletteMode == PaletteMode.Auto
-                ? "Closest watercolor palette is selected automatically after Stage 1 runs."
+                ? "Closest watercolor palette is selected automatically after Stage 2 runs."
                 : "Adjust CIELAB parameters to valid finite values.";
             PART_ActiveSwatchStrip.IsVisible = false;
             return;
@@ -212,7 +282,7 @@ public partial class ColorTransferInspectorView : UserControl
         LabColorStatistics stats = previewProfile.Statistics;
         PART_ActivePaletteMetaText.Text = string.Create(
             CultureInfo.InvariantCulture,
-            $"L* {stats.MeanL:F1} (±{stats.StdDevL:F1}) • a* {stats.MeanA:F1} (±{stats.StdDevA:F1}) • b* {stats.MeanB:F1} (±{stats.StdDevB:F1}) • {previewProfile.Illuminant}");
+            $"L* {stats.MeanL:F1} (±{stats.StdDevL:F1})  •  a* {stats.MeanA:F1} (±{stats.StdDevA:F1})\nb* {stats.MeanB:F1} (±{stats.StdDevB:F1})  •  Illuminant {previewProfile.Illuminant}");
 
         Rgb8[] swatches = PaletteExtractor.SynthesizeSwatches(previewProfile, _swatchBorders.Length);
         for (int i = 0; i < _swatchBorders.Length; i++)

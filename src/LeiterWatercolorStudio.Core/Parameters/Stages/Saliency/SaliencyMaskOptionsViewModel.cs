@@ -9,6 +9,7 @@ namespace LeiterWatercolorStudio.Core.Parameters.Stages.Saliency;
 /// </summary>
 public sealed class SaliencyMaskOptionsViewModel : StageViewModelBase
 {
+    private SaliencyMaskOptions _baseline;
     private SaliencyThresholdMethod _method;
     private double _fixedThreshold;
     private ComponentRetentionPolicy _retentionPolicy;
@@ -17,12 +18,19 @@ public sealed class SaliencyMaskOptionsViewModel : StageViewModelBase
 
     internal SaliencyMaskOptionsViewModel(SaliencyMaskOptions initial)
     {
+        initial.Validate();
+        _baseline = initial;
         _method = initial.Method;
         _fixedThreshold = initial.FixedThreshold;
         _retentionPolicy = initial.RetentionPolicy;
         _minAreaFraction = initial.MinAreaFraction;
         _connectivity = initial.Connectivity;
     }
+
+    /// <summary>
+    /// Gets the baseline <see cref="SaliencyMaskOptions"/> used for per-parameter resets.
+    /// </summary>
+    public SaliencyMaskOptions Baseline => _baseline;
 
     /// <summary>
     /// Gets or sets the saliency thresholding method.
@@ -70,6 +78,16 @@ public sealed class SaliencyMaskOptionsViewModel : StageViewModelBase
     }
 
     /// <summary>
+    /// Updates <see cref="Baseline"/> without modifying current parameter values or raising a parameter edit.
+    /// </summary>
+    public void SetBaseline(SaliencyMaskOptions baseline)
+    {
+        ArgumentNullException.ThrowIfNull(baseline);
+        baseline.Validate();
+        SetProperty(ref _baseline, baseline, nameof(Baseline));
+    }
+
+    /// <summary>
     /// Loads properties from <paramref name="options"/>.
     /// </summary>
     public void LoadFrom(SaliencyMaskOptions options)
@@ -84,6 +102,22 @@ public sealed class SaliencyMaskOptionsViewModel : StageViewModelBase
             SetProperty(ref _retentionPolicy, options.RetentionPolicy, nameof(RetentionPolicy));
             SetProperty(ref _minAreaFraction, options.MinAreaFraction, nameof(MinAreaFraction));
             SetProperty(ref _connectivity, options.Connectivity, nameof(Connectivity));
+        }
+    }
+
+    /// <inheritdoc />
+    public override void ResetToBaseline()
+    {
+        bool changed = _method != _baseline.Method
+            || _fixedThreshold != _baseline.FixedThreshold
+            || _retentionPolicy != _baseline.RetentionPolicy
+            || _minAreaFraction != _baseline.MinAreaFraction
+            || _connectivity != _baseline.Connectivity;
+
+        LoadFrom(_baseline);
+        if (changed)
+        {
+            RaiseParameterChanged(isImmediate: true);
         }
     }
 

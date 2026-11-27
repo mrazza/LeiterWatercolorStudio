@@ -39,6 +39,11 @@ public sealed class PerlinNoiseViewModel : StageViewModelBase
     public PerlinNoiseOptions Baseline => _baseline;
 
     /// <summary>
+    /// Gets whether <see cref="Seed"/> differs from <see cref="Baseline"/>.
+    /// </summary>
+    public bool IsSeedModified => _seed != _baseline.Seed;
+
+    /// <summary>
     /// Gets or sets the pseudo-random permutation seed.
     /// </summary>
     public int Seed
@@ -48,6 +53,7 @@ public sealed class PerlinNoiseViewModel : StageViewModelBase
         {
             if (SetProperty(ref _seed, value))
             {
+                OnPropertyChanged(nameof(IsSeedModified));
                 RaiseParameterChanged(isImmediate: false);
             }
         }
@@ -97,7 +103,10 @@ public sealed class PerlinNoiseViewModel : StageViewModelBase
     {
         ArgumentNullException.ThrowIfNull(baseline);
         baseline.Validate();
-        SetProperty(ref _baseline, baseline, nameof(Baseline));
+        if (SetProperty(ref _baseline, baseline, nameof(Baseline)))
+        {
+            OnPropertyChanged(nameof(IsSeedModified));
+        }
     }
 
     /// <summary>
@@ -111,7 +120,10 @@ public sealed class PerlinNoiseViewModel : StageViewModelBase
 
         using (SuppressNotifications())
         {
-            SetProperty(ref _seed, options.Seed, nameof(Seed));
+            if (SetProperty(ref _seed, options.Seed, nameof(Seed)))
+            {
+                OnPropertyChanged(nameof(IsSeedModified));
+            }
             SetProperty(ref _frequency, options.Frequency, nameof(Frequency));
             SetProperty(ref _octaves, options.Octaves, nameof(Octaves));
             SetProperty(ref _lacunarity, options.Lacunarity, nameof(Lacunarity));
@@ -136,6 +148,7 @@ public sealed class PerlinNoiseViewModel : StageViewModelBase
     {
         if (SetProperty(ref _seed, NextDistinctSeed(_seed), nameof(Seed)))
         {
+            OnPropertyChanged(nameof(IsSeedModified));
             RaiseParameterChanged(isImmediate: true);
         }
     }
@@ -147,6 +160,7 @@ public sealed class PerlinNoiseViewModel : StageViewModelBase
     {
         if (SetProperty(ref _seed, _baseline.Seed, nameof(Seed)))
         {
+            OnPropertyChanged(nameof(IsSeedModified));
             RaiseParameterChanged(isImmediate: true);
         }
     }
@@ -174,7 +188,7 @@ public sealed class PerlinNoiseViewModel : StageViewModelBase
     /// <summary>
     /// Resets all noise parameters to <see cref="Baseline"/>.
     /// </summary>
-    public void ResetToBaseline()
+    public override void ResetToBaseline()
     {
         bool changed = _seed != _baseline.Seed
             || _frequency != _baseline.Frequency

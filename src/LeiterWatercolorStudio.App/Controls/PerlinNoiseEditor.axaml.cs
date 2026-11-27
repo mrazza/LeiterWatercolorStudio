@@ -4,6 +4,8 @@ using System.Windows.Input;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
+using Avalonia.Media.Imaging;
+using Avalonia.Platform;
 using Leiter.Algorithms.Noise;
 using LeiterWatercolorStudio.Core.Parameters;
 
@@ -11,11 +13,15 @@ namespace LeiterWatercolorStudio.App.Controls;
 
 /// <summary>
 /// Reusable collapsible card editor for <see cref="PerlinNoiseViewModel"/> supporting
-/// seed randomization, per-parameter sliders, baseline reset, and drag coalescing events.
+/// live 2D fractal noise preview, seed randomization/reset, per-parameter sliders,
+/// baseline reset, and drag coalescing events.
 /// </summary>
 public partial class PerlinNoiseEditor : UserControl
 {
     private const double ModifiedEpsilon = 1e-6;
+    private const int PreviewWidth = 56;
+    private const int PreviewHeight = 36;
+    private const double PreviewCoordScale = 3.0;
 
     /// <summary>
     /// Identifies the <see cref="Title"/> styled property.
@@ -119,6 +125,8 @@ public partial class PerlinNoiseEditor : UserControl
 
     private readonly ValidatedTextBoxHandler _seedInputHandler;
     private PerlinNoiseViewModel? _subscribedViewModel;
+    private WriteableBitmap? _previewBitmap;
+    private (int Seed, double Frequency, int Octaves, double Lacunarity, double Persistence)? _lastPreviewParams;
     private string? _seedValidationError;
 
     /// <summary>
@@ -163,6 +171,7 @@ public partial class PerlinNoiseEditor : UserControl
         PART_ExpandButton.Click += OnExpandButtonClick;
         PART_ResetButton.Click += OnResetToBaselineClick;
         PART_RandomizeSeedButton.Click += OnRandomizeSeedClick;
+        PART_ResetSeedButton.Click += OnResetSeedClick;
 
         AddHandler(NumericSlider.DragStartedEvent, OnChildSliderDragStarted);
         AddHandler(NumericSlider.DragCompletedEvent, OnChildSliderDragCompleted);
@@ -297,6 +306,11 @@ public partial class PerlinNoiseEditor : UserControl
         private set => SetAndRaise(SeedValidationErrorProperty, ref _seedValidationError, value);
     }
 
+    /// <summary>
+    /// Gets the live 2D grayscale fractal noise preview bitmap rendered in the card header.
+    /// </summary>
+    public WriteableBitmap? NoisePreviewBitmap => _previewBitmap;
+
     /// <inheritdoc />
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
     {
@@ -335,6 +349,7 @@ public partial class PerlinNoiseEditor : UserControl
     {
         base.OnDetachedFromVisualTree(e);
         UpdateViewModelSubscription(null);
+        DisposePreviewBitmap();
     }
 
     private void UpdateViewModelSubscription(PerlinNoiseViewModel? next)
@@ -397,10 +412,93 @@ public partial class PerlinNoiseEditor : UserControl
         PART_LacunaritySlider.InfoText = LacunarityInfoText;
         PART_PersistenceSlider.InfoText = PersistenceInfoText;
 
-        bool isModified = IsNoiseModified(DataContext as PerlinNoiseViewModel);
+        PerlinNoiseViewModel? vm = DataContext as PerlinNoiseViewModel;
+        bool isModified = IsNoiseModified(vm);
         PART_ModifiedDot.IsVisible = isModified;
-        PART_ResetButton.IsEnabled = DataContext is PerlinNoiseViewModel && isModified;
+        PART_ResetButton.IsEnabled = vm is not null && isModified;
         PART_ResetButton.Opacity = isModified ? 1.0 : 0.3;
+
+        bool isSeedModified = vm is not null && vm.IsSeedModified;
+        PART_ResetSeedButton.IsEnabled = isSeedModified;
+        PART_ResetSeedButton.Opacity = isSeedModified ? 1.0 : 0.25;
+
+        UpdateNoisePreview(vm);
+    }
+
+    private void UpdateNoisePreview(PerlinNoiseViewModel? vm)
+    {
+        if (PART_PreviewImage is null)
+        {
+            return;
+        }
+
+        if (vm is null)
+        {
+            _lastPreviewParams = null;
+            DisposePreviewBitmap();
+            return;
+        }
+
+        double freq = double.IsFinite(vm.Frequency) && vm.Frequency > 0.0 ? vm.Frequency : 0.05;
+        int octaves = Math.Clamp(vm.Octaves, 1, 16);
+        double lacunarity = double.IsFinite(vm.Lacunarity) && vm.Lacunarity > 0.0 ? vm.Lacunarity : 2.0;
+        double persistence = double.IsFinite(vm.Persistence) && vm.Persistence >= 0.0 ? vm.Persistence : 0.5;
+
+        var key = (vm.Seed, freq, octaves, lacunarity, persistence);
+        if (_lastPreviewParams == key && _previewBitmap is not null)
+        {
+            return;
+        }
+
+        _lastPreviewParams = key;
+
+        var nextBitmap = new WriteableBitmap(
+            new PixelSize(PreviewWidth, PreviewHeight),
+            new Vector(96, 96),
+            PixelFormat.Bgra8888,
+            AlphaFormat.Opaque);
+
+        using (ILockedFramebuffer fb = nextBitmap.Lock())
+        {
+            var noise = new PerlinNoise(vm.Seed);
+            double step = PreviewCoordScale * freq;
+            unsafe
+            {
+                byte* basePtr = (byte*)fb.Address;
+                for (int y = 0; y < PreviewHeight; y++)
+                {
+                    byte* row = basePtr + (y * fb.RowBytes);
+                    double sy = y * step;
+                    for (int x = 0; x < PreviewWidth; x++)
+                    {
+                        double sample = noise.SampleFractal(x * step, sy, octaves, lacunarity, persistence);
+                        byte v = (byte)Math.Clamp((int)Math.Round(((sample * 0.65) + 0.5) * 255.0), 0, 255);
+                        int offset = x * 4;
+                        row[offset] = v;
+                        row[offset + 1] = v;
+                        row[offset + 2] = v;
+                        row[offset + 3] = 255;
+                    }
+                }
+            }
+        }
+
+        WriteableBitmap? oldBitmap = _previewBitmap;
+        _previewBitmap = nextBitmap;
+        PART_PreviewImage.Source = nextBitmap;
+        oldBitmap?.Dispose();
+    }
+
+    private void DisposePreviewBitmap()
+    {
+        if (PART_PreviewImage is not null)
+        {
+            PART_PreviewImage.Source = null;
+        }
+
+        _previewBitmap?.Dispose();
+        _previewBitmap = null;
+        _lastPreviewParams = null;
     }
 
     private void SyncExpansionState()
@@ -425,6 +523,15 @@ public partial class PerlinNoiseEditor : UserControl
         if (DataContext is PerlinNoiseViewModel vm)
         {
             vm.RandomizeSeed();
+            _seedInputHandler.ResetValidationAndSync();
+        }
+    }
+
+    private void OnResetSeedClick(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is PerlinNoiseViewModel vm)
+        {
+            vm.ResetSeed();
             _seedInputHandler.ResetValidationAndSync();
         }
     }

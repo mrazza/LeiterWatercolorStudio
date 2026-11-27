@@ -158,4 +158,40 @@ public class StageVisualizersAndInspectorTests
         Assert.False(PixelInspectorReadout.TrySample(-1, 0, StageViewId.Input, img, null, out _));
         Assert.Throws<ArgumentOutOfRangeException>(() => PixelInspectorReadout.Sample(img.Width, 0, StageViewId.Input, img, null));
     }
+
+    [Fact]
+    public void ComputeLuminanceHistogram_HandlesNullEmptyRec709AndLargeImages()
+    {
+        Assert.Empty(StageVisualizers.ComputeLuminanceHistogram(null));
+        Assert.Empty(StageVisualizers.ComputeLuminanceHistogram(new SequentialMatrix<Rgb8>(0, 0)));
+        Assert.Throws<ArgumentOutOfRangeException>(() => StageVisualizers.ComputeLuminanceHistogram(null, binCount: 0));
+
+        // Pure black -> bin 0 = 1.0
+        var black = new SequentialMatrix<Rgb8>(4, 4);
+        black.AsSpan().Fill(new Rgb8(0, 0, 0));
+        double[] blackHist = StageVisualizers.ComputeLuminanceHistogram(black, 64);
+        Assert.Equal(64, blackHist.Length);
+        Assert.Equal(1.0, blackHist[0]);
+        Assert.All(blackHist.Skip(1), v => Assert.Equal(0.0, v));
+
+        // Pure white -> last bin = 1.0
+        var white = new SequentialMatrix<Rgb8>(4, 4);
+        white.AsSpan().Fill(new Rgb8(255, 255, 255));
+        double[] whiteHist = StageVisualizers.ComputeLuminanceHistogram(white, 64);
+        Assert.Equal(1.0, whiteHist[^1]);
+        Assert.All(whiteHist.Take(63), v => Assert.Equal(0.0, v));
+
+        // Rec.709 green luma = 0.7152 -> bin floor(0.7152 * 64) = 45
+        var green = new SequentialMatrix<Rgb8>(4, 4);
+        green.AsSpan().Fill(new Rgb8(0, 255, 0));
+        double[] greenHist = StageVisualizers.ComputeLuminanceHistogram(green, 64);
+        Assert.Equal(1.0, greenHist[45]);
+
+        // Large image triggers deterministic subsampling and normalizes peak to 1.0.
+        SequentialMatrix<Rgb8> large = PipelineTestImages.CreateSyntheticScene(600, 600);
+        double[] largeHist = StageVisualizers.ComputeLuminanceHistogram(large, 32);
+        Assert.Equal(32, largeHist.Length);
+        Assert.Equal(1.0, largeHist.Max());
+        Assert.All(largeHist, v => Assert.InRange(v, 0.0, 1.0));
+    }
 }

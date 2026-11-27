@@ -3,7 +3,6 @@
              xmlns:local="using:LeiterWatercolorStudio.App.Views.Inspectors"
              xmlns:controls="using:LeiterWatercolorStudio.App.Controls"
              xmlns:converters="using:LeiterWatercolorStudio.App.Converters"
-             xmlns:models="clr-namespace:LeiterWatercolorStudio.Core.Models;assembly=LeiterWatercolorStudio.Core"
              xmlns:stages="clr-namespace:LeiterWatercolorStudio.Core.Parameters.Stages;assembly=LeiterWatercolorStudio.Core"
              xmlns:ldata="clr-namespace:Leiter.Algorithms.DataStructures;assembly=Leiter"
              x:Class="LeiterWatercolorStudio.App.Views.Inspectors.SegmentationInspectorView"
@@ -11,8 +10,8 @@
 
     <UserControl.Styles>
         <Style Selector="Border.inspector-card">
-            <Setter Property="Background" Value="#1264748B" />
-            <Setter Property="BorderBrush" Value="#3064748B" />
+            <Setter Property="Background" Value="{DynamicResource StudioCardBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource StudioBorderBrush}" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="CornerRadius" Value="6" />
             <Setter Property="Padding" Value="10,9" />
@@ -27,34 +26,6 @@
     <ScrollViewer VerticalScrollBarVisibility="Auto"
                   HorizontalScrollBarVisibility="Disabled">
         <StackPanel Spacing="12" Margin="12">
-            <!-- Stage Header -->
-            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
-                <StackPanel Grid.Column="0" Spacing="1" VerticalAlignment="Center">
-                    <TextBlock Text="3a. Mean-Shift Segmentation"
-                               FontSize="14"
-                               FontWeight="SemiBold" />
-                    <TextBlock Text="CIELAB spatial-range mode seeking and region clustering"
-                               FontSize="11.5"
-                               Opacity="0.68"
-                               TextWrapping="Wrap" />
-                </StackPanel>
-
-                <Button x:Name="PART_ResetButton"
-                        Grid.Column="1"
-                        x:DataType="local:SegmentationInspectorView"
-                        Content="↺"
-                        Width="28"
-                        Height="28"
-                        Padding="0"
-                        FontSize="13"
-                        HorizontalContentAlignment="Center"
-                        VerticalContentAlignment="Center"
-                        VerticalAlignment="Center"
-                        Command="{Binding ResetStageCommand, RelativeSource={RelativeSource AncestorType=local:SegmentationInspectorView}}"
-                        CommandParameter="{x:Static models:PrimaryStageId.Segmentation}"
-                        ToolTip.Tip="Reset Stage 3a Segmentation to baseline" />
-            </Grid>
-
             <!-- Live Segmentation Statistics Readout -->
             <Border Classes="inspector-card">
                 <StackPanel Spacing="4">
@@ -80,7 +51,7 @@
                                         IsInteger="True"
                                         FormatString="F0"
                                         Unit="px"
-                                        BaselineValue="8"
+                                        BaselineValue="{Binding Baseline.SpatialRadius, Converter={x:Static converters:IntToDoubleConverter.Instance}}"
                                         Value="{Binding SpatialRadius, Mode=TwoWay, Converter={x:Static converters:IntToDoubleConverter.Instance}}" />
 
                 <controls:NumericSlider Label="Range Radius"
@@ -92,7 +63,7 @@
                                         IsValidMinimumExclusive="True"
                                         Step="0.5"
                                         FormatString="F1"
-                                        BaselineValue="5.5"
+                                        BaselineValue="{Binding Baseline.RangeRadius}"
                                         Value="{Binding RangeRadius, Mode=TwoWay}" />
 
                 <controls:NumericSlider Label="Min Region Size"
@@ -105,7 +76,7 @@
                                         IsInteger="True"
                                         FormatString="F0"
                                         Unit="px"
-                                        BaselineValue="50"
+                                        BaselineValue="{Binding Baseline.MinRegionSize, Converter={x:Static converters:IntToDoubleConverter.Instance}}"
                                         Value="{Binding MinRegionSize, Mode=TwoWay, Converter={x:Static converters:IntToDoubleConverter.Instance}}" />
             </StackPanel>
 
@@ -124,7 +95,7 @@
                                             Step="1"
                                             IsInteger="True"
                                             FormatString="F0"
-                                            BaselineValue="20"
+                                            BaselineValue="{Binding Baseline.MaxIterations, Converter={x:Static converters:IntToDoubleConverter.Instance}}"
                                             Value="{Binding MaxIterations, Mode=TwoWay, Converter={x:Static converters:IntToDoubleConverter.Instance}}" />
 
                     <controls:NumericSlider Label="Convergence Epsilon"
@@ -136,7 +107,7 @@
                                             IsValidMinimumExclusive="True"
                                             Step="0.005"
                                             FormatString="F3"
-                                            BaselineValue="0.05"
+                                            BaselineValue="{Binding Baseline.ConvergenceEpsilon}"
                                             Value="{Binding ConvergenceEpsilon, Mode=TwoWay}" />
 
                     <StackPanel Spacing="3">

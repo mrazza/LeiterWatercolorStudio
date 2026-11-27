@@ -9,6 +9,8 @@ namespace LeiterWatercolorStudio.Core.Parameters.Stages;
 /// </summary>
 public sealed class HandTremorStageViewModel : StageViewModelBase
 {
+    private bool _baselineEnableHandTremor;
+    private HandTremorOptions _baseline;
     private bool _enableHandTremor;
     private double _amplitude;
     private double _salientAmplitudeScale;
@@ -31,6 +33,8 @@ public sealed class HandTremorStageViewModel : StageViewModelBase
         WatercolorOptions defaults = WatercolorOptions.Default;
         HandTremorOptions tremor = defaults.HandTremor;
 
+        _baselineEnableHandTremor = defaults.EnableHandTremor;
+        _baseline = tremor;
         _enableHandTremor = defaults.EnableHandTremor;
         _amplitude = tremor.Amplitude;
         _salientAmplitudeScale = tremor.SalientAmplitudeScale;
@@ -50,6 +54,16 @@ public sealed class HandTremorStageViewModel : StageViewModelBase
         SubscribeChild(PrimaryNoise);
         SubscribeChild(SecondaryNoise);
     }
+
+    /// <summary>
+    /// Gets the baseline <see cref="HandTremorOptions"/> used for per-parameter resets.
+    /// </summary>
+    public HandTremorOptions Baseline => _baseline;
+
+    /// <summary>
+    /// Gets the baseline enabled state for Stage 5 hand tremor perturbation.
+    /// </summary>
+    public bool BaselineEnableHandTremor => _baselineEnableHandTremor;
 
     /// <summary>
     /// Gets or sets whether Stage 5 hand tremor perturbation is enabled.
@@ -189,6 +203,26 @@ public sealed class HandTremorStageViewModel : StageViewModelBase
     public PerlinNoiseViewModel SecondaryNoise { get; }
 
     /// <summary>
+    /// Updates <see cref="Baseline"/> and child noise baselines without modifying current parameter values.
+    /// </summary>
+    public void SetBaseline(HandTremorOptions baseline) =>
+        SetBaseline(_baselineEnableHandTremor, baseline);
+
+    /// <summary>
+    /// Updates <see cref="BaselineEnableHandTremor"/>, <see cref="Baseline"/>, and child noise baselines
+    /// without modifying current parameter values.
+    /// </summary>
+    public void SetBaseline(bool enableHandTremor, HandTremorOptions baseline)
+    {
+        ArgumentNullException.ThrowIfNull(baseline);
+        baseline.Validate();
+        SetProperty(ref _baselineEnableHandTremor, enableHandTremor, nameof(BaselineEnableHandTremor));
+        SetProperty(ref _baseline, baseline, nameof(Baseline));
+        PrimaryNoise.SetBaseline(baseline.PrimaryNoise);
+        SecondaryNoise.SetBaseline(baseline.SecondaryNoise);
+    }
+
+    /// <summary>
     /// Loads Stage 5 parameters from pipeline options.
     /// </summary>
     public void LoadFrom(bool enableHandTremor, HandTremorOptions options)
@@ -209,6 +243,28 @@ public sealed class HandTremorStageViewModel : StageViewModelBase
             SetProperty(ref _paperGapOpacity, options.PaperGapOpacity, nameof(PaperGapOpacity));
             PrimaryNoise.LoadFrom(options.PrimaryNoise);
             SecondaryNoise.LoadFrom(options.SecondaryNoise);
+        }
+    }
+
+    /// <inheritdoc />
+    public override void ResetToBaseline()
+    {
+        bool changed = _enableHandTremor != _baselineEnableHandTremor
+            || _amplitude != _baseline.Amplitude
+            || _salientAmplitudeScale != _baseline.SalientAmplitudeScale
+            || _similarHueThresholdDegrees != _baseline.SimilarHueThresholdDegrees
+            || _overlapDarkening != _baseline.OverlapDarkening
+            || _paperColor != _baseline.PaperColor
+            || _minContrastingChroma != _baseline.MinContrastingChroma
+            || _paperGapBias != _baseline.PaperGapBias
+            || _paperGapOpacity != _baseline.PaperGapOpacity
+            || !Equals(PrimaryNoise.ToOptions(), _baseline.PrimaryNoise)
+            || !Equals(SecondaryNoise.ToOptions(), _baseline.SecondaryNoise);
+
+        LoadFrom(_baselineEnableHandTremor, _baseline);
+        if (changed)
+        {
+            RaiseParameterChanged(isImmediate: true);
         }
     }
 

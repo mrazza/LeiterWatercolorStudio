@@ -6,12 +6,29 @@ using Leiter.Algorithms.Stylization.Watercolor;
 namespace LeiterWatercolorStudio.Core.Parameters.Stages;
 
 /// <summary>
+/// Immutable baseline snapshot for Stage 6 (Finishing) and all five of its sub-stages.
+/// </summary>
+public sealed record FinishingBaseline(
+    bool EnableEdgeDarkening,
+    EdgeDarkeningOptions EdgeDarkening,
+    bool EnableTurbulenceFlow,
+    TurbulenceFlowOptions TurbulenceFlow,
+    bool EnableToneCurve,
+    PiecewiseToneCurveOptions ToneCurve,
+    bool EnablePaperGranulation,
+    PaperGranulationOptions PaperGranulation,
+    bool EnableFxaa,
+    FxaaOptions Fxaa);
+
+/// <summary>
 /// View model for Stage 6 (Finishing: Edge Darkening, Turbulence Flow, Piecewise Tone Curve,
 /// Paper Granulation, and FXAA).
 /// </summary>
 public sealed class FinishingStageViewModel : StageViewModelBase
 {
     private const double ToneMinGap = 0.001;
+
+    private FinishingBaseline _baseline;
 
     private bool _enableEdgeDarkening;
     private double _edgeIntensity;
@@ -43,6 +60,17 @@ public sealed class FinishingStageViewModel : StageViewModelBase
     public FinishingStageViewModel()
     {
         WatercolorOptions defaults = WatercolorOptions.Default;
+        _baseline = new FinishingBaseline(
+            defaults.EnableEdgeDarkening,
+            defaults.EdgeDarkening,
+            defaults.EnableTurbulenceFlow,
+            defaults.TurbulenceFlow,
+            defaults.EnableToneCurve,
+            defaults.ToneCurve,
+            defaults.EnablePaperGranulation,
+            defaults.PaperGranulation,
+            defaults.EnableFxaa,
+            defaults.Fxaa);
 
         _enableEdgeDarkening = defaults.EnableEdgeDarkening;
         _edgeIntensity = defaults.EdgeDarkening.Intensity;
@@ -73,6 +101,36 @@ public sealed class FinishingStageViewModel : StageViewModelBase
         SubscribeChild(TurbulenceNoise);
         SubscribeChild(GrainNoise);
     }
+
+    /// <summary>
+    /// Gets the baseline configuration for Stage 6 and all five sub-stages.
+    /// </summary>
+    public FinishingBaseline Baseline => _baseline;
+
+    /// <summary>
+    /// Gets the baseline <see cref="EdgeDarkeningOptions"/> for Edge Darkening controls.
+    /// </summary>
+    public EdgeDarkeningOptions EdgeDarkeningBaseline => _baseline.EdgeDarkening;
+
+    /// <summary>
+    /// Gets the baseline <see cref="TurbulenceFlowOptions"/> for Turbulence Flow controls.
+    /// </summary>
+    public TurbulenceFlowOptions TurbulenceFlowBaseline => _baseline.TurbulenceFlow;
+
+    /// <summary>
+    /// Gets the baseline <see cref="PiecewiseToneCurveOptions"/> for Tone Curve controls.
+    /// </summary>
+    public PiecewiseToneCurveOptions ToneCurveBaseline => _baseline.ToneCurve;
+
+    /// <summary>
+    /// Gets the baseline <see cref="PaperGranulationOptions"/> for Paper Granulation controls.
+    /// </summary>
+    public PaperGranulationOptions PaperGranulationBaseline => _baseline.PaperGranulation;
+
+    /// <summary>
+    /// Gets the baseline <see cref="FxaaOptions"/> for FXAA controls.
+    /// </summary>
+    public FxaaOptions FxaaBaseline => _baseline.Fxaa;
 
     /// <summary>
     /// Gets or sets whether pigment edge darkening is enabled.
@@ -284,6 +342,79 @@ public sealed class FinishingStageViewModel : StageViewModelBase
     }
 
     /// <summary>
+    /// Updates <see cref="Baseline"/>, sub-stage baseline properties, and child noise baselines
+    /// without modifying current parameter values.
+    /// </summary>
+    public void SetBaseline(FinishingBaseline baseline)
+    {
+        ArgumentNullException.ThrowIfNull(baseline);
+        SetBaseline(
+            baseline.EnableEdgeDarkening,
+            baseline.EdgeDarkening,
+            baseline.EnableTurbulenceFlow,
+            baseline.TurbulenceFlow,
+            baseline.EnableToneCurve,
+            baseline.ToneCurve,
+            baseline.EnablePaperGranulation,
+            baseline.PaperGranulation,
+            baseline.EnableFxaa,
+            baseline.Fxaa);
+    }
+
+    /// <summary>
+    /// Updates <see cref="Baseline"/>, sub-stage baseline properties, and child noise baselines
+    /// without modifying current parameter values.
+    /// </summary>
+    public void SetBaseline(
+        bool enableEdgeDarkening,
+        EdgeDarkeningOptions edgeDarkening,
+        bool enableTurbulenceFlow,
+        TurbulenceFlowOptions turbulenceFlow,
+        bool enableToneCurve,
+        PiecewiseToneCurveOptions toneCurve,
+        bool enablePaperGranulation,
+        PaperGranulationOptions paperGranulation,
+        bool enableFxaa,
+        FxaaOptions fxaa)
+    {
+        ArgumentNullException.ThrowIfNull(edgeDarkening);
+        ArgumentNullException.ThrowIfNull(turbulenceFlow);
+        ArgumentNullException.ThrowIfNull(toneCurve);
+        ArgumentNullException.ThrowIfNull(paperGranulation);
+        ArgumentNullException.ThrowIfNull(fxaa);
+
+        edgeDarkening.Validate();
+        turbulenceFlow.Validate();
+        toneCurve.Validate();
+        paperGranulation.Validate();
+        fxaa.Validate();
+
+        var next = new FinishingBaseline(
+            enableEdgeDarkening,
+            edgeDarkening,
+            enableTurbulenceFlow,
+            turbulenceFlow,
+            enableToneCurve,
+            toneCurve,
+            enablePaperGranulation,
+            paperGranulation,
+            enableFxaa,
+            fxaa);
+
+        if (SetProperty(ref _baseline, next, nameof(Baseline)))
+        {
+            OnPropertyChanged(nameof(EdgeDarkeningBaseline));
+            OnPropertyChanged(nameof(TurbulenceFlowBaseline));
+            OnPropertyChanged(nameof(ToneCurveBaseline));
+            OnPropertyChanged(nameof(PaperGranulationBaseline));
+            OnPropertyChanged(nameof(FxaaBaseline));
+        }
+
+        TurbulenceNoise.SetBaseline(turbulenceFlow.Noise);
+        GrainNoise.SetBaseline(paperGranulation.GrainNoise);
+    }
+
+    /// <summary>
     /// Loads all Stage 6 sub-stage parameters from pipeline options.
     /// </summary>
     public void LoadFrom(
@@ -337,6 +468,64 @@ public sealed class FinishingStageViewModel : StageViewModelBase
             SetProperty(ref _relativeContrastThreshold, fxaa.RelativeContrastThreshold, nameof(RelativeContrastThreshold));
             SetProperty(ref _absoluteContrastThreshold, fxaa.AbsoluteContrastThreshold, nameof(AbsoluteContrastThreshold));
             SetProperty(ref _maxSpanSearchSteps, fxaa.MaxSpanSearchSteps, nameof(MaxSpanSearchSteps));
+        }
+    }
+
+    /// <summary>
+    /// Resets the Tone Curve parameters (<see cref="MinTone"/>, <see cref="MaxTone"/>,
+    /// <see cref="ShadowKnee"/>, <see cref="HighlightKnee"/>) to <see cref="ToneCurveBaseline"/>.
+    /// </summary>
+    public void ResetToneCurveToBaseline()
+    {
+        PiecewiseToneCurveOptions baseline = _baseline.ToneCurve;
+        bool changed = _minTone != baseline.MinTone
+            || _maxTone != baseline.MaxTone
+            || _shadowKnee != baseline.ShadowKnee
+            || _highlightKnee != baseline.HighlightKnee;
+
+        using (SuppressNotifications())
+        {
+            SetProperty(ref _minTone, baseline.MinTone, nameof(MinTone));
+            SetProperty(ref _maxTone, baseline.MaxTone, nameof(MaxTone));
+            SetProperty(ref _shadowKnee, baseline.ShadowKnee, nameof(ShadowKnee));
+            SetProperty(ref _highlightKnee, baseline.HighlightKnee, nameof(HighlightKnee));
+        }
+
+        if (changed)
+        {
+            RaiseParameterChanged(isImmediate: true);
+        }
+    }
+
+    /// <inheritdoc />
+    public override void ResetToBaseline()
+    {
+        bool changed = _enableEdgeDarkening != _baseline.EnableEdgeDarkening
+            || !Equals(ToEdgeDarkeningOptions(), _baseline.EdgeDarkening)
+            || _enableTurbulenceFlow != _baseline.EnableTurbulenceFlow
+            || !Equals(ToTurbulenceFlowOptions(), _baseline.TurbulenceFlow)
+            || _enableToneCurve != _baseline.EnableToneCurve
+            || !Equals(ToToneCurveOptions(), _baseline.ToneCurve)
+            || _enablePaperGranulation != _baseline.EnablePaperGranulation
+            || !Equals(ToPaperGranulationOptions(), _baseline.PaperGranulation)
+            || _enableFxaa != _baseline.EnableFxaa
+            || !Equals(ToFxaaOptions(), _baseline.Fxaa);
+
+        LoadFrom(
+            _baseline.EnableEdgeDarkening,
+            _baseline.EdgeDarkening,
+            _baseline.EnableTurbulenceFlow,
+            _baseline.TurbulenceFlow,
+            _baseline.EnableToneCurve,
+            _baseline.ToneCurve,
+            _baseline.EnablePaperGranulation,
+            _baseline.PaperGranulation,
+            _baseline.EnableFxaa,
+            _baseline.Fxaa);
+
+        if (changed)
+        {
+            RaiseParameterChanged(isImmediate: true);
         }
     }
 

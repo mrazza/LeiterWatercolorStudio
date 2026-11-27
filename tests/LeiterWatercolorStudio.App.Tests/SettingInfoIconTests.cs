@@ -256,12 +256,12 @@ public class SettingInfoIconTests
 
         var inspectorExpectations = new (string Name, Control View, object ViewModel, int ExpectedInfoIcons)[]
         {
-            ("ColorTransfer", new ColorTransferInspectorView(), parameters.ColorTransfer, 12),
+            ("ColorTransfer", new ColorTransferInspectorView(), parameters.ColorTransfer, 11),
             ("Saliency", new SaliencyInspectorView(), parameters.Saliency, 23),
             ("Segmentation", new SegmentationInspectorView(), parameters.Segmentation, 6),
-            ("LodAbstraction", new LodAbstractionInspectorView(), parameters.LodAbstraction, 8),
-            ("WetInWet", new WetInWetInspectorView(), parameters.WetInWet, 13),
-            ("HandTremor", new HandTremorInspectorView(), parameters.HandTremor, 24),
+            ("LodAbstraction", new LodAbstractionInspectorView(), parameters.LodAbstraction, 7),
+            ("WetInWet", new WetInWetInspectorView(), parameters.WetInWet, 12),
+            ("HandTremor", new HandTremorInspectorView(), parameters.HandTremor, 20),
             ("Finishing", new FinishingInspectorView(), parameters.Finishing, 31),
         };
 

@@ -4,7 +4,9 @@ using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
+using Avalonia.Media.Imaging;
 using Avalonia.VisualTree;
+using Leiter.Algorithms.Noise;
 using Leiter.Pixels;
 using LeiterWatercolorStudio.App.Controls;
 using LeiterWatercolorStudio.App.Views.Inspectors;
@@ -18,7 +20,7 @@ namespace LeiterWatercolorStudio.App.Tests;
 public class NumericInputValidationTests
 {
     [AvaloniaFact]
-    public void NumericSlider_AcceptsValidTypedValuesBeyondSliderRange_PreservesPrecisionAndNudges()
+    public void NumericSlider_AcceptsValidTypedValuesBeyondSliderRange_ExpandsTrackAndNudges()
     {
         var positiveSlider = new NumericSlider
         {
@@ -87,13 +89,13 @@ public class NumericInputValidationTests
             window.Show();
             TestAppHelpers.PumpUi();
 
-            // 1. Typed value above slider Maximum is accepted verbatim; slider thumb pins to track max with tooltip.
+            // 1. Typed value above slider Maximum is accepted verbatim AND track expands dynamically to accommodate it.
             SubmitSliderText(window, positiveSlider, "50");
             Assert.False(positiveSlider.HasValidationError);
             Assert.Equal(50.0, positiveSlider.Value, 6);
             Slider trackSlider = positiveSlider.FindControl<Slider>("PART_Slider")!;
-            Assert.Equal(20.0, trackSlider.Value, 6);
-            Assert.False(string.IsNullOrWhiteSpace(ToolTip.GetTip(trackSlider) as string));
+            Assert.True(trackSlider.Maximum >= 50.0 * 1.15 - 1e-6);
+            Assert.Equal(50.0, trackSlider.Value, 6);
 
             // 2. Up / Shift+Up nudges above slider Maximum without snapping back to 20.0.
             TextBox ampBox = positiveSlider.FindControl<TextBox>("PART_ValueTextBox")!;
@@ -112,7 +114,7 @@ public class NumericInputValidationTests
             Assert.False(strictPositiveSlider.HasValidationError);
             Assert.Equal(0.0001, strictPositiveSlider.Value, 8);
             TextBox freqBox = strictPositiveSlider.FindControl<TextBox>("PART_ValueTextBox")!;
-            Assert.Equal(0.0001.ToString("0.############", CultureInfo.CurrentCulture), freqBox.Text);
+            Assert.Equal(0.0001.ToString("0.00##", CultureInfo.CurrentCulture), freqBox.Text);
 
             // 4. Open-ended integer above slider Maximum is accepted.
             SubmitSliderText(window, integerSlider, "256");
@@ -128,10 +130,277 @@ public class NumericInputValidationTests
             Assert.False(signedSlider.HasValidationError);
             Assert.Equal(500.0, signedSlider.Value, 6);
 
-            // 6. Auto-expanding slider track bounds for large image-adapted BaselineValue.
+            // 6. Auto-expanding slider track bounds for large image-adapted BaselineValue with headroom (1.5x).
             integerSlider.BaselineValue = 120.0;
+            integerSlider.Value = 120.0;
             TestAppHelpers.PumpUi();
-            Assert.Equal(120.0, integerSlider.FindControl<Slider>("PART_Slider")!.Maximum, 6);
+            Assert.Equal(180.0, integerSlider.FindControl<Slider>("PART_Slider")!.Maximum, 6);
+            Border baselineTick = integerSlider.FindControl<Border>("PART_BaselineTick")!;
+            Assert.True(baselineTick.IsVisible);
+        }
+        finally
+        {
+            window.Close();
+            TestAppHelpers.PumpUi();
+        }
+    }
+
+    [AvaloniaFact]
+    public void NumericSlider_FormatsImageAdaptedFloatsCleanly_AndPreservesPrecisionOnFocusBlur()
+    {
+        var sliderF2 = new NumericSlider
+        {
+            Label = "Edge Intensity",
+            Minimum = 0.0,
+            Maximum = 5.0,
+            ValidMinimum = 0.0,
+            Step = 0.05,
+            FormatString = "F2",
+            BaselineValue = 11.039142,
+            Value = 11.039142,
+        };
+
+        var sliderSmall = new NumericSlider
+        {
+            Label = "Frequency",
+            Minimum = 0.001,
+            Maximum = 0.5,
+            ValidMinimum = 0.0,
+            IsValidMinimumExclusive = true,
+            Step = 0.001,
+            FormatString = "F3",
+            BaselineValue = 0.0067115,
+            Value = 0.0067115,
+        };
+
+        var blurButton = new Button { Content = "Other" };
+        var window = new Window
+        {
+            Width = 340,
+            Height = 260,
+            Content = new StackPanel { Children = { sliderF2, sliderSmall, blurButton } },
+        };
+
+        try
+        {
+            window.Show();
+            TestAppHelpers.PumpUi();
+
+            TextBox boxF2 = sliderF2.FindControl<TextBox>("PART_ValueTextBox")!;
+            TextBox boxSmall = sliderSmall.FindControl<TextBox>("PART_ValueTextBox")!;
+
+            Assert.Equal(11.039142.ToString("F2", CultureInfo.CurrentCulture), boxF2.Text);
+            Assert.Equal(0.0067115.ToString("0.00##", CultureInfo.CurrentCulture), boxSmall.Text);
+            Assert.False(sliderF2.IsModified);
+            Assert.False(sliderSmall.IsModified);
+
+            // Focusing and blurring without editing must NOT overwrite exact precision or mark modified.
+            boxF2.Focus();
+            TestAppHelpers.PumpUi();
+            blurButton.Focus();
+            TestAppHelpers.PumpUi();
+
+            Assert.Equal(11.039142, sliderF2.Value, 8);
+            Assert.False(sliderF2.IsModified);
+
+            // Verify additional representative image-adapted values never emit 12-digit unclipped strings.
+            sliderF2.Value = 5.065667;
+            TestAppHelpers.PumpUi();
+            Assert.Equal(5.065667.ToString("F2", CultureInfo.CurrentCulture), boxF2.Text);
+
+            sliderF2.Value = 59.59608;
+            TestAppHelpers.PumpUi();
+            Assert.Equal(59.59608.ToString("F2", CultureInfo.CurrentCulture), boxF2.Text);
+
+            sliderF2.Value = 0.1318915;
+            TestAppHelpers.PumpUi();
+            Assert.Equal(0.1318915.ToString("F2", CultureInfo.CurrentCulture), boxF2.Text);
+        }
+        finally
+        {
+            window.Close();
+            TestAppHelpers.PumpUi();
+        }
+    }
+
+    [AvaloniaFact]
+    public void NumericSlider_ExpandedTrackDrag_DoesNotSnapToHardcodedMax_AndShiftDragFineTunes()
+    {
+        var slider = new NumericSlider
+        {
+            Label = "Range Radius",
+            Minimum = 0.0,
+            Maximum = 10.0,
+            ValidMinimum = 0.0,
+            Step = 0.05,
+            FormatString = "F2",
+            BaselineValue = 20.0,
+            Value = 20.0,
+        };
+
+        var window = new Window
+        {
+            Width = 340,
+            Height = 160,
+            Content = slider,
+        };
+
+        try
+        {
+            window.Show();
+            TestAppHelpers.PumpUi();
+
+            Slider track = slider.FindControl<Slider>("PART_Slider")!;
+            Assert.Equal(30.0, track.Maximum, 6);
+
+            Point trackLeft = track.TranslatePoint(new Point(10, track.Bounds.Height * 0.5), window)!.Value;
+            Point trackMid = track.TranslatePoint(new Point(track.Bounds.Width * 0.5, track.Bounds.Height * 0.5), window)!.Value;
+            Point trackThreeQuarter = track.TranslatePoint(new Point(track.Bounds.Width * 0.75, track.Bounds.Height * 0.5), window)!.Value;
+
+            // Normal click/drag to ~75% of expanded [0, 30] track -> stays well above hardcoded Maximum=10.
+            window.MouseDown(trackThreeQuarter, MouseButton.Left);
+            window.MouseMove(new Point(trackThreeQuarter.X + 4, trackThreeQuarter.Y));
+            window.MouseUp(new Point(trackThreeQuarter.X + 4, trackThreeQuarter.Y), MouseButton.Left);
+            TestAppHelpers.PumpUi();
+
+            Assert.True(slider.Value > 15.0, $"Expected drag on expanded track to remain > 15, got {slider.Value}");
+
+            // Shift+drag across 40px produces ~10x finer delta than full-track normal drag.
+            slider.Value = 15.0;
+            TestAppHelpers.PumpUi();
+
+            window.MouseDown(trackMid, MouseButton.Left, RawInputModifiers.Shift);
+            window.MouseMove(new Point(trackMid.X + 40, trackMid.Y), RawInputModifiers.Shift);
+            window.MouseUp(new Point(trackMid.X + 40, trackMid.Y), MouseButton.Left, RawInputModifiers.Shift);
+            TestAppHelpers.PumpUi();
+
+            double shiftDelta = slider.Value - 15.0;
+            double fullTrackDelta = (40.0 / Math.Max(1.0, track.Bounds.Width - 16.0)) * 30.0;
+            Assert.InRange(shiftDelta, 0.01, fullTrackDelta * 0.25);
+
+            // Reset leaves clean baseline.
+            Assert.True(trackLeft.X < trackMid.X);
+        }
+        finally
+        {
+            window.Close();
+            TestAppHelpers.PumpUi();
+        }
+    }
+
+    [AvaloniaFact]
+    public void NumericSlider_MouseWheel_NudgesOnlyWhenTextBoxFocusedOrCtrlHeld()
+    {
+        var slider = new NumericSlider
+        {
+            Label = "Edge Intensity",
+            Minimum = 0.0,
+            Maximum = 5.0,
+            ValidMinimum = 0.0,
+            Step = 0.1,
+            FormatString = "F2",
+            BaselineValue = 1.0,
+            Value = 1.0,
+        };
+
+        var other = new Button { Content = "Other" };
+        var window = new Window
+        {
+            Width = 340,
+            Height = 200,
+            Content = new StackPanel { Children = { slider, other } },
+        };
+
+        try
+        {
+            window.Show();
+            TestAppHelpers.PumpUi();
+
+            other.Focus();
+            TestAppHelpers.PumpUi();
+
+            // Unfocused without Ctrl -> wheel does NOT hijack scrolling / mutate Value.
+            Point sliderCenter = slider.TranslatePoint(
+                new Point(slider.Bounds.Width * 0.5, slider.Bounds.Height * 0.5),
+                window)!.Value;
+            window.MouseWheel(sliderCenter, new Vector(0, 1), RawInputModifiers.None);
+            TestAppHelpers.PumpUi();
+            Assert.Equal(1.0, slider.Value, 6);
+
+            // Ctrl+Wheel on slider -> nudges by Step.
+            window.MouseWheel(sliderCenter, new Vector(0, 1), RawInputModifiers.Control);
+            TestAppHelpers.PumpUi();
+            Assert.Equal(1.1, slider.Value, 6);
+
+            // Focused TextBox + Wheel -> nudges by Step.
+            TextBox box = slider.FindControl<TextBox>("PART_ValueTextBox")!;
+            box.Focus();
+            TestAppHelpers.PumpUi();
+            Point boxCenter = box.TranslatePoint(new Point(box.Bounds.Width * 0.5, box.Bounds.Height * 0.5), window)!.Value;
+            window.MouseWheel(boxCenter, new Vector(0, 1), RawInputModifiers.None);
+            TestAppHelpers.PumpUi();
+            Assert.Equal(1.2, slider.Value, 6);
+        }
+        finally
+        {
+            window.Close();
+            TestAppHelpers.PumpUi();
+        }
+    }
+
+    [AvaloniaFact]
+    public void PerlinNoiseEditor_GeneratesLiveNoisePreview_AndSupportsPerSeedReset()
+    {
+        var noiseVm = new PerlinNoiseViewModel(new PerlinNoiseOptions(Seed: 404, Frequency: 0.0067115, Octaves: 4));
+        var editor = new PerlinNoiseEditor
+        {
+            Width = 320,
+            Title = "Turbulence Noise",
+            DataContext = noiseVm,
+        };
+
+        var window = new Window
+        {
+            Width = 350,
+            Height = 420,
+            Content = editor,
+        };
+
+        try
+        {
+            window.Show();
+            TestAppHelpers.PumpUi();
+
+            WriteableBitmap? initialBitmap = editor.NoisePreviewBitmap;
+            Assert.NotNull(initialBitmap);
+            Assert.Equal(new PixelSize(56, 36), initialBitmap!.PixelSize);
+
+            // Frequency formats cleanly with F4 without 12-digit fallback.
+            NumericSlider freqSlider = editor.FindControl<NumericSlider>("PART_FrequencySlider")!;
+            TextBox freqBox = freqSlider.FindControl<TextBox>("PART_ValueTextBox")!;
+            Assert.Equal(0.0067115.ToString("F4", CultureInfo.CurrentCulture), freqBox.Text);
+
+            // Modify both Frequency and Seed, verify preview regenerates and per-seed reset only resets Seed.
+            noiseVm.Frequency = 0.08;
+            noiseVm.Seed = 9999;
+            TestAppHelpers.PumpUi();
+
+            Assert.NotNull(editor.NoisePreviewBitmap);
+            Assert.NotSame(initialBitmap, editor.NoisePreviewBitmap);
+
+            Button resetSeedButton = editor.FindControl<Button>("PART_ResetSeedButton")!;
+            Avalonia.Controls.Shapes.Ellipse seedModifiedDot = editor.FindControl<Avalonia.Controls.Shapes.Ellipse>("PART_SeedModifiedDot")!;
+            Assert.True(noiseVm.IsSeedModified);
+            Assert.True(seedModifiedDot.IsVisible);
+            Assert.True(resetSeedButton.IsEnabled);
+            resetSeedButton.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+            TestAppHelpers.PumpUi();
+
+            Assert.Equal(404, noiseVm.Seed);
+            Assert.Equal(0.08, noiseVm.Frequency, 6);
+            Assert.False(noiseVm.IsSeedModified);
+            Assert.False(seedModifiedDot.IsVisible);
+            Assert.False(resetSeedButton.IsEnabled);
         }
         finally
         {
@@ -351,6 +620,8 @@ public class NumericInputValidationTests
         try
         {
             window.Show();
+            TestAppHelpers.PumpUi();
+            view.FocusSection("ToneCurve");
             TestAppHelpers.PumpUi();
 
             NumericSlider minTone = FindSliderByLabel(view, "Min Tone");

@@ -6,12 +6,22 @@ using LeiterWatercolorStudio.Core.Models;
 namespace LeiterWatercolorStudio.Core.Parameters.Stages;
 
 /// <summary>
+/// Immutable baseline snapshot for Stage 1 (Color Transfer).
+/// </summary>
+public sealed record ColorTransferBaseline(
+    bool EnableColorTransfer,
+    ColorTransferProfile? TargetPalette,
+    double ColorTransferStrength,
+    PaletteMode? PaletteModeHint = null);
+
+/// <summary>
 /// View model for Stage 1 (Color Transfer) parameters and target palette selection.
 /// </summary>
 public sealed class ColorTransferStageViewModel : StageViewModelBase
 {
     private const string DefaultCustomPaletteName = "Custom Palette";
 
+    private ColorTransferBaseline _baseline;
     private bool _enableColorTransfer;
     private PaletteMode _paletteMode;
     private int _selectedBuiltInPaletteIndex;
@@ -32,6 +42,11 @@ public sealed class ColorTransferStageViewModel : StageViewModelBase
     public ColorTransferStageViewModel()
     {
         ColorTransferProfile seedProfile = WatercolorPalettes.BalancedWash;
+        _baseline = new ColorTransferBaseline(
+            WatercolorOptions.Default.EnableColorTransfer,
+            WatercolorOptions.Default.TargetPalette,
+            WatercolorOptions.Default.ColorTransferStrength,
+            PaletteModeHint: null);
         _enableColorTransfer = WatercolorOptions.Default.EnableColorTransfer;
         _paletteMode = PaletteMode.Auto;
         _selectedBuiltInPaletteIndex = 0;
@@ -45,6 +60,11 @@ public sealed class ColorTransferStageViewModel : StageViewModelBase
         _stdDevB = seedProfile.Statistics.StdDevB;
         _customIlluminant = seedProfile.Illuminant;
     }
+
+    /// <summary>
+    /// Gets the baseline Stage 1 configuration used for per-parameter and stage resets.
+    /// </summary>
+    public ColorTransferBaseline Baseline => _baseline;
 
     /// <summary>
     /// Gets the curated built-in watercolor palettes from <see cref="WatercolorPalettes.Defaults"/>.
@@ -239,6 +259,36 @@ public sealed class ColorTransferStageViewModel : StageViewModelBase
     }
 
     /// <summary>
+    /// Updates <see cref="Baseline"/> without modifying current parameter values or raising a parameter edit.
+    /// </summary>
+    public void SetBaseline(ColorTransferBaseline baseline)
+    {
+        ArgumentNullException.ThrowIfNull(baseline);
+        if (!double.IsFinite(baseline.ColorTransferStrength) || baseline.ColorTransferStrength < 0.0 || baseline.ColorTransferStrength > 1.0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(baseline), baseline.ColorTransferStrength, "Color transfer strength must be finite in [0.0, 1.0].");
+        }
+
+        baseline.TargetPalette?.Validate();
+        if (baseline.PaletteModeHint is { } hint && !Enum.IsDefined(hint))
+        {
+            throw new ArgumentOutOfRangeException(nameof(baseline), hint, "Unsupported PaletteMode value.");
+        }
+
+        SetProperty(ref _baseline, baseline, nameof(Baseline));
+    }
+
+    /// <summary>
+    /// Updates <see cref="Baseline"/> without modifying current parameter values or raising a parameter edit.
+    /// </summary>
+    public void SetBaseline(
+        bool enableColorTransfer,
+        ColorTransferProfile? targetPalette,
+        double colorTransferStrength,
+        PaletteMode? paletteModeHint = null) =>
+        SetBaseline(new ColorTransferBaseline(enableColorTransfer, targetPalette, colorTransferStrength, paletteModeHint));
+
+    /// <summary>
     /// Loads Stage 1 parameters from pipeline options with optional explicit palette mode override.
     /// </summary>
     public void LoadFrom(
@@ -277,6 +327,33 @@ public sealed class ColorTransferStageViewModel : StageViewModelBase
                     ApplyCustomProfileFields(targetPalette);
                 }
             }
+        }
+    }
+
+    /// <inheritdoc />
+    public override void ResetToBaseline()
+    {
+        bool prevEnable = _enableColorTransfer;
+        double prevStrength = _colorTransferStrength;
+        PaletteMode prevMode = _paletteMode;
+        ColorTransferProfile? prevTarget = ToTargetPalette();
+        ColorTransferProfile? prevMatched = _activeMatchedPalette;
+
+        LoadFrom(
+            _baseline.EnableColorTransfer,
+            _baseline.TargetPalette,
+            _baseline.ColorTransferStrength,
+            _baseline.PaletteModeHint);
+
+        bool changed = prevEnable != _enableColorTransfer
+            || prevStrength != _colorTransferStrength
+            || prevMode != _paletteMode
+            || !Equals(prevTarget, ToTargetPalette())
+            || !Equals(prevMatched, _activeMatchedPalette);
+
+        if (changed)
+        {
+            RaiseParameterChanged(isImmediate: true);
         }
     }
 

@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Windows.Input;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Interactivity;
 using Leiter.Pixels;
 using LeiterWatercolorStudio.App.Controls;
 using LeiterWatercolorStudio.Core.Parameters.Stages;
@@ -29,6 +30,7 @@ public partial class HandTremorInspectorView : UserControl
             o => o.PaperColorHexValidationError);
 
     private readonly ValidatedTextBoxHandler _hexInputHandler;
+    private readonly ValidatedTextBoxHandler _flyoutHexInputHandler;
     private HandTremorStageViewModel? _subscribedViewModel;
     private string? _paperColorHexValidationError;
 
@@ -43,24 +45,18 @@ public partial class HandTremorInspectorView : UserControl
             PART_PaperColorHexTextBox,
             PART_PaperColorHexErrorText,
             () => DataContext is HandTremorStageViewModel vm ? vm.PaperColorHex : string.Empty,
-            rawText =>
-            {
-                if (DataContext is not HandTremorStageViewModel vm)
-                {
-                    return null;
-                }
-
-                if (!TryParseRgbHex(rawText, out Rgb8 color, out string error))
-                {
-                    return error;
-                }
-
-                vm.PaperColor = color;
-                return null;
-            },
+            rawText => ApplyHexInput(rawText),
             err => PaperColorHexValidationError = err);
 
+        _flyoutHexInputHandler = new ValidatedTextBoxHandler(
+            PART_FlyoutPaperColorHexTextBox,
+            PART_FlyoutPaperColorHexErrorText,
+            () => DataContext is HandTremorStageViewModel vm ? vm.PaperColorHex : string.Empty,
+            rawText => ApplyHexInput(rawText),
+            _ => { });
+
         _hexInputHandler.SyncFromModel(forceEvenIfFocused: true);
+        _flyoutHexInputHandler.SyncFromModel(forceEvenIfFocused: true);
     }
 
     /// <summary>
@@ -106,11 +102,42 @@ public partial class HandTremorInspectorView : UserControl
         UpdateViewModelSubscription(null);
     }
 
+    private string? ApplyHexInput(string? rawText)
+    {
+        if (DataContext is not HandTremorStageViewModel vm)
+        {
+            return null;
+        }
+
+        if (!TryParseRgbHex(rawText, out Rgb8 color, out string error))
+        {
+            return error;
+        }
+
+        vm.PaperColor = color;
+        return null;
+    }
+
+    private void OnPaperSwatchClick(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not HandTremorStageViewModel vm ||
+            sender is not Button { Tag: string hex } ||
+            !TryParseRgbHex(hex, out Rgb8 color, out _))
+        {
+            return;
+        }
+
+        vm.PaperColor = color;
+        _hexInputHandler.ResetValidationAndSync();
+        _flyoutHexInputHandler.ResetValidationAndSync();
+    }
+
     private void UpdateViewModelSubscription(HandTremorStageViewModel? next)
     {
         if (ReferenceEquals(_subscribedViewModel, next))
         {
             _hexInputHandler.SyncFromModel();
+            _flyoutHexInputHandler.SyncFromModel();
             return;
         }
 
@@ -126,6 +153,7 @@ public partial class HandTremorInspectorView : UserControl
         }
 
         _hexInputHandler.ResetValidationAndSync();
+        _flyoutHexInputHandler.ResetValidationAndSync();
     }
 
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -135,6 +163,7 @@ public partial class HandTremorInspectorView : UserControl
             string.Equals(e.PropertyName, nameof(HandTremorStageViewModel.PaperColor), StringComparison.Ordinal))
         {
             _hexInputHandler.ResetValidationAndSync();
+            _flyoutHexInputHandler.ResetValidationAndSync();
         }
     }
 

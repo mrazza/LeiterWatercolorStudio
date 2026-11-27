@@ -53,6 +53,14 @@ public partial class PipelineFilmstrip : UserControl
         AvaloniaProperty.Register<PipelineFilmstrip, bool>(nameof(ShowSubStageDrawer));
 
     /// <summary>
+    /// Identifies the <see cref="ActiveStageSummary"/> styled property.
+    /// </summary>
+    public static readonly StyledProperty<string?> ActiveStageSummaryProperty =
+        AvaloniaProperty.Register<PipelineFilmstrip, string?>(
+            nameof(ActiveStageSummary),
+            "Single-view stage — no sub-views");
+
+    /// <summary>
     /// Identifies the <see cref="SelectStageCommand"/> styled property.
     /// </summary>
     public static readonly StyledProperty<ICommand?> SelectStageCommandProperty =
@@ -118,12 +126,21 @@ public partial class PipelineFilmstrip : UserControl
     }
 
     /// <summary>
-    /// Gets or sets whether the sub-stage drawer above the filmstrip is visible.
+    /// Gets or sets whether the sub-stage drawer above the filmstrip is active.
     /// </summary>
     public bool ShowSubStageDrawer
     {
         get => GetValue(ShowSubStageDrawerProperty);
         set => SetValue(ShowSubStageDrawerProperty, value);
+    }
+
+    /// <summary>
+    /// Gets or sets the quiet summary text displayed in the persistent bar when the active stage has no sub-stages.
+    /// </summary>
+    public string? ActiveStageSummary
+    {
+        get => GetValue(ActiveStageSummaryProperty);
+        set => SetValue(ActiveStageSummaryProperty, value);
     }
 
     /// <summary>

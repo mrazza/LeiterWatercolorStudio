@@ -1,6 +1,7 @@
 using System.Windows.Input;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Data.Converters;
 using Leiter.Algorithms.DataStructures;
 using Leiter.Algorithms.Morphology;
 using Leiter.Algorithms.Saliency;
@@ -8,7 +9,7 @@ using Leiter.Algorithms.Saliency;
 namespace LeiterWatercolorStudio.App.Views.Inspectors;
 
 /// <summary>
-/// Inspector panel for Stage 2 (Saliency, SaliencyCut/GrabCut/Mask, and Saliency Distance Field).
+/// Inspector panel for Stage 3 (Saliency, SaliencyCut/GrabCut/Mask, and Saliency Distance Field).
 /// </summary>
 public partial class SaliencyInspectorView : UserControl
 {
@@ -34,6 +35,30 @@ public partial class SaliencyInspectorView : UserControl
     public static IReadOnlyList<ComponentRetentionPolicy> RetentionPolicies { get; } = Enum.GetValues<ComponentRetentionPolicy>();
 
     /// <summary>
+    /// Converts a <see cref="SaliencyThresholdMethod"/> to whether <see cref="SaliencyThresholdMethod.Fixed"/> is active.
+    /// </summary>
+    public static IValueConverter IsFixedThresholdMethodConverter { get; } =
+        new FuncValueConverter<SaliencyThresholdMethod, bool>(m => m == SaliencyThresholdMethod.Fixed);
+
+    /// <summary>
+    /// Converts a <see cref="SaliencyThresholdMethod"/> to visual opacity for the Fixed Threshold slider.
+    /// </summary>
+    public static IValueConverter FixedThresholdOpacityConverter { get; } =
+        new FuncValueConverter<SaliencyThresholdMethod, double>(m => m == SaliencyThresholdMethod.Fixed ? 1.0 : 0.45);
+
+    /// <summary>
+    /// Converts a <see cref="ComponentRetentionPolicy"/> to whether <see cref="ComponentRetentionPolicy.MinimumAreaFraction"/> is active.
+    /// </summary>
+    public static IValueConverter IsMinimumAreaRetentionConverter { get; } =
+        new FuncValueConverter<ComponentRetentionPolicy, bool>(p => p == ComponentRetentionPolicy.MinimumAreaFraction);
+
+    /// <summary>
+    /// Converts a <see cref="ComponentRetentionPolicy"/> to visual opacity for the Min Area Fraction slider.
+    /// </summary>
+    public static IValueConverter MinimumAreaOpacityConverter { get; } =
+        new FuncValueConverter<ComponentRetentionPolicy, double>(p => p == ComponentRetentionPolicy.MinimumAreaFraction ? 1.0 : 0.45);
+
+    /// <summary>
     /// Initializes a new instance of <see cref="SaliencyInspectorView"/>.
     /// </summary>
     public SaliencyInspectorView()
@@ -42,7 +67,7 @@ public partial class SaliencyInspectorView : UserControl
     }
 
     /// <summary>
-    /// Gets or sets the command invoked when resetting Stage 2 to the active baseline.
+    /// Gets or sets the command invoked when resetting Stage 3 to the active baseline.
     /// </summary>
     public ICommand? ResetStageCommand
     {

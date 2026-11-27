@@ -9,6 +9,7 @@ namespace LeiterWatercolorStudio.Core.Parameters.Stages;
 /// </summary>
 public sealed class SegmentationStageViewModel : StageViewModelBase
 {
+    private MeanShiftOptions _baseline;
     private int _spatialRadius;
     private double _rangeRadius;
     private int _minRegionSize;
@@ -22,6 +23,7 @@ public sealed class SegmentationStageViewModel : StageViewModelBase
     public SegmentationStageViewModel()
     {
         MeanShiftOptions defaults = WatercolorOptions.Default.MeanShift;
+        _baseline = defaults;
         _spatialRadius = defaults.SpatialRadius;
         _rangeRadius = defaults.RangeRadius;
         _minRegionSize = defaults.MinRegionSize;
@@ -29,6 +31,11 @@ public sealed class SegmentationStageViewModel : StageViewModelBase
         _convergenceEpsilon = defaults.ConvergenceEpsilon;
         _connectivity = defaults.Connectivity;
     }
+
+    /// <summary>
+    /// Gets the baseline <see cref="MeanShiftOptions"/> used for per-parameter resets.
+    /// </summary>
+    public MeanShiftOptions Baseline => _baseline;
 
     /// <summary>
     /// Gets or sets the spatial search window radius in pixels (<c>&gt;= 1</c>).
@@ -85,6 +92,16 @@ public sealed class SegmentationStageViewModel : StageViewModelBase
     }
 
     /// <summary>
+    /// Updates <see cref="Baseline"/> without modifying current parameter values or raising a parameter edit.
+    /// </summary>
+    public void SetBaseline(MeanShiftOptions baseline)
+    {
+        ArgumentNullException.ThrowIfNull(baseline);
+        baseline.Validate();
+        SetProperty(ref _baseline, baseline, nameof(Baseline));
+    }
+
+    /// <summary>
     /// Loads Stage 3a parameters from <paramref name="options"/>.
     /// </summary>
     public void LoadFrom(MeanShiftOptions options)
@@ -100,6 +117,23 @@ public sealed class SegmentationStageViewModel : StageViewModelBase
             SetProperty(ref _maxIterations, options.MaxIterations, nameof(MaxIterations));
             SetProperty(ref _convergenceEpsilon, options.ConvergenceEpsilon, nameof(ConvergenceEpsilon));
             SetProperty(ref _connectivity, options.Connectivity, nameof(Connectivity));
+        }
+    }
+
+    /// <inheritdoc />
+    public override void ResetToBaseline()
+    {
+        bool changed = _spatialRadius != _baseline.SpatialRadius
+            || _rangeRadius != _baseline.RangeRadius
+            || _minRegionSize != _baseline.MinRegionSize
+            || _maxIterations != _baseline.MaxIterations
+            || _convergenceEpsilon != _baseline.ConvergenceEpsilon
+            || _connectivity != _baseline.Connectivity;
+
+        LoadFrom(_baseline);
+        if (changed)
+        {
+            RaiseParameterChanged(isImmediate: true);
         }
     }
 

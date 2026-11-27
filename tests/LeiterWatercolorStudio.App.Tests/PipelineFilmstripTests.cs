@@ -275,4 +275,61 @@ public class PipelineFilmstripTests
 
         return matrix;
     }
+
+    [AvaloniaFact]
+    public void PipelineFilmstrip_FitsAllEightStages_At1024Width_AndKeepsSubStageBarSteady()
+    {
+        List<StageCardViewModel> stages = CreateStageCards();
+        var filmstrip = new PipelineFilmstrip
+        {
+            Stages = stages,
+            SelectedStage = stages[0],
+            SubStages = stages[0].SubStages,
+            ShowSubStageDrawer = false,
+        };
+
+        var window = new Window
+        {
+            Width = 1024,
+            Height = 260,
+            Content = filmstrip,
+        };
+
+        try
+        {
+            window.Show();
+            TestAppHelpers.PumpUi();
+
+            double heightSingleView = filmstrip.Bounds.Height;
+
+            ItemsControl primaryItems = filmstrip.FindControl<ItemsControl>("PrimaryStagesItemsControl")!;
+            List<Border> cards = primaryItems
+                .GetVisualDescendants()
+                .OfType<Border>()
+                .Where(b => b.Classes.Contains("stage-card"))
+                .ToList();
+
+            Assert.Equal(8, cards.Count);
+            Border lastCard = cards[7];
+            Point lastTopRight = lastCard.TranslatePoint(new Point(lastCard.Bounds.Width, 0), window)!.Value;
+            Assert.True(lastTopRight.X <= 1024.0, $"Stage 8 card clipped past 1024px: right={lastTopRight.X:F1}");
+
+            // Switch to multi-view stage (Saliency with 5 sub-stages) and verify bar height stays steady
+            filmstrip.SelectedStage = stages[2];
+            filmstrip.SubStages = stages[2].SubStages;
+            filmstrip.ShowSubStageDrawer = true;
+            TestAppHelpers.PumpUi();
+
+            double heightMultiView = filmstrip.Bounds.Height;
+            Assert.InRange(Math.Abs(heightMultiView - heightSingleView), 0.0, 4.0);
+        }
+        finally
+        {
+            window.Close();
+            foreach (StageCardViewModel card in stages)
+            {
+                card.Dispose();
+            }
+        }
+    }
 }

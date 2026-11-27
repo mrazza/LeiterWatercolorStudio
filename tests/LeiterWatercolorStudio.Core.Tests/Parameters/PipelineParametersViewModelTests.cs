@@ -13,6 +13,8 @@ using Leiter.Pixels;
 using Leiter.Pixels.ColorSpaces;
 using LeiterWatercolorStudio.Core.Models;
 using LeiterWatercolorStudio.Core.Parameters;
+using LeiterWatercolorStudio.Core.Parameters.Stages;
+using LeiterWatercolorStudio.Core.Tests.Pipeline;
 using Xunit;
 
 namespace LeiterWatercolorStudio.Core.Tests.Parameters;
@@ -370,5 +372,180 @@ public class PipelineParametersViewModelTests
         Assert.Equal(3.1, vm.Finishing.EdgeIntensity);
         Assert.True(vm.CanUndo);
         Assert.False(vm.CanRedo);
+    }
+
+    [Fact]
+    public void ActiveBaseline_PropagatesAcrossAllStageAndSubStageViewModels_ForDefaultSizeAndImage()
+    {
+        SequentialMatrix<Rgb8> img = PipelineTestImages.CreateSyntheticScene(48, 36);
+        WatercolorOptions forSize = WatercolorOptions.ForSize(new Size(1600, 1200));
+        WatercolorOptions forImage = WatercolorOptions.ForImage(img);
+
+        var vm = new PipelineParametersViewModel();
+
+        // Default initialization sets active baseline across every stage and sub-VM.
+        AssertBaselinesMatch(vm, WatercolorOptions.Default, expectedPaletteHint: null);
+
+        // SetBaselineOnly(ForSize) propagates without altering current values or raising OptionsChanged.
+        var changedProps = new List<string?>();
+        vm.ColorTransfer.PropertyChanged += (_, e) => changedProps.Add($"CT:{e.PropertyName}");
+        vm.Saliency.PropertyChanged += (_, e) => changedProps.Add($"Sal:{e.PropertyName}");
+        vm.Saliency.SaliencyCut.PropertyChanged += (_, e) => changedProps.Add($"Cut:{e.PropertyName}");
+        vm.Saliency.SaliencyDistanceField.PropertyChanged += (_, e) => changedProps.Add($"DF:{e.PropertyName}");
+        vm.Segmentation.PropertyChanged += (_, e) => changedProps.Add($"Seg:{e.PropertyName}");
+        vm.LodAbstraction.PropertyChanged += (_, e) => changedProps.Add($"Lod:{e.PropertyName}");
+        vm.WetInWet.PropertyChanged += (_, e) => changedProps.Add($"Wet:{e.PropertyName}");
+        vm.HandTremor.PropertyChanged += (_, e) => changedProps.Add($"Tremor:{e.PropertyName}");
+        vm.Finishing.PropertyChanged += (_, e) => changedProps.Add($"Fin:{e.PropertyName}");
+
+        vm.SetBaselineOnly(BaselineMode.ForSize, forSize);
+        AssertBaselinesMatch(vm, forSize, expectedPaletteHint: null);
+        Assert.Equal(WatercolorOptions.Default, vm.BuildOptions());
+        Assert.Contains("Sal:Baseline", changedProps);
+        Assert.Contains("Cut:Baseline", changedProps);
+        Assert.Contains("Cut:BaselineMaxWorkingDimension", changedProps);
+        Assert.Contains("Seg:Baseline", changedProps);
+        Assert.Contains("Lod:Baseline", changedProps);
+        Assert.Contains("Wet:Baseline", changedProps);
+        Assert.Contains("Tremor:Baseline", changedProps);
+        Assert.Contains("Fin:Baseline", changedProps);
+        Assert.Contains("Fin:EdgeDarkeningBaseline", changedProps);
+        Assert.Contains("Fin:TurbulenceFlowBaseline", changedProps);
+        Assert.Contains("Fin:ToneCurveBaseline", changedProps);
+        Assert.Contains("Fin:PaperGranulationBaseline", changedProps);
+        Assert.Contains("Fin:FxaaBaseline", changedProps);
+
+        // SwitchBaseline(ForImage) updates both baselines and loaded values, including ColorTransfer and SaliencyDistanceField.
+        changedProps.Clear();
+        vm.SwitchBaseline(BaselineMode.ForImage, forImage, PaletteMode.Auto);
+        AssertBaselinesMatch(vm, forImage, PaletteMode.Auto);
+        Assert.Contains("CT:Baseline", changedProps);
+        Assert.Contains("Fin:ToneCurveBaseline", changedProps);
+
+        // Explicit SmoothingSigma baseline change raises DF:Baseline and DF:BaselineSmoothingSigma.
+        WatercolorOptions explicitDf = forImage with
+        {
+            SaliencyDistanceField = new SaliencyDistanceFieldOptions(SmoothingSigma: 9.5, DefaultSigmaScale: 0.04)
+        };
+        vm.SetBaselineOnly(BaselineMode.ForImage, explicitDf, PaletteMode.Auto);
+        Assert.Contains("DF:Baseline", changedProps);
+        Assert.Contains("DF:BaselineSmoothingSigma", changedProps);
+
+        // Loading a preset does not clobber the active baseline.
+        WatercolorOptions preset = CreateAllNonDefaultOptions();
+        vm.LoadFromOptions(preset, recordUndo: true, paletteModeHint: PaletteMode.Custom);
+        Assert.Equal(preset, vm.BuildOptions());
+        AssertBaselinesMatch(vm, explicitDf, PaletteMode.Auto);
+    }
+
+    [Fact]
+    public void StageResetToBaseline_ResetsEveryStageToActiveBaseline()
+    {
+        WatercolorOptions customBaseline = CreateAllNonDefaultOptions(WatercolorPalettes.CoastalCerulean) with
+        {
+            EnableColorTransfer = true,
+            EnableLodAbstraction = true,
+            EnableWetInWet = true,
+            EnableHandTremor = true,
+            EnableEdgeDarkening = true,
+            EnableTurbulenceFlow = true,
+            EnableToneCurve = true,
+            EnablePaperGranulation = true,
+            EnableFxaa = true,
+        };
+
+        var vm = new PipelineParametersViewModel(customBaseline, BaselineMode.ForImage);
+
+        // Mutate every stage away from customBaseline.
+        vm.ColorTransfer.ColorTransferStrength = 0.1;
+        vm.ColorTransfer.SetCustomProfile(new ColorTransferProfile("Other", new(45, 0, 0, 8, 4, 4)));
+        vm.Saliency.EgbiBlurSigma = 3.5;
+        vm.Saliency.Egbi.KFactor = 400.0;
+        vm.Saliency.RegionalContrastSaliency.CenterPriorWeight = 1.0;
+        vm.Saliency.SaliencyCut.TrimapBandRadius = 25;
+        vm.Saliency.GrabCut.Iterations = 9;
+        vm.Saliency.SaliencyMask.FixedThreshold = 0.9;
+        vm.Saliency.SaliencyDistanceField.DefaultSigmaScale = 0.12;
+        vm.Segmentation.SpatialRadius = 22;
+        vm.LodAbstraction.SalientKernelSize = 11;
+        vm.WetInWet.ScatterRadius = 15;
+        vm.HandTremor.Amplitude = 12.0;
+        vm.HandTremor.PrimaryNoise.Seed = 99999;
+        vm.Finishing.EdgeIntensity = 4.5;
+        vm.Finishing.TurbulenceNoise.Seed = 88888;
+        vm.Finishing.MinTone = 0.25;
+        vm.Finishing.GrainNoise.Seed = 77777;
+        vm.Finishing.MaxSpanSearchSteps = 32;
+
+        // Calling ResetToBaseline on each stage VM directly restores customBaseline.
+        vm.ColorTransfer.ResetToBaseline();
+        vm.Saliency.ResetToBaseline();
+        vm.Segmentation.ResetToBaseline();
+        vm.LodAbstraction.ResetToBaseline();
+        vm.WetInWet.ResetToBaseline();
+        vm.HandTremor.ResetToBaseline();
+        vm.Finishing.ResetToBaseline();
+
+        Assert.Equal(customBaseline, vm.BuildOptions());
+
+        // Calling ResetToBaseline again when already at baseline should not raise ParameterChanged.
+        var fired = false;
+        vm.Finishing.ParameterChanged += _ => fired = true;
+        vm.Finishing.ResetToBaseline();
+        Assert.False(fired);
+
+        // ResetToneCurveToBaseline restores only ToneCurve sub-stage.
+        vm.Finishing.MinTone = 0.2;
+        vm.Finishing.EdgeIntensity = 4.0;
+        vm.Finishing.ResetToneCurveToBaseline();
+        Assert.Equal(customBaseline.ToneCurve, vm.Finishing.ToToneCurveOptions());
+        Assert.Equal(4.0, vm.Finishing.EdgeIntensity);
+    }
+
+    private static void AssertBaselinesMatch(
+        PipelineParametersViewModel vm,
+        WatercolorOptions expected,
+        PaletteMode? expectedPaletteHint)
+    {
+        Assert.Equal(expected.EnableColorTransfer, vm.ColorTransfer.Baseline.EnableColorTransfer);
+        Assert.Equal(expected.TargetPalette, vm.ColorTransfer.Baseline.TargetPalette);
+        Assert.Equal(expected.ColorTransferStrength, vm.ColorTransfer.Baseline.ColorTransferStrength);
+        Assert.Equal(expectedPaletteHint, vm.ColorTransfer.Baseline.PaletteModeHint);
+
+        Assert.Equal(expected.EgbiBlurSigma, vm.Saliency.Baseline.EgbiBlurSigma);
+        Assert.Equal(expected.Egbi, vm.Saliency.Egbi.Baseline);
+        Assert.Equal(expected.RegionalContrastSaliency, vm.Saliency.RegionalContrastSaliency.Baseline);
+        Assert.Equal(expected.SaliencyCut, vm.Saliency.SaliencyCut.Baseline);
+        Assert.Equal(expected.SaliencyCut.MaxWorkingDimension ?? 1024, vm.Saliency.SaliencyCut.BaselineMaxWorkingDimension);
+        Assert.Equal(expected.SaliencyCut.GrabCut, vm.Saliency.GrabCut.Baseline);
+        Assert.Equal(expected.SaliencyCut.Mask, vm.Saliency.SaliencyMask.Baseline);
+        Assert.Equal(expected.SaliencyDistanceField, vm.Saliency.SaliencyDistanceField.Baseline);
+        Assert.Equal(expected.SaliencyDistanceField.SmoothingSigma ?? 12.0, vm.Saliency.SaliencyDistanceField.BaselineSmoothingSigma);
+
+        Assert.Equal(expected.MeanShift, vm.Segmentation.Baseline);
+
+        Assert.Equal(expected.EnableLodAbstraction, vm.LodAbstraction.BaselineEnableLodAbstraction);
+        Assert.Equal(expected.LodAbstraction, vm.LodAbstraction.Baseline);
+
+        Assert.Equal(expected.EnableWetInWet, vm.WetInWet.BaselineEnableWetInWet);
+        Assert.Equal(expected.WetInWet, vm.WetInWet.Baseline);
+
+        Assert.Equal(expected.EnableHandTremor, vm.HandTremor.BaselineEnableHandTremor);
+        Assert.Equal(expected.HandTremor, vm.HandTremor.Baseline);
+        Assert.Equal(expected.HandTremor.PrimaryNoise, vm.HandTremor.PrimaryNoise.Baseline);
+        Assert.Equal(expected.HandTremor.SecondaryNoise, vm.HandTremor.SecondaryNoise.Baseline);
+
+        Assert.Equal(expected.EnableEdgeDarkening, vm.Finishing.Baseline.EnableEdgeDarkening);
+        Assert.Equal(expected.EdgeDarkening, vm.Finishing.EdgeDarkeningBaseline);
+        Assert.Equal(expected.EnableTurbulenceFlow, vm.Finishing.Baseline.EnableTurbulenceFlow);
+        Assert.Equal(expected.TurbulenceFlow, vm.Finishing.TurbulenceFlowBaseline);
+        Assert.Equal(expected.TurbulenceFlow.Noise, vm.Finishing.TurbulenceNoise.Baseline);
+        Assert.Equal(expected.EnableToneCurve, vm.Finishing.Baseline.EnableToneCurve);
+        Assert.Equal(expected.ToneCurve, vm.Finishing.ToneCurveBaseline);
+        Assert.Equal(expected.EnablePaperGranulation, vm.Finishing.Baseline.EnablePaperGranulation);
+        Assert.Equal(expected.PaperGranulation, vm.Finishing.PaperGranulationBaseline);
+        Assert.Equal(expected.PaperGranulation.GrainNoise, vm.Finishing.GrainNoise.Baseline);
+        Assert.Equal(expected.EnableFxaa, vm.Finishing.Baseline.EnableFxaa);
+        Assert.Equal(expected.Fxaa, vm.Finishing.FxaaBaseline);
     }
 }

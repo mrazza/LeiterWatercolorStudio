@@ -293,4 +293,76 @@ public class PerlinNoiseAndStageConstraintsTests
         Assert.True(wet.EllipticalMajorRadius > 0.0 && wet.EllipticalMinorRadius > 0.0 && wet.EllipticalSigmaScale > 0.0);
         wet.ToOptions().Validate();
     }
+
+    [Fact]
+    public void PerlinNoiseViewModel_IsSeedModified_TracksSeedAndBaselineChanges()
+    {
+        var baseline = new PerlinNoiseOptions(Seed: 42, Frequency: 0.12, Octaves: 5, Lacunarity: 2.2, Persistence: 0.45);
+        var vm = new PerlinNoiseViewModel(baseline);
+        var seedModifiedNotifications = new List<bool>();
+        vm.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(PerlinNoiseViewModel.IsSeedModified))
+            {
+                seedModifiedNotifications.Add(vm.IsSeedModified);
+            }
+        };
+
+        Assert.False(vm.IsSeedModified);
+
+        vm.Seed = 123;
+        Assert.True(vm.IsSeedModified);
+        Assert.Equal([true], seedModifiedNotifications);
+
+        vm.ResetSeed();
+        Assert.False(vm.IsSeedModified);
+        Assert.Equal(baseline.Seed, vm.Seed);
+        Assert.Equal([true, false], seedModifiedNotifications);
+
+        vm.RandomizeSeed();
+        Assert.True(vm.IsSeedModified);
+
+        vm.ResetToBaseline();
+        Assert.False(vm.IsSeedModified);
+
+        // SetBaseline updates IsSeedModified when baseline seed diverges from current seed.
+        vm.SetBaseline(baseline with { Seed = 777 });
+        Assert.True(vm.IsSeedModified);
+
+        // LoadFrom matching baseline seed clears IsSeedModified.
+        vm.LoadFrom(baseline with { Seed = 777 });
+        Assert.False(vm.IsSeedModified);
+    }
+
+    [Fact]
+    public void WetInWetStageViewModel_SelectableFilteringModes_ExcludesDisabledAndPreservesBackCompat()
+    {
+        Assert.Equal(
+            [WetInWetMode.Default, WetInWetMode.ExcludeSalientBoundaries, WetInWetMode.ExcludeSalientRegions],
+            WetInWetStageViewModel.SelectableFilteringModes);
+        Assert.DoesNotContain(WetInWetMode.Disabled, WetInWetStageViewModel.SelectableFilteringModes);
+
+        var vm = new WetInWetStageViewModel();
+        Assert.True(vm.IsWetInWetActive);
+
+        // Toggling EnableWetInWet off preserves the selected filtering mode.
+        vm.Mode = WetInWetMode.ExcludeSalientBoundaries;
+        vm.EnableWetInWet = false;
+        Assert.False(vm.IsWetInWetActive);
+        Assert.Equal(WetInWetMode.ExcludeSalientBoundaries, vm.Mode);
+
+        // Legacy preset with WetInWetMode.Disabled remains round-trippable.
+        WetInWetOptions disabledOpts = WatercolorOptions.Default.WetInWet with { Mode = WetInWetMode.Disabled };
+        vm.LoadFrom(enableWetInWet: true, disabledOpts);
+        Assert.Equal(WetInWetMode.Disabled, vm.Mode);
+        Assert.False(vm.IsWetInWetActive);
+        Assert.Equal(WetInWetMode.Disabled, vm.ToOptions().Mode);
+
+        // Turning EnableWetInWet on when Mode was Disabled restores a usable filtering mode.
+        vm.LoadFrom(enableWetInWet: false, disabledOpts);
+        vm.EnableWetInWet = true;
+        Assert.True(vm.EnableWetInWet);
+        Assert.NotEqual(WetInWetMode.Disabled, vm.Mode);
+        Assert.True(vm.IsWetInWetActive);
+    }
 }

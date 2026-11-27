@@ -4,6 +4,7 @@
         <ResourceDictionary>
             <ResourceDictionary.ThemeDictionaries>
                 <ResourceDictionary x:Key="Dark">
+                    <!-- Core Studio Chrome -->
                     <SolidColorBrush x:Key="StudioCanvasBrush" Color="#11151C" />
                     <SolidColorBrush x:Key="StudioPanelBrush" Color="#161B24" />
                     <SolidColorBrush x:Key="StudioCardBrush" Color="#1C222E" />
@@ -20,8 +21,115 @@
                     <SolidColorBrush x:Key="StudioHoverBrush" Color="#242C3C" />
                     <SolidColorBrush x:Key="StudioSelectedBrush" Color="#1D3456" />
                     <SolidColorBrush x:Key="StudioDangerBrush" Color="#EF4444" />
+
+                    <!-- Viewport & Floating HUD -->
+                    <SolidColorBrush x:Key="StudioViewportMatBrush" Color="#14161B" />
+                    <SolidColorBrush x:Key="StudioViewportImageFrameBrush" Color="#1B1F27" />
+                    <SolidColorBrush x:Key="StudioViewportImageBorderBrush" Color="#33FFFFFF" />
+                    <SolidColorBrush x:Key="StudioViewportDividerBrush" Color="#2D3442" />
+                    <SolidColorBrush x:Key="StudioViewportPixelGridBrush" Color="#1EFFFFFF" />
+                    <SolidColorBrush x:Key="StudioHudBgBrush" Color="#DC1A1D24" />
+                    <SolidColorBrush x:Key="StudioHudBorderBrush" Color="#2CFFFFFF" />
+                    <SolidColorBrush x:Key="StudioHudForegroundBrush" Color="#E5E7EB" />
+                    <SolidColorBrush x:Key="StudioHudMutedBrush" Color="#94A3B8" />
+                    <SolidColorBrush x:Key="StudioHoverHudBgBrush" Color="#28FFFFFF" />
+                    <SolidColorBrush x:Key="StudioHoverHudPressedBrush" Color="#38FFFFFF" />
+                    <SolidColorBrush x:Key="StudioPaneBadgeBgBrush" Color="#CC15181F" />
+                    <SolidColorBrush x:Key="StudioPaneBadgeBorderBrush" Color="#30FFFFFF" />
+                    <SolidColorBrush x:Key="StudioWipeLineBrush" Color="#D9FFFFFF" />
+                    <SolidColorBrush x:Key="StudioWipeHandleBgBrush" Color="#EC1B1F27" />
+                    <SolidColorBrush x:Key="StudioWipeHandleBorderBrush" Color="#CCFFFFFF" />
+                    <SolidColorBrush x:Key="StudioEmptyCardBrush" Color="#EE1B1F27" />
+                    <SolidColorBrush x:Key="StudioEmptyCardBorderBrush" Color="#33FFFFFF" />
+                    <SolidColorBrush x:Key="StudioDropOverlayBgBrush" Color="#331D4ED8" />
+                    <SolidColorBrush x:Key="StudioDropOverlayBorderBrush" Color="#93C5FD" />
+                    <SolidColorBrush x:Key="StudioDropPillBgBrush" Color="#EC15181F" />
+                    <SolidColorBrush x:Key="StudioReseedChipBgBrush" Color="#1E293B" />
+                    <SolidColorBrush x:Key="StudioReseedChipFgBrush" Color="#93C5FD" />
+                    <SolidColorBrush x:Key="StudioReseedChipBorderBrush" Color="#4060A5FA" />
+                    <SolidColorBrush x:Key="StudioReseedChipHoverBgBrush" Color="#263B59" />
+
+                    <!-- Pipeline Filmstrip & Sub-Stages -->
+                    <SolidColorBrush x:Key="StudioFilmstripBgBrush" Color="#131720" />
+                    <SolidColorBrush x:Key="StudioFilmstripBorderBrush" Color="#252C3A" />
+                    <SolidColorBrush x:Key="StudioFilmstripCardBrush" Color="#1A202B" />
+                    <SolidColorBrush x:Key="StudioFilmstripCardBorderBrush" Color="#2D3648" />
+                    <SolidColorBrush x:Key="StudioFilmstripCardHoverBrush" Color="#202836" />
+                    <SolidColorBrush x:Key="StudioFilmstripCardHoverBorderBrush" Color="#475569" />
+                    <SolidColorBrush x:Key="StudioFilmstripCardBypassedBrush" Color="#151922" />
+                    <SolidColorBrush x:Key="StudioFilmstripCardBypassedBorderBrush" Color="#262D3B" />
+                    <SolidColorBrush x:Key="StudioFilmstripCardRunningBrush" Color="#19283B" />
+                    <SolidColorBrush x:Key="StudioFilmstripCardSelectedBrush" Color="#1D2E46" />
+                    <SolidColorBrush x:Key="StudioFilmstripThumbBgBrush" Color="#0D1118" />
+                    <SolidColorBrush x:Key="StudioFilmstripThumbBorderBrush" Color="#232B3A" />
+                    <SolidColorBrush x:Key="StudioSubStageBarBgBrush" Color="#181E29" />
+                    <SolidColorBrush x:Key="StudioSubStageBarBorderBrush" Color="#293244" />
+                    <SolidColorBrush x:Key="StudioPillBgBrush" Color="#212836" />
+                    <SolidColorBrush x:Key="StudioPillBorderBrush" Color="#313B4F" />
+                    <SolidColorBrush x:Key="StudioPillHoverBrush" Color="#2A3345" />
+                    <SolidColorBrush x:Key="StudioPillHoverBorderBrush" Color="#4B5B78" />
+                    <SolidColorBrush x:Key="StudioPillActiveBgBrush" Color="#1E3A5F" />
+                    <SolidColorBrush x:Key="StudioPillActiveBorderBrush" Color="#38BDF8" />
+                    <SolidColorBrush x:Key="StudioPillActiveHoverBgBrush" Color="#244672" />
+                    <SolidColorBrush x:Key="StudioPillTimingBgBrush" Color="#151B25" />
+                    <SolidColorBrush x:Key="StudioConnectorBrush" Color="#475569" />
+                    <SolidColorBrush x:Key="StudioPinHoverBgBrush" Color="#2A3447" />
+                    <SolidColorBrush x:Key="StudioPinPinnedBgBrush" Color="#3B2F13" />
+                    <SolidColorBrush x:Key="StudioPinPinnedFgBrush" Color="#FBBF24" />
+
+                    <!-- Stage Status Badges -->
+                    <SolidColorBrush x:Key="StudioStatusRunningBgBrush" Color="#0C4A6E" />
+                    <SolidColorBrush x:Key="StudioStatusRunningFgBrush" Color="#7DD3FC" />
+                    <SolidColorBrush x:Key="StudioStatusRunningBorderBrush" Color="#0284C7" />
+                    <SolidColorBrush x:Key="StudioStatusCachedBgBrush" Color="#064E3B" />
+                    <SolidColorBrush x:Key="StudioStatusCachedFgBrush" Color="#6EE7B7" />
+                    <SolidColorBrush x:Key="StudioStatusCachedBorderBrush" Color="#047857" />
+                    <SolidColorBrush x:Key="StudioStatusStaleBgBrush" Color="#451A03" />
+                    <SolidColorBrush x:Key="StudioStatusStaleFgBrush" Color="#FCD34D" />
+                    <SolidColorBrush x:Key="StudioStatusStaleBorderBrush" Color="#B45309" />
+                    <SolidColorBrush x:Key="StudioStatusBypassedBgBrush" Color="#272C36" />
+                    <SolidColorBrush x:Key="StudioStatusBypassedFgBrush" Color="#9CA3AF" />
+
+                    <!-- 4x2 Stage Grid -->
+                    <SolidColorBrush x:Key="StudioGridBgBrush" Color="#11151C" />
+                    <SolidColorBrush x:Key="StudioGridHeaderBgBrush" Color="#161B24" />
+                    <SolidColorBrush x:Key="StudioGridHeaderBorderBrush" Color="#252C38" />
+                    <SolidColorBrush x:Key="StudioGridTileBgBrush" Color="#171C26" />
+                    <SolidColorBrush x:Key="StudioGridTileHeaderBgBrush" Color="#1C222E" />
+                    <SolidColorBrush x:Key="StudioGridTileBorderBrush" Color="#2A3242" />
+                    <SolidColorBrush x:Key="StudioGridTileViewportBgBrush" Color="#0D1016" />
+
+                    <!-- Custom Controls (Noise, Tone Curve, Slider) -->
+                    <SolidColorBrush x:Key="StudioNoiseCardBgBrush" Color="#141820" />
+                    <SolidColorBrush x:Key="StudioNoiseCardBorderBrush" Color="#334155" />
+                    <SolidColorBrush x:Key="StudioCurveCanvasBgBrush" Color="#181C24" />
+                    <SolidColorBrush x:Key="StudioCurveCanvasBorderBrush" Color="#2D3545" />
+                    <SolidColorBrush x:Key="StudioCurveGridBrush" Color="#252C3A" />
+                    <SolidColorBrush x:Key="StudioCurveGridMajorBrush" Color="#333C4F" />
+                    <SolidColorBrush x:Key="StudioCurveAxisBrush" Color="#94A3B8" />
+                    <SolidColorBrush x:Key="StudioCurveIdentityBrush" Color="#4B5568" />
+                    <SolidColorBrush x:Key="StudioCurveZoneBrush" Color="#64748B" />
+                    <SolidColorBrush x:Key="StudioCurveShadowTintBrush" Color="#186366F1" />
+                    <SolidColorBrush x:Key="StudioCurveHighlightTintBrush" Color="#18F59E0B" />
+                    <SolidColorBrush x:Key="StudioCurveHistogramBrush" Color="#3094A3B8" />
+                    <SolidColorBrush x:Key="StudioCurveHistogramStrokeBrush" Color="#5594A3B8" />
+                    <SolidColorBrush x:Key="StudioCurveAreaBrush" Color="#2438BDF8" />
+                    <SolidColorBrush x:Key="StudioCurveLineBrush" Color="#38BDF8" />
+                    <SolidColorBrush x:Key="StudioCurveMutedLineBrush" Color="#64748B" />
+                    <SolidColorBrush x:Key="StudioCurveHandleFillBrush" Color="#F8FAFC" />
+                    <SolidColorBrush x:Key="StudioCurveHandleStrokeBrush" Color="#38BDF8" />
+                    <SolidColorBrush x:Key="StudioCurveKneeStrokeBrush" Color="#F59E0B" />
+                    <SolidColorBrush x:Key="StudioCurveHandleHaloBrush" Color="#4438BDF8" />
+                    <SolidColorBrush x:Key="StudioCurveKneeHaloBrush" Color="#44F59E0B" />
+                    <SolidColorBrush x:Key="StudioCurveBadgeBgBrush" Color="#E60F172A" />
+                    <SolidColorBrush x:Key="StudioCurveBadgeBorderBrush" Color="#475569" />
+                    <SolidColorBrush x:Key="StudioCurveBadgeFgBrush" Color="#F1F5F9" />
+                    <SolidColorBrush x:Key="StudioSliderBaselineTickBrush" Color="#94A3B8" />
+                    <SolidColorBrush x:Key="StudioModifiedDotBrush" Color="#38BDF8" />
                 </ResourceDictionary>
+
                 <ResourceDictionary x:Key="Light">
+                    <!-- Core Studio Chrome -->
                     <SolidColorBrush x:Key="StudioCanvasBrush" Color="#E6EBF2" />
                     <SolidColorBrush x:Key="StudioPanelBrush" Color="#F5F7FA" />
                     <SolidColorBrush x:Key="StudioCardBrush" Color="#FFFFFF" />
@@ -38,6 +146,111 @@
                     <SolidColorBrush x:Key="StudioHoverBrush" Color="#E2E8F0" />
                     <SolidColorBrush x:Key="StudioSelectedBrush" Color="#DBEAFE" />
                     <SolidColorBrush x:Key="StudioDangerBrush" Color="#DC2626" />
+
+                    <!-- Viewport & Floating HUD -->
+                    <SolidColorBrush x:Key="StudioViewportMatBrush" Color="#DCE2EA" />
+                    <SolidColorBrush x:Key="StudioViewportImageFrameBrush" Color="#F8FAFC" />
+                    <SolidColorBrush x:Key="StudioViewportImageBorderBrush" Color="#330F172A" />
+                    <SolidColorBrush x:Key="StudioViewportDividerBrush" Color="#CBD5E1" />
+                    <SolidColorBrush x:Key="StudioViewportPixelGridBrush" Color="#1E0F172A" />
+                    <SolidColorBrush x:Key="StudioHudBgBrush" Color="#E6FFFFFF" />
+                    <SolidColorBrush x:Key="StudioHudBorderBrush" Color="#CBD5E1" />
+                    <SolidColorBrush x:Key="StudioHudForegroundBrush" Color="#0F172A" />
+                    <SolidColorBrush x:Key="StudioHudMutedBrush" Color="#475569" />
+                    <SolidColorBrush x:Key="StudioHoverHudBgBrush" Color="#E2E8F0" />
+                    <SolidColorBrush x:Key="StudioHoverHudPressedBrush" Color="#CBD5E1" />
+                    <SolidColorBrush x:Key="StudioPaneBadgeBgBrush" Color="#E6F8FAFC" />
+                    <SolidColorBrush x:Key="StudioPaneBadgeBorderBrush" Color="#CBD5E1" />
+                    <SolidColorBrush x:Key="StudioWipeLineBrush" Color="#CC0F172A" />
+                    <SolidColorBrush x:Key="StudioWipeHandleBgBrush" Color="#F2FFFFFF" />
+                    <SolidColorBrush x:Key="StudioWipeHandleBorderBrush" Color="#475569" />
+                    <SolidColorBrush x:Key="StudioEmptyCardBrush" Color="#F5FFFFFF" />
+                    <SolidColorBrush x:Key="StudioEmptyCardBorderBrush" Color="#CBD5E1" />
+                    <SolidColorBrush x:Key="StudioDropOverlayBgBrush" Color="#262563EB" />
+                    <SolidColorBrush x:Key="StudioDropOverlayBorderBrush" Color="#2563EB" />
+                    <SolidColorBrush x:Key="StudioDropPillBgBrush" Color="#F5FFFFFF" />
+                    <SolidColorBrush x:Key="StudioReseedChipBgBrush" Color="#EFF6FF" />
+                    <SolidColorBrush x:Key="StudioReseedChipFgBrush" Color="#1D4ED8" />
+                    <SolidColorBrush x:Key="StudioReseedChipBorderBrush" Color="#93C5FD" />
+                    <SolidColorBrush x:Key="StudioReseedChipHoverBgBrush" Color="#DBEAFE" />
+
+                    <!-- Pipeline Filmstrip & Sub-Stages -->
+                    <SolidColorBrush x:Key="StudioFilmstripBgBrush" Color="#EEF2F7" />
+                    <SolidColorBrush x:Key="StudioFilmstripBorderBrush" Color="#CBD5E1" />
+                    <SolidColorBrush x:Key="StudioFilmstripCardBrush" Color="#FFFFFF" />
+                    <SolidColorBrush x:Key="StudioFilmstripCardBorderBrush" Color="#CBD5E1" />
+                    <SolidColorBrush x:Key="StudioFilmstripCardHoverBrush" Color="#F8FAFC" />
+                    <SolidColorBrush x:Key="StudioFilmstripCardHoverBorderBrush" Color="#94A3B8" />
+                    <SolidColorBrush x:Key="StudioFilmstripCardBypassedBrush" Color="#F1F5F9" />
+                    <SolidColorBrush x:Key="StudioFilmstripCardBypassedBorderBrush" Color="#CBD5E1" />
+                    <SolidColorBrush x:Key="StudioFilmstripCardRunningBrush" Color="#E0F2FE" />
+                    <SolidColorBrush x:Key="StudioFilmstripCardSelectedBrush" Color="#EFF6FF" />
+                    <SolidColorBrush x:Key="StudioFilmstripThumbBgBrush" Color="#E2E8F0" />
+                    <SolidColorBrush x:Key="StudioFilmstripThumbBorderBrush" Color="#CBD5E1" />
+                    <SolidColorBrush x:Key="StudioSubStageBarBgBrush" Color="#F8FAFC" />
+                    <SolidColorBrush x:Key="StudioSubStageBarBorderBrush" Color="#CBD5E1" />
+                    <SolidColorBrush x:Key="StudioPillBgBrush" Color="#FFFFFF" />
+                    <SolidColorBrush x:Key="StudioPillBorderBrush" Color="#CBD5E1" />
+                    <SolidColorBrush x:Key="StudioPillHoverBrush" Color="#E2E8F0" />
+                    <SolidColorBrush x:Key="StudioPillHoverBorderBrush" Color="#94A3B8" />
+                    <SolidColorBrush x:Key="StudioPillActiveBgBrush" Color="#DBEAFE" />
+                    <SolidColorBrush x:Key="StudioPillActiveBorderBrush" Color="#2563EB" />
+                    <SolidColorBrush x:Key="StudioPillActiveHoverBgBrush" Color="#BFDBFE" />
+                    <SolidColorBrush x:Key="StudioPillTimingBgBrush" Color="#E2E8F0" />
+                    <SolidColorBrush x:Key="StudioConnectorBrush" Color="#94A3B8" />
+                    <SolidColorBrush x:Key="StudioPinHoverBgBrush" Color="#E2E8F0" />
+                    <SolidColorBrush x:Key="StudioPinPinnedBgBrush" Color="#FEF3C7" />
+                    <SolidColorBrush x:Key="StudioPinPinnedFgBrush" Color="#D97706" />
+
+                    <!-- Stage Status Badges -->
+                    <SolidColorBrush x:Key="StudioStatusRunningBgBrush" Color="#E0F2FE" />
+                    <SolidColorBrush x:Key="StudioStatusRunningFgBrush" Color="#0369A1" />
+                    <SolidColorBrush x:Key="StudioStatusRunningBorderBrush" Color="#0284C7" />
+                    <SolidColorBrush x:Key="StudioStatusCachedBgBrush" Color="#D1FAE5" />
+                    <SolidColorBrush x:Key="StudioStatusCachedFgBrush" Color="#047857" />
+                    <SolidColorBrush x:Key="StudioStatusCachedBorderBrush" Color="#059669" />
+                    <SolidColorBrush x:Key="StudioStatusStaleBgBrush" Color="#FEF3C7" />
+                    <SolidColorBrush x:Key="StudioStatusStaleFgBrush" Color="#B45309" />
+                    <SolidColorBrush x:Key="StudioStatusStaleBorderBrush" Color="#D97706" />
+                    <SolidColorBrush x:Key="StudioStatusBypassedBgBrush" Color="#E2E8F0" />
+                    <SolidColorBrush x:Key="StudioStatusBypassedFgBrush" Color="#475569" />
+
+                    <!-- 4x2 Stage Grid -->
+                    <SolidColorBrush x:Key="StudioGridBgBrush" Color="#E6EBF2" />
+                    <SolidColorBrush x:Key="StudioGridHeaderBgBrush" Color="#F5F7FA" />
+                    <SolidColorBrush x:Key="StudioGridHeaderBorderBrush" Color="#CBD5E1" />
+                    <SolidColorBrush x:Key="StudioGridTileBgBrush" Color="#FFFFFF" />
+                    <SolidColorBrush x:Key="StudioGridTileHeaderBgBrush" Color="#F8FAFC" />
+                    <SolidColorBrush x:Key="StudioGridTileBorderBrush" Color="#CBD5E1" />
+                    <SolidColorBrush x:Key="StudioGridTileViewportBgBrush" Color="#DCE2EA" />
+
+                    <!-- Custom Controls (Noise, Tone Curve, Slider) -->
+                    <SolidColorBrush x:Key="StudioNoiseCardBgBrush" Color="#F8FAFC" />
+                    <SolidColorBrush x:Key="StudioNoiseCardBorderBrush" Color="#CBD5E1" />
+                    <SolidColorBrush x:Key="StudioCurveCanvasBgBrush" Color="#FFFFFF" />
+                    <SolidColorBrush x:Key="StudioCurveCanvasBorderBrush" Color="#CBD5E1" />
+                    <SolidColorBrush x:Key="StudioCurveGridBrush" Color="#E2E8F0" />
+                    <SolidColorBrush x:Key="StudioCurveGridMajorBrush" Color="#CBD5E1" />
+                    <SolidColorBrush x:Key="StudioCurveAxisBrush" Color="#64748B" />
+                    <SolidColorBrush x:Key="StudioCurveIdentityBrush" Color="#94A3B8" />
+                    <SolidColorBrush x:Key="StudioCurveZoneBrush" Color="#94A3B8" />
+                    <SolidColorBrush x:Key="StudioCurveShadowTintBrush" Color="#146366F1" />
+                    <SolidColorBrush x:Key="StudioCurveHighlightTintBrush" Color="#18F59E0B" />
+                    <SolidColorBrush x:Key="StudioCurveHistogramBrush" Color="#2864748B" />
+                    <SolidColorBrush x:Key="StudioCurveHistogramStrokeBrush" Color="#4864748B" />
+                    <SolidColorBrush x:Key="StudioCurveAreaBrush" Color="#1F2563EB" />
+                    <SolidColorBrush x:Key="StudioCurveLineBrush" Color="#2563EB" />
+                    <SolidColorBrush x:Key="StudioCurveMutedLineBrush" Color="#94A3B8" />
+                    <SolidColorBrush x:Key="StudioCurveHandleFillBrush" Color="#FFFFFF" />
+                    <SolidColorBrush x:Key="StudioCurveHandleStrokeBrush" Color="#2563EB" />
+                    <SolidColorBrush x:Key="StudioCurveKneeStrokeBrush" Color="#D97706" />
+                    <SolidColorBrush x:Key="StudioCurveHandleHaloBrush" Color="#362563EB" />
+                    <SolidColorBrush x:Key="StudioCurveKneeHaloBrush" Color="#36D97706" />
+                    <SolidColorBrush x:Key="StudioCurveBadgeBgBrush" Color="#F2FFFFFF" />
+                    <SolidColorBrush x:Key="StudioCurveBadgeBorderBrush" Color="#94A3B8" />
+                    <SolidColorBrush x:Key="StudioCurveBadgeFgBrush" Color="#0F172A" />
+                    <SolidColorBrush x:Key="StudioSliderBaselineTickBrush" Color="#64748B" />
+                    <SolidColorBrush x:Key="StudioModifiedDotBrush" Color="#2563EB" />
                 </ResourceDictionary>
             </ResourceDictionary.ThemeDictionaries>
         </ResourceDictionary>
@@ -120,6 +333,71 @@
         <Setter Property="BorderBrush" Value="{DynamicResource StudioMutedBrush}" />
     </Style>
     <Style Selector="Button.studio-btn:disabled">
+        <Setter Property="Opacity" Value="0.45" />
+    </Style>
+
+    <Style Selector="Button.studio-icon-btn">
+        <Setter Property="Background" Value="{DynamicResource StudioCardBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource StudioForegroundBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource StudioBorderBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="6" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="Width" Value="28" />
+        <Setter Property="Height" Value="28" />
+        <Setter Property="MinHeight" Value="28" />
+        <Setter Property="HorizontalContentAlignment" Value="Center" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="Cursor" Value="Hand" />
+    </Style>
+    <Style Selector="Button.studio-icon-btn:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource StudioHoverBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource StudioMutedBrush}" />
+    </Style>
+    <Style Selector="Button.studio-icon-btn:disabled">
+        <Setter Property="Opacity" Value="0.4" />
+    </Style>
+
+    <Style Selector="Button.studio-run-subtle">
+        <Setter Property="Background" Value="{DynamicResource StudioCardBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource StudioSecondaryForegroundBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource StudioBorderBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="6" />
+        <Setter Property="Padding" Value="10,5" />
+        <Setter Property="MinHeight" Value="28" />
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="FontWeight" Value="Medium" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="Cursor" Value="Hand" />
+    </Style>
+    <Style Selector="Button.studio-run-subtle:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource StudioHoverBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource StudioMutedBrush}" />
+    </Style>
+    <Style Selector="Button.studio-run-subtle:disabled">
+        <Setter Property="Opacity" Value="0.45" />
+    </Style>
+
+    <Style Selector="Button.studio-chip">
+        <Setter Property="Background" Value="{DynamicResource StudioSurfaceAltBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource StudioSecondaryForegroundBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource StudioBorderBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="12" />
+        <Setter Property="Padding" Value="8,3" />
+        <Setter Property="MinHeight" Value="22" />
+        <Setter Property="FontSize" Value="11" />
+        <Setter Property="FontWeight" Value="Medium" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="Cursor" Value="Hand" />
+    </Style>
+    <Style Selector="Button.studio-chip:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource StudioHoverBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource StudioAccentBrush}" />
+        <Setter Property="TextElement.Foreground" Value="{DynamicResource StudioForegroundBrush}" />
+    </Style>
+    <Style Selector="Button.studio-chip:disabled">
         <Setter Property="Opacity" Value="0.45" />
     </Style>
 

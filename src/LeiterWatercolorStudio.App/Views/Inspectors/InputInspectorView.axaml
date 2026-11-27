@@ -1,14 +1,15 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:local="using:LeiterWatercolorStudio.App.Views.Inspectors"
+             xmlns:vm="using:LeiterWatercolorStudio.App.ViewModels"
              x:Class="LeiterWatercolorStudio.App.Views.Inspectors.InputInspectorView"
              x:Name="Root"
              x:DataType="local:InputInspectorView">
 
     <UserControl.Styles>
         <Style Selector="Border.inspector-card">
-            <Setter Property="Background" Value="#1264748B" />
-            <Setter Property="BorderBrush" Value="#3064748B" />
+            <Setter Property="Background" Value="{DynamicResource StudioCardBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource StudioBorderBrush}" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="CornerRadius" Value="6" />
             <Setter Property="Padding" Value="10,9" />
@@ -31,17 +32,6 @@
     <ScrollViewer VerticalScrollBarVisibility="Auto"
                   HorizontalScrollBarVisibility="Disabled">
         <StackPanel Spacing="12" Margin="12">
-            <!-- Stage Header -->
-            <StackPanel Spacing="2">
-                <TextBlock Text="Input &amp; Summary"
-                           FontSize="14"
-                           FontWeight="SemiBold" />
-                <TextBlock Text="Source image metadata, active baseline, and output actions"
-                           FontSize="11.5"
-                           Opacity="0.68"
-                           TextWrapping="Wrap" />
-            </StackPanel>
-
             <!-- Empty State Hint -->
             <Border Classes="inspector-card"
                     IsVisible="{Binding !#Root.HasImage}">
@@ -110,11 +100,70 @@
                 </StackPanel>
             </Border>
 
+            <!-- Artist Look Shortcuts -->
+            <Border Classes="studio-card"
+                    x:DataType="vm:MainWindowViewModel">
+                <StackPanel Spacing="7">
+                    <StackPanel Spacing="2">
+                        <TextBlock Classes="section-title" Text="ARTIST LOOK SHORTCUTS" />
+                        <TextBlock Text="Jump straight to the stage controls behind common artistic goals."
+                                   FontSize="11"
+                                   Opacity="0.68"
+                                   TextWrapping="Wrap" />
+                    </StackPanel>
+
+                    <WrapPanel Orientation="Horizontal">
+                        <Button Classes="studio-chip"
+                                Margin="0,0,5,5"
+                                Content="Looser Wash"
+                                Command="{Binding ApplyLookShortcutCommand}"
+                                CommandParameter="looser-wash"
+                                ToolTip.Tip="Stage 5 (LOD Abstraction): broaden non-salient washes and distance smoothing" />
+
+                        <Button Classes="studio-chip"
+                                Margin="0,0,5,5"
+                                Content="Paper Tooth"
+                                Command="{Binding ApplyLookShortcutCommand}"
+                                CommandParameter="paper-tooth"
+                                ToolTip.Tip="Stage 8 (Finishing → Paper Granulation): tune pigment settling and fiber micro-warp" />
+
+                        <Button Classes="studio-chip"
+                                Margin="0,0,5,5"
+                                Content="Crisper Edges"
+                                Command="{Binding ApplyLookShortcutCommand}"
+                                CommandParameter="crisper-edges"
+                                ToolTip.Tip="Stage 8 (Finishing → Edge Darkening): sharpen dried pigment rims along wash borders" />
+
+                        <Button Classes="studio-chip"
+                                Margin="0,0,5,5"
+                                Content="Richer Color"
+                                Command="{Binding ApplyLookShortcutCommand}"
+                                CommandParameter="richer-color"
+                                ToolTip.Tip="Stage 2 (Color Transfer): choose a watercolor palette or boost transfer strength" />
+
+                        <Button Classes="studio-chip"
+                                Margin="0,0,5,5"
+                                Content="Focus Subject"
+                                Command="{Binding ApplyLookShortcutCommand}"
+                                CommandParameter="focus-subject"
+                                ToolTip.Tip="Stage 3 (Saliency): refine RC saliency map, SaliencyCut mask, and distance falloff" />
+
+                        <Button Classes="studio-chip"
+                                Margin="0,0,5,5"
+                                Content="Paper Gaps"
+                                Command="{Binding ApplyLookShortcutCommand}"
+                                CommandParameter="paper-gaps"
+                                ToolTip.Tip="Stage 7 (Hand Tremor): adjust edge wobble, paper gap bias, and paper color" />
+                    </WrapPanel>
+                </StackPanel>
+            </Border>
+
             <!-- Quick Actions -->
             <StackPanel Spacing="6">
                 <TextBlock Classes="section-title" Text="QUICK ACTIONS" />
 
                 <Button x:Name="PART_OpenImageButton"
+                        Classes="studio-btn"
                         Content="Open Image..."
                         HorizontalAlignment="Stretch"
                         HorizontalContentAlignment="Center"
@@ -123,6 +172,7 @@
 
                 <StackPanel Spacing="6" IsEnabled="{Binding #Root.HasImage}">
                     <Button x:Name="PART_RenderFullResButton"
+                            Classes="studio-btn"
                             Content="Render Full Resolution"
                             HorizontalAlignment="Stretch"
                             HorizontalContentAlignment="Center"
@@ -130,6 +180,7 @@
                             Command="{Binding #Root.RenderFullResCommand}" />
 
                     <Button x:Name="PART_ExportFinalButton"
+                            Classes="studio-btn"
                             Content="Export Final Image..."
                             HorizontalAlignment="Stretch"
                             HorizontalContentAlignment="Center"

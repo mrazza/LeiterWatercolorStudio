@@ -76,7 +76,7 @@ public sealed class PipelineParametersViewModel : ObservableObject
         UndoRedo.PropertyChanged += OnUndoRedoPropertyChanged;
 
         ApplyAllStages(initialBaseline, paletteModeHint: null);
-        SyncPerlinBaselines(initialBaseline);
+        SyncAllBaselines(initialBaseline, paletteModeHint: null);
         UndoRedo.Reset(BuildOptions());
     }
 
@@ -239,34 +239,25 @@ public sealed class PipelineParametersViewModel : ObservableObject
             switch (stageId)
             {
                 case PrimaryStageId.ColorTransfer:
-                    ColorTransfer.LoadFrom(
-                        _baselineOptions.EnableColorTransfer,
-                        _baselineOptions.TargetPalette,
-                        _baselineOptions.ColorTransferStrength,
-                        _baselinePaletteModeHint);
+                    ColorTransfer.ResetToBaseline();
                     break;
                 case PrimaryStageId.Saliency:
-                    Saliency.LoadFrom(
-                        _baselineOptions.EgbiBlurSigma,
-                        _baselineOptions.Egbi,
-                        _baselineOptions.RegionalContrastSaliency,
-                        _baselineOptions.SaliencyCut,
-                        _baselineOptions.SaliencyDistanceField);
+                    Saliency.ResetToBaseline();
                     break;
                 case PrimaryStageId.Segmentation:
-                    Segmentation.LoadFrom(_baselineOptions.MeanShift);
+                    Segmentation.ResetToBaseline();
                     break;
                 case PrimaryStageId.LodAbstraction:
-                    LodAbstraction.LoadFrom(_baselineOptions.EnableLodAbstraction, _baselineOptions.LodAbstraction);
+                    LodAbstraction.ResetToBaseline();
                     break;
                 case PrimaryStageId.WetInWet:
-                    WetInWet.LoadFrom(_baselineOptions.EnableWetInWet, _baselineOptions.WetInWet);
+                    WetInWet.ResetToBaseline();
                     break;
                 case PrimaryStageId.HandTremor:
-                    HandTremor.LoadFrom(_baselineOptions.EnableHandTremor, _baselineOptions.HandTremor);
+                    HandTremor.ResetToBaseline();
                     break;
                 case PrimaryStageId.Finishing:
-                    LoadFinishingFrom(_baselineOptions);
+                    Finishing.ResetToBaseline();
                     break;
                 default:
                     throw new ArgumentOutOfRangeException(nameof(stageId), stageId, "Unsupported PrimaryStageId value.");
@@ -346,7 +337,7 @@ public sealed class PipelineParametersViewModel : ObservableObject
         ActiveBaselineMode = mode;
         BaselineOptions = baselineOptions;
         _baselinePaletteModeHint = paletteModeHint;
-        SyncPerlinBaselines(baselineOptions);
+        SyncAllBaselines(baselineOptions, paletteModeHint);
     }
 
     /// <summary>
@@ -440,12 +431,34 @@ public sealed class PipelineParametersViewModel : ObservableObject
             options.Fxaa);
     }
 
-    private void SyncPerlinBaselines(WatercolorOptions baseline)
+    private void SyncAllBaselines(WatercolorOptions baseline, PaletteMode? paletteModeHint)
     {
-        HandTremor.PrimaryNoise.SetBaseline(baseline.HandTremor.PrimaryNoise);
-        HandTremor.SecondaryNoise.SetBaseline(baseline.HandTremor.SecondaryNoise);
-        Finishing.TurbulenceNoise.SetBaseline(baseline.TurbulenceFlow.Noise);
-        Finishing.GrainNoise.SetBaseline(baseline.PaperGranulation.GrainNoise);
+        ColorTransfer.SetBaseline(
+            baseline.EnableColorTransfer,
+            baseline.TargetPalette,
+            baseline.ColorTransferStrength,
+            paletteModeHint);
+        Saliency.SetBaseline(
+            baseline.EgbiBlurSigma,
+            baseline.Egbi,
+            baseline.RegionalContrastSaliency,
+            baseline.SaliencyCut,
+            baseline.SaliencyDistanceField);
+        Segmentation.SetBaseline(baseline.MeanShift);
+        LodAbstraction.SetBaseline(baseline.EnableLodAbstraction, baseline.LodAbstraction);
+        WetInWet.SetBaseline(baseline.EnableWetInWet, baseline.WetInWet);
+        HandTremor.SetBaseline(baseline.EnableHandTremor, baseline.HandTremor);
+        Finishing.SetBaseline(
+            baseline.EnableEdgeDarkening,
+            baseline.EdgeDarkening,
+            baseline.EnableTurbulenceFlow,
+            baseline.TurbulenceFlow,
+            baseline.EnableToneCurve,
+            baseline.ToneCurve,
+            baseline.EnablePaperGranulation,
+            baseline.PaperGranulation,
+            baseline.EnableFxaa,
+            baseline.Fxaa);
     }
 
     private void OnStageParameterChanged(bool isImmediate)

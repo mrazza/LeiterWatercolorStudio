@@ -6,19 +6,19 @@
              DragDrop.AllowDrop="True"
              Focusable="True"
              ClipToBounds="True"
-             Background="#14161B">
+             Background="{DynamicResource StudioViewportMatBrush}">
     <UserControl.Styles>
         <Style Selector="Border.hud-pill">
-            <Setter Property="Background" Value="#DC1A1D24" />
-            <Setter Property="BorderBrush" Value="#2CFFFFFF" />
+            <Setter Property="Background" Value="{DynamicResource StudioHudBgBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource StudioHudBorderBrush}" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="CornerRadius" Value="10" />
             <Setter Property="Padding" Value="5,4" />
         </Style>
 
         <Style Selector="Border.pane-badge">
-            <Setter Property="Background" Value="#CC15181F" />
-            <Setter Property="BorderBrush" Value="#30FFFFFF" />
+            <Setter Property="Background" Value="{DynamicResource StudioPaneBadgeBgBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource StudioPaneBadgeBorderBrush}" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="CornerRadius" Value="6" />
             <Setter Property="Padding" Value="8,3" />
@@ -26,7 +26,7 @@
 
         <Style Selector="Button.hud-btn">
             <Setter Property="Background" Value="Transparent" />
-            <Setter Property="Foreground" Value="#D4D8E1" />
+            <Setter Property="Foreground" Value="{DynamicResource StudioHudForegroundBrush}" />
             <Setter Property="BorderThickness" Value="0" />
             <Setter Property="CornerRadius" Value="6" />
             <Setter Property="Padding" Value="8,4" />
@@ -37,17 +37,17 @@
         </Style>
 
         <Style Selector="Button.hud-btn:pointerover /template/ ContentPresenter">
-            <Setter Property="Background" Value="#28FFFFFF" />
-            <Setter Property="Foreground" Value="#FFFFFF" />
+            <Setter Property="Background" Value="{DynamicResource StudioHoverHudBgBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource StudioHudForegroundBrush}" />
         </Style>
 
         <Style Selector="Button.hud-btn:pressed /template/ ContentPresenter">
-            <Setter Property="Background" Value="#38FFFFFF" />
+            <Setter Property="Background" Value="{DynamicResource StudioHoverHudPressedBrush}" />
         </Style>
 
         <Style Selector="Button.mode-chip">
             <Setter Property="Background" Value="Transparent" />
-            <Setter Property="Foreground" Value="#C4C9D4" />
+            <Setter Property="Foreground" Value="{DynamicResource StudioHudMutedBrush}" />
             <Setter Property="BorderThickness" Value="0" />
             <Setter Property="CornerRadius" Value="6" />
             <Setter Property="Padding" Value="9,4" />
@@ -58,25 +58,25 @@
         </Style>
 
         <Style Selector="Button.mode-chip:pointerover /template/ ContentPresenter">
-            <Setter Property="Background" Value="#22FFFFFF" />
-            <Setter Property="Foreground" Value="#FFFFFF" />
+            <Setter Property="Background" Value="{DynamicResource StudioHoverHudBgBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource StudioHudForegroundBrush}" />
         </Style>
 
         <Style Selector="Button.mode-chip.active">
-            <Setter Property="Background" Value="#2563EB" />
-            <Setter Property="Foreground" Value="#FFFFFF" />
+            <Setter Property="Background" Value="{DynamicResource StudioAccentBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource StudioAccentForegroundBrush}" />
             <Setter Property="FontWeight" Value="SemiBold" />
         </Style>
 
         <Style Selector="Button.mode-chip.active:pointerover /template/ ContentPresenter">
-            <Setter Property="Background" Value="#3B82F6" />
-            <Setter Property="Foreground" Value="#FFFFFF" />
+            <Setter Property="Background" Value="{DynamicResource StudioAccentHoverBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource StudioAccentForegroundBrush}" />
         </Style>
 
         <Style Selector="Button.reseed-chip">
-            <Setter Property="Background" Value="#1E293B" />
-            <Setter Property="Foreground" Value="#93C5FD" />
-            <Setter Property="BorderBrush" Value="#4060A5FA" />
+            <Setter Property="Background" Value="{DynamicResource StudioReseedChipBgBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource StudioReseedChipFgBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource StudioReseedChipBorderBrush}" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="CornerRadius" Value="6" />
             <Setter Property="Padding" Value="9,4" />
@@ -87,8 +87,8 @@
         </Style>
 
         <Style Selector="Button.reseed-chip:pointerover /template/ ContentPresenter">
-            <Setter Property="Background" Value="#263B59" />
-            <Setter Property="Foreground" Value="#DBEAFE" />
+            <Setter Property="Background" Value="{DynamicResource StudioReseedChipHoverBgBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource StudioReseedChipFgBrush}" />
         </Style>
     </UserControl.Styles>
 
@@ -102,20 +102,20 @@
                 IsVisible="False">
             <Border x:Name="PART_WipeLine"
                     Width="2"
-                    Background="#D9FFFFFF"
+                    Background="{DynamicResource StudioWipeLineBrush}"
                     IsHitTestVisible="False" />
             <Border x:Name="PART_WipeHandle"
                     Width="32"
                     Height="32"
                     CornerRadius="16"
-                    Background="#EC1B1F27"
-                    BorderBrush="#CCFFFFFF"
+                    Background="{DynamicResource StudioWipeHandleBgBrush}"
+                    BorderBrush="{DynamicResource StudioWipeHandleBorderBrush}"
                     BorderThickness="1.5"
                     Cursor="SizeWestEast">
                 <TextBlock Text="◄ ►"
                            FontSize="10"
                            FontWeight="Bold"
-                           Foreground="#F8FAFC"
+                           Foreground="{DynamicResource StudioHudForegroundBrush}"
                            HorizontalAlignment="Center"
                            VerticalAlignment="Center" />
             </Border>
@@ -125,7 +125,7 @@
         <Grid x:Name="PART_HudOverlay"
               Margin="12"
               RowDefinitions="Auto,*,Auto">
-            <!-- Row 0: Visualization Modes (Top-Left) + Zoom Controls (Top-Right) -->
+            <!-- Row 0: Visualization Modes (Top-Left, or Right Pane in Side-by-Side) + Zoom Controls (Top-Right) -->
             <Grid Grid.Row="0"
                   ColumnDefinitions="*,Auto">
                 <Border x:Name="PART_ModeBar"
@@ -141,7 +141,7 @@
                         <Border x:Name="PART_ReseedSeparator"
                                 Width="1"
                                 Margin="2,3"
-                                Background="#28FFFFFF"
+                                Background="{DynamicResource StudioHudBorderBrush}"
                                 IsVisible="False" />
                         <Button x:Name="PART_ReseedButton"
                                 Classes="reseed-chip"
@@ -162,27 +162,27 @@
                         <Button x:Name="PART_FitButton"
                                 Classes="hud-btn"
                                 Content="Fit"
-                                ToolTip.Tip="Fit image to viewport" />
+                                ToolTip.Tip="Fit image to viewport (Ctrl+0)" />
                         <Button x:Name="PART_OneToOneButton"
                                 Classes="hud-btn"
                                 Content="1:1"
-                                ToolTip.Tip="Zoom to 100% (1:1 pixels)" />
+                                ToolTip.Tip="Zoom to 100% / 1:1 pixels (Ctrl+1)" />
                         <Border Width="1"
                                 Margin="3,4"
-                                Background="#26FFFFFF" />
+                                Background="{DynamicResource StudioHudBorderBrush}" />
                         <Button x:Name="PART_ZoomOutButton"
                                 Classes="hud-btn"
                                 Content="−"
                                 Width="26"
                                 Padding="0"
                                 HorizontalContentAlignment="Center"
-                                ToolTip.Tip="Zoom out" />
+                                ToolTip.Tip="Zoom out (Ctrl+-)" />
                         <TextBlock x:Name="PART_ZoomText"
                                    Text="100%"
                                    MinWidth="46"
                                    FontSize="11"
                                    FontWeight="SemiBold"
-                                   Foreground="#E5E7EB"
+                                   Foreground="{DynamicResource StudioHudForegroundBrush}"
                                    TextAlignment="Center"
                                    VerticalAlignment="Center"
                                    HorizontalAlignment="Center" />
@@ -192,15 +192,27 @@
                                 Width="26"
                                 Padding="0"
                                 HorizontalContentAlignment="Center"
-                                ToolTip.Tip="Zoom in" />
+                                ToolTip.Tip="Zoom in (Ctrl++)" />
                     </StackPanel>
                 </Border>
             </Grid>
 
-            <!-- Row 1: Pane labels for SplitWipe / SideBySide -->
+            <!-- Row 1: Pane labels for SplitWipe / SideBySide / Hold-to-Compare -->
             <Grid Grid.Row="1"
                   Margin="0,8,0,0"
                   IsHitTestVisible="False">
+                <!-- Hold-to-Compare badge -->
+                <Border x:Name="PART_HoldCompareBadge"
+                        Classes="pane-badge"
+                        HorizontalAlignment="Left"
+                        VerticalAlignment="Top"
+                        IsVisible="False">
+                    <TextBlock x:Name="PART_HoldCompareLabel"
+                               FontSize="11"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource StudioHudForegroundBrush}" />
+                </Border>
+
                 <!-- Side-by-Side pane labels -->
                 <Grid x:Name="PART_SideBySideLabels"
                       ColumnDefinitions="*,*"
@@ -214,7 +226,7 @@
                         <TextBlock x:Name="PART_SideCompareLabel"
                                    FontSize="11"
                                    FontWeight="SemiBold"
-                                   Foreground="#E2E8F0" />
+                                   Foreground="{DynamicResource StudioHudForegroundBrush}" />
                     </Border>
                     <Border x:Name="PART_SidePrimaryBadge"
                             Grid.Column="1"
@@ -226,7 +238,7 @@
                         <TextBlock x:Name="PART_SidePrimaryLabel"
                                    FontSize="11"
                                    FontWeight="SemiBold"
-                                   Foreground="#E2E8F0" />
+                                   Foreground="{DynamicResource StudioHudForegroundBrush}" />
                     </Border>
                 </Grid>
 
@@ -241,7 +253,7 @@
                         <TextBlock x:Name="PART_WipeCompareLabel"
                                    FontSize="11"
                                    FontWeight="SemiBold"
-                                   Foreground="#E2E8F0" />
+                                   Foreground="{DynamicResource StudioHudForegroundBrush}" />
                     </Border>
                     <Border x:Name="PART_WipePrimaryBadge"
                             Classes="pane-badge"
@@ -251,38 +263,39 @@
                         <TextBlock x:Name="PART_WipePrimaryLabel"
                                    FontSize="11"
                                    FontWeight="SemiBold"
-                                   Foreground="#E2E8F0" />
+                                   Foreground="{DynamicResource StudioHudForegroundBrush}" />
                     </Border>
                 </Grid>
             </Grid>
 
-            <!-- Row 2: Hover Pixel HUD (Bottom-Left) + Processing Pill (Bottom-Right) -->
+            <!-- Row 2: Compact 1-line Hover Pixel HUD (Bottom-Left) + Processing Pill with Cancel (Bottom-Right) -->
             <Grid Grid.Row="2"
-                  ColumnDefinitions="*,Auto"
-                  IsHitTestVisible="False">
+                  ColumnDefinitions="*,Auto">
                 <Border x:Name="PART_HoverHud"
                         Grid.Column="0"
                         Classes="hud-pill"
-                        Padding="10,7"
+                        Padding="8,5"
+                        CornerRadius="8"
                         HorizontalAlignment="Left"
                         VerticalAlignment="Bottom"
+                        IsHitTestVisible="False"
                         IsVisible="False">
                     <StackPanel Orientation="Horizontal"
-                                Spacing="10"
+                                Spacing="8"
                                 VerticalAlignment="Center">
                         <Border x:Name="PART_HoverSwatch"
-                                Width="20"
-                                Height="20"
-                                CornerRadius="4"
-                                BorderBrush="#66FFFFFF"
+                                Width="16"
+                                Height="16"
+                                CornerRadius="3"
+                                BorderBrush="{DynamicResource StudioHudBorderBrush}"
                                 BorderThickness="1"
                                 VerticalAlignment="Center"
                                 IsVisible="False" />
                         <TextBlock x:Name="PART_HoverHudText"
                                    FontFamily="Consolas, Menlo, Monaco, monospace"
                                    FontSize="11"
-                                   LineHeight="16"
-                                   Foreground="#E5E7EB"
+                                   Foreground="{DynamicResource StudioHudForegroundBrush}"
+                                   TextTrimming="CharacterEllipsis"
                                    VerticalAlignment="Center" />
                     </StackPanel>
                 </Border>
@@ -290,7 +303,7 @@
                 <Border x:Name="PART_ProcessingPill"
                         Grid.Column="1"
                         Classes="hud-pill"
-                        Padding="10,6"
+                        Padding="10,5"
                         Margin="10,0,0,0"
                         HorizontalAlignment="Right"
                         VerticalAlignment="Bottom"
@@ -300,14 +313,21 @@
                                 VerticalAlignment="Center">
                         <Ellipse Width="8"
                                  Height="8"
-                                 Fill="#60A5FA"
+                                 Fill="{DynamicResource StudioAccentBrush}"
                                  VerticalAlignment="Center" />
                         <TextBlock x:Name="PART_ProcessingText"
                                    Text="Processing..."
                                    FontSize="11"
                                    FontWeight="Medium"
-                                   Foreground="#E2E8F0"
+                                   Foreground="{DynamicResource StudioHudForegroundBrush}"
                                    VerticalAlignment="Center" />
+                        <Button x:Name="PART_CancelButton"
+                                Classes="hud-btn"
+                                Content="Cancel"
+                                Padding="7,2"
+                                MinHeight="22"
+                                Foreground="{DynamicResource StudioDangerBrush}"
+                                ToolTip.Tip="Cancel active render (Escape)" />
                     </StackPanel>
                 </Border>
             </Grid>
@@ -317,11 +337,11 @@
         <Border x:Name="PART_EmptyState"
                 HorizontalAlignment="Center"
                 VerticalAlignment="Center"
-                MaxWidth="420"
+                MaxWidth="440"
                 Padding="32,28"
                 CornerRadius="14"
-                Background="#EE1B1F27"
-                BorderBrush="#33FFFFFF"
+                Background="{DynamicResource StudioEmptyCardBrush}"
+                BorderBrush="{DynamicResource StudioEmptyCardBorderBrush}"
                 BorderThickness="1"
                 IsVisible="True">
             <StackPanel Spacing="12"
@@ -329,36 +349,47 @@
                 <Border Width="48"
                         Height="48"
                         CornerRadius="24"
-                        Background="#1F3B82F6"
-                        BorderBrush="#5560A5FA"
+                        Background="{DynamicResource StudioSelectedBrush}"
+                        BorderBrush="{DynamicResource StudioAccentBrush}"
                         BorderThickness="1"
                         HorizontalAlignment="Center">
-                    <TextBlock Text="🎨"
-                               FontSize="20"
-                               HorizontalAlignment="Center"
-                               VerticalAlignment="Center" />
+                    <Path Width="22"
+                          Height="22"
+                          Stretch="Uniform"
+                          Fill="{DynamicResource StudioAccentBrush}"
+                          HorizontalAlignment="Center"
+                          VerticalAlignment="Center"
+                          Data="M12,3A9,9 0 0,0 3,12A9,9 0 0,0 12,21A1.5,1.5 0 0,0 13.5,19.5C13.5,19.11 13.35,18.76 13.11,18.5C12.88,18.23 12.73,17.88 12.73,17.5A1.5,1.5 0 0,1 14.23,16H16A5,5 0 0,0 21,11C21,6.58 16.97,3 12,3M6.5,12A1.5,1.5 0 0,1 5,10.5A1.5,1.5 0 0,1 6.5,9A1.5,1.5 0 0,1 8,10.5A1.5,1.5 0 0,1 6.5,12M9.5,8A1.5,1.5 0 0,1 8,6.5A1.5,1.5 0 0,1 9.5,5A1.5,1.5 0 0,1 11,6.5A1.5,1.5 0 0,1 9.5,8M14.5,8A1.5,1.5 0 0,1 13,6.5A1.5,1.5 0 0,1 14.5,5A1.5,1.5 0 0,1 16,6.5A1.5,1.5 0 0,1 14.5,8M17.5,12A1.5,1.5 0 0,1 16,10.5A1.5,1.5 0 0,1 17.5,9A1.5,1.5 0 0,1 19,10.5A1.5,1.5 0 0,1 17.5,12Z" />
                 </Border>
                 <TextBlock Text="Open an Image to Begin"
                            FontSize="17"
                            FontWeight="SemiBold"
-                           Foreground="#F1F5F9"
+                           Foreground="{DynamicResource StudioForegroundBrush}"
                            HorizontalAlignment="Center" />
-                <TextBlock Text="Drag and drop a PNG, JPEG, BMP, or WebP image here, or choose a file from disk."
+                <TextBlock Text="Drag and drop a PNG, JPEG, BMP, or WebP image anywhere, choose a file from disk, or explore with a sample photo."
                            FontSize="12"
-                           Foreground="#94A3B8"
+                           Foreground="{DynamicResource StudioMutedBrush}"
                            TextAlignment="Center"
                            TextWrapping="Wrap" />
-                <Button x:Name="PART_OpenImageButton"
-                        Content="Open Image..."
-                        HorizontalAlignment="Center"
-                        Margin="0,6,0,0"
-                        Padding="18,8"
-                        CornerRadius="8"
-                        Background="#2563EB"
-                        Foreground="#FFFFFF"
-                        FontSize="13"
-                        FontWeight="SemiBold"
-                        Cursor="Hand" />
+                <StackPanel Orientation="Horizontal"
+                            Spacing="8"
+                            HorizontalAlignment="Center"
+                            Margin="0,6,0,0">
+                    <Button x:Name="PART_OpenImageButton"
+                            Classes="studio-accent"
+                            Content="Open Image..."
+                            Padding="16,8"
+                            CornerRadius="8"
+                            FontSize="13"
+                            ToolTip.Tip="Open a source image from disk (Ctrl+O)" />
+                    <Button x:Name="PART_TrySampleButton"
+                            Classes="studio-btn"
+                            Content="Try Sample Photo"
+                            Padding="14,8"
+                            CornerRadius="8"
+                            FontSize="13"
+                            ToolTip.Tip="Load a built-in landscape photo to preview watercolor effects immediately" />
+                </StackPanel>
             </StackPanel>
         </Border>
 
@@ -366,22 +397,22 @@
         <Border x:Name="PART_DropOverlay"
                 Margin="8"
                 CornerRadius="12"
-                BorderBrush="#93C5FD"
+                BorderBrush="{DynamicResource StudioDropOverlayBorderBrush}"
                 BorderThickness="2"
-                Background="#331D4ED8"
+                Background="{DynamicResource StudioDropOverlayBgBrush}"
                 IsHitTestVisible="False"
                 IsVisible="False">
             <Border HorizontalAlignment="Center"
                     VerticalAlignment="Center"
                     Padding="18,10"
                     CornerRadius="10"
-                    Background="#EC15181F"
-                    BorderBrush="#60A5FA"
+                    Background="{DynamicResource StudioDropPillBgBrush}"
+                    BorderBrush="{DynamicResource StudioAccentBrush}"
                     BorderThickness="1">
                 <TextBlock Text="Drop image to open"
                            FontSize="14"
                            FontWeight="SemiBold"
-                           Foreground="#EFF6FF" />
+                           Foreground="{DynamicResource StudioForegroundBrush}" />
             </Border>
         </Border>
     </Grid>

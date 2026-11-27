@@ -5,14 +5,34 @@
              HorizontalAlignment="Left"
              VerticalAlignment="Center">
     <UserControl.Styles>
+        <Style Selector="Border#PART_Circle">
+            <Setter Property="Opacity" Value="0.52" />
+            <Setter Property="Transitions">
+                <Transitions>
+                    <DoubleTransition Property="Opacity" Duration="0:0:0.12" />
+                </Transitions>
+            </Setter>
+        </Style>
         <Style Selector="Border#PART_HitTarget:pointerover Border#PART_Circle">
+            <Setter Property="Opacity" Value="1.0" />
+            <Setter Property="BorderBrush" Value="{DynamicResource StudioAccentBrush}" />
+            <Setter Property="Background" Value="{DynamicResource StudioSelectedBrush}" />
+        </Style>
+        <Style Selector="UserControl:focus-within Border#PART_Circle">
+            <Setter Property="Opacity" Value="1.0" />
             <Setter Property="BorderBrush" Value="{DynamicResource StudioAccentBrush}" />
             <Setter Property="Background" Value="{DynamicResource StudioSelectedBrush}" />
         </Style>
         <Style Selector="Border#PART_HitTarget:pointerover Ellipse#PART_GlyphDot">
             <Setter Property="Fill" Value="{DynamicResource StudioAccentBrush}" />
         </Style>
+        <Style Selector="UserControl:focus-within Ellipse#PART_GlyphDot">
+            <Setter Property="Fill" Value="{DynamicResource StudioAccentBrush}" />
+        </Style>
         <Style Selector="Border#PART_HitTarget:pointerover Border#PART_GlyphStem">
+            <Setter Property="Background" Value="{DynamicResource StudioAccentBrush}" />
+        </Style>
+        <Style Selector="UserControl:focus-within Border#PART_GlyphStem">
             <Setter Property="Background" Value="{DynamicResource StudioAccentBrush}" />
         </Style>
     </UserControl.Styles>

@@ -294,4 +294,152 @@ public class ViewportAndGridTests
             }
         }
     }
+
+    [AvaloniaFact]
+    public void ZoomPanViewport_HidesLoneRgbModeBar_ShowsMultipleModesOrReseed_AndSupportsHoldToCompare()
+    {
+        var primaryMatrix = new SequentialMatrix<Rgb8>(80, 60);
+        var compareMatrix = new SequentialMatrix<Rgb8>(80, 60);
+        WriteableBitmap primaryBitmap = MatrixBitmapConverter.Blit(primaryMatrix);
+        WriteableBitmap compareBitmap = MatrixBitmapConverter.Blit(compareMatrix);
+
+        var viewport = new ZoomPanViewport
+        {
+            Width = 500,
+            Height = 320,
+            PrimaryBitmap = primaryBitmap,
+            CompareBitmap = compareBitmap,
+            PrimaryLabel = "Final",
+            CompareLabel = "Input",
+            IsEmpty = false,
+            AvailableVisualizationModes = [VisualizationMode.Rgb],
+            SelectedVisualizationMode = VisualizationMode.Rgb,
+        };
+
+        bool? lastHoverCompare = null;
+        viewport.HoverPixelChanged += (_, args) => lastHoverCompare = args.IsCompareSide;
+
+        var window = new Window
+        {
+            Width = 500,
+            Height = 320,
+            Content = viewport,
+        };
+
+        try
+        {
+            window.Show();
+            TestAppHelpers.PumpUi();
+
+            Border modeBar = viewport.FindControl<Border>("PART_ModeBar")!;
+            Border holdBadge = viewport.FindControl<Border>("PART_HoldCompareBadge")!;
+            Canvas wipeOverlay = viewport.FindControl<Canvas>("PART_WipeOverlay")!;
+
+            // Lone RGB chip with no Reseed button keeps PART_ModeBar hidden
+            Assert.False(modeBar.IsVisible);
+
+            // ShowReseedButton or >= 2 modes shows PART_ModeBar
+            viewport.ShowReseedButton = true;
+            TestAppHelpers.PumpUi();
+            Assert.True(modeBar.IsVisible);
+
+            viewport.ShowReseedButton = false;
+            TestAppHelpers.PumpUi();
+            Assert.False(modeBar.IsVisible);
+
+            viewport.AvailableVisualizationModes = [VisualizationMode.Rgb, VisualizationMode.FxaaDiffMagnifier];
+            TestAppHelpers.PumpUi();
+            Assert.True(modeBar.IsVisible);
+
+            // SideBySide anchors PART_ModeBar into the right (Primary) pane
+            viewport.CompareMode = CompareMode.SideBySide;
+            TestAppHelpers.PumpUi();
+            Assert.True(modeBar.Margin.Left > 200.0);
+
+            // Hold-to-Compare overrides SplitWipe/SideBySide visually without mutating CompareMode
+            viewport.CompareMode = CompareMode.SplitWipe;
+            viewport.IsHoldComparing = true;
+            TestAppHelpers.PumpUi();
+            Assert.True(holdBadge.IsVisible);
+            Assert.False(wipeOverlay.IsVisible);
+            Assert.Equal(CompareMode.SplitWipe, viewport.CompareMode);
+
+            window.MouseMove(new Point(250, 160));
+            TestAppHelpers.PumpUi();
+            Assert.True(lastHoverCompare);
+
+            viewport.IsHoldComparing = false;
+            TestAppHelpers.PumpUi();
+            Assert.False(holdBadge.IsVisible);
+            Assert.True(wipeOverlay.IsVisible);
+        }
+        finally
+        {
+            window.Close();
+            primaryBitmap.Dispose();
+            compareBitmap.Dispose();
+        }
+    }
+
+    [AvaloniaFact]
+    public void StageGridView_ClickPinButton_DispatchesTogglePinStageCommand()
+    {
+        var stages = new ObservableCollection<StageCardViewModel>();
+        var sampleMatrix = new SequentialMatrix<Rgb8>(32, 24);
+        foreach (PipelineStageDescriptor descriptor in PipelineStageRegistry.Stages)
+        {
+            stages.Add(new StageCardViewModel(descriptor)
+            {
+                Thumbnail = MatrixBitmapConverter.BlitThumbnail(sampleMatrix),
+                GridBitmap = MatrixBitmapConverter.Blit(sampleMatrix),
+            });
+        }
+
+        StageCardViewModel? toggledCard = null;
+        var gridView = new StageGridView
+        {
+            Stages = stages,
+            SelectedStage = stages[0],
+            TogglePinStageCommand = new RelayCommand<StageCardViewModel>(card => toggledCard = card),
+        };
+
+        var window = new Window
+        {
+            Width = 1000,
+            Height = 640,
+            Content = gridView,
+        };
+
+        try
+        {
+            window.Show();
+            TestAppHelpers.PumpUi();
+
+            ItemsControl itemsControl = gridView.FindControl<ItemsControl>("GridItemsControl")!;
+            Button pinButton = itemsControl
+                .GetVisualDescendants()
+                .OfType<Button>()
+                .First(b => b.Classes.Contains("grid-pin-btn") &&
+                            b.DataContext is StageCardViewModel card &&
+                            card.StageId == PrimaryStageId.Saliency);
+
+            Point pinPoint = pinButton.TranslatePoint(
+                new Point(pinButton.Bounds.Width * 0.5, pinButton.Bounds.Height * 0.5),
+                window)!.Value;
+
+            window.MouseDown(pinPoint, MouseButton.Left);
+            window.MouseUp(pinPoint, MouseButton.Left);
+            TestAppHelpers.PumpUi();
+
+            Assert.Equal(stages[(int)PrimaryStageId.Saliency], toggledCard);
+        }
+        finally
+        {
+            window.Close();
+            foreach (StageCardViewModel card in stages)
+            {
+                card.Dispose();
+            }
+        }
+    }
 }

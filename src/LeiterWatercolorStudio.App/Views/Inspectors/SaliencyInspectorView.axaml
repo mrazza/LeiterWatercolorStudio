@@ -3,7 +3,6 @@
              xmlns:local="using:LeiterWatercolorStudio.App.Views.Inspectors"
              xmlns:controls="using:LeiterWatercolorStudio.App.Controls"
              xmlns:converters="using:LeiterWatercolorStudio.App.Converters"
-             xmlns:models="clr-namespace:LeiterWatercolorStudio.Core.Models;assembly=LeiterWatercolorStudio.Core"
              xmlns:stages="clr-namespace:LeiterWatercolorStudio.Core.Parameters.Stages;assembly=LeiterWatercolorStudio.Core"
              xmlns:ldata="clr-namespace:Leiter.Algorithms.DataStructures;assembly=Leiter"
              xmlns:lmorph="clr-namespace:Leiter.Algorithms.Morphology;assembly=Leiter"
@@ -13,8 +12,8 @@
 
     <UserControl.Styles>
         <Style Selector="Border.inspector-card">
-            <Setter Property="Background" Value="#1264748B" />
-            <Setter Property="BorderBrush" Value="#3064748B" />
+            <Setter Property="Background" Value="{DynamicResource StudioCardBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource StudioBorderBrush}" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="CornerRadius" Value="6" />
             <Setter Property="Padding" Value="10,9" />
@@ -29,38 +28,10 @@
     <ScrollViewer VerticalScrollBarVisibility="Auto"
                   HorizontalScrollBarVisibility="Disabled">
         <StackPanel Spacing="12" Margin="12">
-            <!-- Stage Header -->
-            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
-                <StackPanel Grid.Column="0" Spacing="1" VerticalAlignment="Center">
-                    <TextBlock Text="2. Saliency &amp; Distance Field"
-                               FontSize="14"
-                               FontWeight="SemiBold" />
-                    <TextBlock Text="Regional contrast, SaliencyCut, and foreground focus field"
-                               FontSize="11.5"
-                               Opacity="0.68"
-                               TextWrapping="Wrap" />
-                </StackPanel>
-
-                <Button x:Name="PART_ResetButton"
-                        Grid.Column="1"
-                        x:DataType="local:SaliencyInspectorView"
-                        Content="↺"
-                        Width="28"
-                        Height="28"
-                        Padding="0"
-                        FontSize="13"
-                        HorizontalContentAlignment="Center"
-                        VerticalContentAlignment="Center"
-                        VerticalAlignment="Center"
-                        Command="{Binding ResetStageCommand, RelativeSource={RelativeSource AncestorType=local:SaliencyInspectorView}}"
-                        CommandParameter="{x:Static models:PrimaryStageId.Saliency}"
-                        ToolTip.Tip="Reset Stage 2 Saliency to baseline" />
-            </Grid>
-
             <!-- Basic Controls -->
             <StackPanel Spacing="8">
                 <controls:NumericSlider Label="Pre-Blur Sigma"
-                                        Description="Gaussian pre-blur applied before Stage 2 EGBI segmentation (0 disables pre-blur)."
+                                        Description="Gaussian pre-blur applied before Stage 3 EGBI segmentation (0 disables pre-blur)."
                                         InfoText="Softens fine camera grain and tiny textures before building the initial saliency patches. Raising this smooths noisy grass or leaves in Pre-Blur and EGBI Regions, helping Saliency stay locked on main shapes instead of clutter."
                                         Minimum="0"
                                         Maximum="5"
@@ -68,7 +39,7 @@
                                         Step="0.05"
                                         FormatString="F2"
                                         Unit="px"
-                                        BaselineValue="0.8"
+                                        BaselineValue="{Binding Baseline.EgbiBlurSigma}"
                                         Value="{Binding EgbiBlurSigma, Mode=TwoWay}" />
 
                 <controls:NumericSlider Label="EGBI K-Factor"
@@ -79,7 +50,7 @@
                                         ValidMinimum="0"
                                         Step="1"
                                         FormatString="F1"
-                                        BaselineValue="50"
+                                        BaselineValue="{Binding Egbi.Baseline.KFactor}"
                                         Value="{Binding Egbi.KFactor, Mode=TwoWay}" />
 
                 <controls:NumericSlider Label="EGBI Min Region Size"
@@ -92,7 +63,7 @@
                                         IsInteger="True"
                                         FormatString="F0"
                                         Unit="px"
-                                        BaselineValue="200"
+                                        BaselineValue="{Binding Egbi.Baseline.MinRegionSize, Converter={x:Static converters:IntToDoubleConverter.Instance}}"
                                         Value="{Binding Egbi.MinRegionSize, Mode=TwoWay, Converter={x:Static converters:IntToDoubleConverter.Instance}}" />
 
                 <controls:NumericSlider Label="Center Prior Weight"
@@ -103,7 +74,7 @@
                                         ValidMinimum="0"
                                         Step="0.25"
                                         FormatString="F2"
-                                        BaselineValue="9"
+                                        BaselineValue="{Binding RegionalContrastSaliency.Baseline.CenterPriorWeight}"
                                         Value="{Binding RegionalContrastSaliency.CenterPriorWeight, Mode=TwoWay}" />
 
                 <controls:NumericSlider Label="SaliencyCut Iterations"
@@ -115,7 +86,7 @@
                                         Step="1"
                                         IsInteger="True"
                                         FormatString="F0"
-                                        BaselineValue="4"
+                                        BaselineValue="{Binding SaliencyCut.Baseline.MaxOuterIterations, Converter={x:Static converters:IntToDoubleConverter.Instance}}"
                                         Value="{Binding SaliencyCut.MaxOuterIterations, Mode=TwoWay, Converter={x:Static converters:IntToDoubleConverter.Instance}}" />
 
                 <controls:NumericSlider Label="Distance Sigma Scale"
@@ -126,7 +97,7 @@
                                         ValidMinimum="0"
                                         Step="0.005"
                                         FormatString="F3"
-                                        BaselineValue="0.03"
+                                        BaselineValue="{Binding SaliencyDistanceField.Baseline.DefaultSigmaScale}"
                                         Value="{Binding SaliencyDistanceField.DefaultSigmaScale, Mode=TwoWay}" />
 
                 <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
@@ -149,7 +120,7 @@
                                         Step="0.5"
                                         FormatString="F1"
                                         Unit="px"
-                                        BaselineValue="12"
+                                        BaselineValue="{Binding SaliencyDistanceField.BaselineSmoothingSigma}"
                                         IsVisible="{Binding SaliencyDistanceField.UseExplicitSmoothingSigma}"
                                         IsEnabled="{Binding SaliencyDistanceField.UseExplicitSmoothingSigma}"
                                         Value="{Binding SaliencyDistanceField.SmoothingSigma, Mode=TwoWay}" />
@@ -174,7 +145,7 @@
                                                     ValidMinimum="0"
                                                     Step="0.1"
                                                     FormatString="F2"
-                                                    BaselineValue="1"
+                                                    BaselineValue="{Binding Egbi.Baseline.Epsilon}"
                                                     Value="{Binding Egbi.Epsilon, Mode=TwoWay}" />
 
                             <StackPanel Spacing="3">
@@ -239,7 +210,7 @@
                                                     IsInteger="True"
                                                     FormatString="F0"
                                                     Unit="px"
-                                                    BaselineValue="10"
+                                                    BaselineValue="{Binding SaliencyCut.Baseline.TrimapBandRadius, Converter={x:Static converters:IntToDoubleConverter.Instance}}"
                                                     Value="{Binding SaliencyCut.TrimapBandRadius, Mode=TwoWay, Converter={x:Static converters:IntToDoubleConverter.Instance}}" />
 
                             <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
@@ -263,7 +234,7 @@
                                                     IsInteger="True"
                                                     FormatString="F0"
                                                     Unit="px"
-                                                    BaselineValue="1024"
+                                                    BaselineValue="{Binding SaliencyCut.BaselineMaxWorkingDimension, Converter={x:Static converters:IntToDoubleConverter.Instance}}"
                                                     IsEnabled="{Binding SaliencyCut.UseMaxWorkingDimension}"
                                                     Value="{Binding SaliencyCut.MaxWorkingDimension, Mode=TwoWay, Converter={x:Static converters:IntToDoubleConverter.Instance}}" />
                         </StackPanel>
@@ -283,7 +254,7 @@
                                                     Step="1"
                                                     IsInteger="True"
                                                     FormatString="F0"
-                                                    BaselineValue="5"
+                                                    BaselineValue="{Binding GrabCut.Baseline.Iterations, Converter={x:Static converters:IntToDoubleConverter.Instance}}"
                                                     Value="{Binding GrabCut.Iterations, Mode=TwoWay, Converter={x:Static converters:IntToDoubleConverter.Instance}}" />
 
                             <controls:NumericSlider Label="GMM Components"
@@ -295,7 +266,7 @@
                                                     Step="1"
                                                     IsInteger="True"
                                                     FormatString="F0"
-                                                    BaselineValue="5"
+                                                    BaselineValue="{Binding GrabCut.Baseline.MixtureComponentCount, Converter={x:Static converters:IntToDoubleConverter.Instance}}"
                                                     Value="{Binding GrabCut.MixtureComponentCount, Mode=TwoWay, Converter={x:Static converters:IntToDoubleConverter.Instance}}" />
 
                             <controls:NumericSlider Label="Smoothness Weight"
@@ -306,7 +277,7 @@
                                                     ValidMinimum="0"
                                                     Step="1"
                                                     FormatString="F1"
-                                                    BaselineValue="50"
+                                                    BaselineValue="{Binding GrabCut.Baseline.SmoothnessWeight}"
                                                     Value="{Binding GrabCut.SmoothnessWeight, Mode=TwoWay}" />
                         </StackPanel>
                     </Border>
@@ -336,7 +307,8 @@
                                 </ComboBox>
                             </StackPanel>
 
-                            <controls:NumericSlider Label="Fixed Threshold"
+                            <controls:NumericSlider x:Name="PART_FixedThresholdSlider"
+                                                    Label="Fixed Threshold"
                                                     Description="Threshold in [0, 1] used when Method is Fixed."
                                                     InfoText="Sets the exact cutoff brightness (0 to 1) in RC Saliency Map when Threshold Method is set to Fixed. Lower values include larger parts of the scene in SaliencyCut Mask; higher values isolate only the highest-contrast focal hotspot."
                                                     Minimum="0"
@@ -345,7 +317,9 @@
                                                     ValidMaximum="1"
                                                     Step="0.01"
                                                     FormatString="F3"
-                                                    BaselineValue="{x:Static lsaliency:SaliencyMaskOptions.DefaultFixedThreshold}"
+                                                    BaselineValue="{Binding SaliencyMask.Baseline.FixedThreshold}"
+                                                    IsEnabled="{Binding SaliencyMask.Method, Converter={x:Static local:SaliencyInspectorView.IsFixedThresholdMethodConverter}}"
+                                                    Opacity="{Binding SaliencyMask.Method, Converter={x:Static local:SaliencyInspectorView.FixedThresholdOpacityConverter}}"
                                                     Value="{Binding SaliencyMask.FixedThreshold, Mode=TwoWay}" />
 
                             <StackPanel Spacing="3">
@@ -368,7 +342,8 @@
                                 </ComboBox>
                             </StackPanel>
 
-                            <controls:NumericSlider Label="Min Area Fraction"
+                            <controls:NumericSlider x:Name="PART_MinAreaFractionSlider"
+                                                    Label="Min Area Fraction"
                                                     Description="Minimum connected component area fraction retained when policy is Minimum Area Fraction."
                                                     InfoText="Sets the smallest island size (as a fraction of total image area) kept in SaliencyCut Mask under Minimum Area Fraction. Raising it removes stray background dots so only major objects keep crisp detail in the final painting."
                                                     Minimum="0"
@@ -377,7 +352,9 @@
                                                     ValidMaximum="1"
                                                     Step="0.005"
                                                     FormatString="F3"
-                                                    BaselineValue="0.01"
+                                                    BaselineValue="{Binding SaliencyMask.Baseline.MinAreaFraction}"
+                                                    IsEnabled="{Binding SaliencyMask.RetentionPolicy, Converter={x:Static local:SaliencyInspectorView.IsMinimumAreaRetentionConverter}}"
+                                                    Opacity="{Binding SaliencyMask.RetentionPolicy, Converter={x:Static local:SaliencyInspectorView.MinimumAreaOpacityConverter}}"
                                                     Value="{Binding SaliencyMask.MinAreaFraction, Mode=TwoWay}" />
 
                             <StackPanel Spacing="3">
