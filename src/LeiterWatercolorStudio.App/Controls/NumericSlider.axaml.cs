@@ -590,6 +590,15 @@ public partial class NumericSlider : UserControl
                 double expandedMax = BaselineValue > 0.0 ? BaselineValue * 1.5 : BaselineValue + (max - min);
                 max = Math.Max(max, ClampExpandedMax(expandedMax, BaselineValue));
             }
+            else if (BaselineValue > 0.0 &&
+                     max > 1.0 &&
+                     Math.Abs(max - 255.0) > 1e-9 &&
+                     double.IsPositiveInfinity(ValidMaximum) &&
+                     BaselineValue >= max * 0.85)
+            {
+                double expandedMax = RoundNearMaxHeadroom(BaselineValue * 1.35);
+                max = Math.Max(max, ClampExpandedMax(expandedMax, BaselineValue));
+            }
 
             if (BaselineValue < min)
             {
@@ -633,6 +642,16 @@ public partial class NumericSlider : UserControl
         }
 
         return (min, max);
+    }
+
+    private double RoundNearMaxHeadroom(double candidate)
+    {
+        if (IsInteger || candidate >= 10.0)
+        {
+            return Math.Ceiling(candidate);
+        }
+
+        return Math.Ceiling(candidate * 2.0) * 0.5;
     }
 
     private double ClampExpandedMax(double candidate, double requiredIncludedValue)

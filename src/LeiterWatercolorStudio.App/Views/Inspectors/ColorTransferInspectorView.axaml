@@ -49,6 +49,30 @@
             <Setter Property="Foreground" Value="{DynamicResource StudioAccentForegroundBrush}" />
             <Setter Property="FontWeight" Value="SemiBold" />
         </Style>
+        <Style Selector="ToggleButton.segmented-tab">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="{DynamicResource StudioSecondaryForegroundBrush}" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="CornerRadius" Value="4" />
+            <Setter Property="Padding" Value="6,4" />
+            <Setter Property="MinHeight" Value="26" />
+            <Setter Property="FontSize" Value="11.5" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="Cursor" Value="Hand" />
+        </Style>
+        <Style Selector="ToggleButton.segmented-tab:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource StudioHoverBrush}" />
+        </Style>
+        <Style Selector="ToggleButton.segmented-tab:checked /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource StudioAccentBrush}" />
+            <Setter Property="TextElement.Foreground" Value="{DynamicResource StudioAccentForegroundBrush}" />
+        </Style>
+        <Style Selector="ToggleButton.segmented-tab:checked">
+            <Setter Property="Foreground" Value="{DynamicResource StudioAccentForegroundBrush}" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
     </UserControl.Styles>
 
     <ScrollViewer VerticalScrollBarVisibility="Auto"
@@ -143,46 +167,6 @@
                         ToolTip.Tip="Duplicate this built-in palette into Custom mode to tweak its CIELAB colors" />
             </StackPanel>
 
-            <!-- Custom Mode Reference Extraction (visible when PaletteMode == Custom) -->
-            <StackPanel x:Name="PART_CustomSection"
-                        Spacing="6"
-                        IsVisible="{Binding PaletteMode, Converter={x:Static converters:PaletteModeMatchConverter.Custom}}">
-                <Button x:Name="PART_ExtractPaletteButton"
-                        x:DataType="local:ColorTransferInspectorView"
-                        Classes="studio-btn"
-                        Content="Extract from Reference Image..."
-                        HorizontalAlignment="Stretch"
-                        HorizontalContentAlignment="Center"
-                        Padding="10,7"
-                        Command="{Binding ExtractPaletteCommand, RelativeSource={RelativeSource AncestorType=local:ColorTransferInspectorView}}" />
-
-                <Border x:Name="PART_ReferencePreviewCard"
-                        x:DataType="local:ColorTransferInspectorView"
-                        Classes="inspector-card"
-                        IsVisible="{Binding HasReferencePreview, RelativeSource={RelativeSource AncestorType=local:ColorTransferInspectorView}}">
-                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
-                        <Border Grid.Column="0"
-                                Width="44"
-                                Height="44"
-                                CornerRadius="4"
-                                ClipToBounds="True"
-                                Background="{DynamicResource StudioSurfaceAltBrush}"
-                                BorderBrush="{DynamicResource StudioBorderBrush}"
-                                BorderThickness="1">
-                            <Image Source="{Binding ReferenceThumbnail, RelativeSource={RelativeSource AncestorType=local:ColorTransferInspectorView}}"
-                                   Stretch="UniformToFill" />
-                        </Border>
-                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
-                            <TextBlock Classes="section-title" Text="REFERENCE IMAGE" />
-                            <TextBlock Text="{Binding ReferenceImageName, RelativeSource={RelativeSource AncestorType=local:ColorTransferInspectorView}, TargetNullValue='Extracted palette'}"
-                                       FontSize="12"
-                                       FontWeight="SemiBold"
-                                       TextTrimming="CharacterEllipsis" />
-                        </StackPanel>
-                    </Grid>
-                </Border>
-            </StackPanel>
-
             <!-- Transfer Strength Slider -->
             <controls:NumericSlider Label="Transfer Strength"
                                     Description="Blend weight between original colors (0) and transferred watercolor palette (1)."
@@ -245,6 +229,51 @@
                             HorizontalAlignment="Left"
                             IsVisible="{Binding PaletteMode, Converter={x:Static local:ColorTransferInspectorView.IsAutoModeConverter}}"
                             ToolTip.Tip="Copy the matched palette into Custom mode for manual CIELAB tuning" />
+
+                    <!-- Custom Mode Reference Extraction (compactly paired with Active Palette swatches) -->
+                    <StackPanel x:Name="PART_CustomSection"
+                                Spacing="6"
+                                Margin="0,2,0,0"
+                                IsVisible="{Binding PaletteMode, Converter={x:Static converters:PaletteModeMatchConverter.Custom}}">
+                        <Button x:Name="PART_ExtractPaletteButton"
+                                x:DataType="local:ColorTransferInspectorView"
+                                Classes="studio-btn"
+                                Content="Extract from Reference Image..."
+                                HorizontalAlignment="Stretch"
+                                HorizontalContentAlignment="Center"
+                                Padding="10,6"
+                                Command="{Binding ExtractPaletteCommand, RelativeSource={RelativeSource AncestorType=local:ColorTransferInspectorView}}" />
+
+                        <Border x:Name="PART_ReferencePreviewCard"
+                                x:DataType="local:ColorTransferInspectorView"
+                                Background="{DynamicResource StudioSurfaceAltBrush}"
+                                BorderBrush="{DynamicResource StudioBorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="4"
+                                Padding="6"
+                                IsVisible="{Binding HasReferencePreview, RelativeSource={RelativeSource AncestorType=local:ColorTransferInspectorView}}">
+                            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
+                                <Border Grid.Column="0"
+                                        Width="36"
+                                        Height="36"
+                                        CornerRadius="4"
+                                        ClipToBounds="True"
+                                        Background="{DynamicResource StudioCardBrush}"
+                                        BorderBrush="{DynamicResource StudioBorderBrush}"
+                                        BorderThickness="1">
+                                    <Image Source="{Binding ReferenceThumbnail, RelativeSource={RelativeSource AncestorType=local:ColorTransferInspectorView}}"
+                                           Stretch="UniformToFill" />
+                                </Border>
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="1">
+                                    <TextBlock Classes="section-title" Text="REFERENCE IMAGE" />
+                                    <TextBlock Text="{Binding ReferenceImageName, RelativeSource={RelativeSource AncestorType=local:ColorTransferInspectorView}, TargetNullValue='Extracted palette'}"
+                                               FontSize="11.5"
+                                               FontWeight="SemiBold"
+                                               TextTrimming="CharacterEllipsis" />
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+                    </StackPanel>
                 </StackPanel>
             </Border>
 
@@ -298,108 +327,134 @@
                         </ComboBox>
                     </StackPanel>
 
-                    <controls:NumericSlider Label="Mean L*"
-                                            Description="Target mean CIELAB lightness (L* in [0, 100]) for Custom palette statistics"
-                                            InfoText="Controls overall brightness of the transferred palette (editable in Custom mode). Lower values create moody, darker washes; higher values yield airy, light-filled watercolor tones in Color Transfer and the final painting."
-                                            Minimum="0"
-                                            Maximum="100"
-                                            Step="0.1"
-                                            FormatString="F2"
-                                            HasBaseline="False"
-                                            IsReadOnly="{Binding PaletteMode, Converter={x:Static converters:PaletteModeMatchConverter.NotCustom}}"
-                                            Value="{Binding MeanL, Mode=TwoWay}" />
+                    <!-- Compact CIELAB Axis Group Toggle (Mean L*a*b* vs Spread StdDev) -->
+                    <Border Background="{DynamicResource StudioSurfaceAltBrush}"
+                            BorderBrush="{DynamicResource StudioBorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="6"
+                            Padding="2">
+                        <UniformGrid Columns="2">
+                            <ToggleButton x:Name="PART_MeanLabTabButton"
+                                          Classes="segmented-tab"
+                                          Content="Mean L*a*b*"
+                                          IsChecked="True" />
+                            <ToggleButton x:Name="PART_StdDevLabTabButton"
+                                          Classes="segmented-tab"
+                                          Content="Spread (StdDev)"
+                                          IsChecked="False" />
+                        </UniformGrid>
+                    </Border>
 
-                    <StackPanel Spacing="0">
-                        <controls:NumericSlider Label="Mean a*"
-                                                Description="Target mean CIELAB green-red opponent axis (a*) for Custom palette statistics"
-                                                InfoText="Shifts the overall color balance between cool greens and warm pinks/reds (editable in Custom mode). Negative values push washes cooler toward green; positive values add rosy or terracotta warmth in Color Transfer and downstream stages."
-                                                Minimum="-128"
-                                                Maximum="127"
+                    <StackPanel x:Name="PART_MeanLabPanel"
+                                Spacing="8"
+                                IsVisible="True">
+                        <controls:NumericSlider Label="Mean L*"
+                                                Description="Target mean CIELAB lightness (L* in [0, 100]) for Custom palette statistics"
+                                                InfoText="Controls overall brightness of the transferred palette (editable in Custom mode). Lower values create moody, darker washes; higher values yield airy, light-filled watercolor tones in Color Transfer and the final painting."
+                                                Minimum="0"
+                                                Maximum="100"
                                                 Step="0.1"
                                                 FormatString="F2"
                                                 HasBaseline="False"
                                                 IsReadOnly="{Binding PaletteMode, Converter={x:Static converters:PaletteModeMatchConverter.NotCustom}}"
-                                                Value="{Binding MeanA, Mode=TwoWay}" />
-                        <Grid RowDefinitions="Auto,Auto" RowSpacing="2" Margin="0,0,0,4">
-                            <Border Grid.Row="0" Height="4" CornerRadius="2" Opacity="0.88">
-                                <Border.Background>
-                                    <LinearGradientBrush StartPoint="0%,50%" EndPoint="100%,50%">
-                                        <GradientStop Offset="0" Color="#22C55E" />
-                                        <GradientStop Offset="0.5" Color="#94A3B8" />
-                                        <GradientStop Offset="1" Color="#EF4444" />
-                                    </LinearGradientBrush>
-                                </Border.Background>
-                            </Border>
-                            <Grid Grid.Row="1" ColumnDefinitions="*,*">
-                                <TextBlock Grid.Column="0" Classes="studio-muted" FontSize="10" Text="−a* Green" />
-                                <TextBlock Grid.Column="1" Classes="studio-muted" FontSize="10" HorizontalAlignment="Right" Text="+a* Red" />
+                                                Value="{Binding MeanL, Mode=TwoWay}" />
+
+                        <StackPanel Spacing="0">
+                            <controls:NumericSlider Label="Mean a*"
+                                                    Description="Target mean CIELAB green-red opponent axis (a*) for Custom palette statistics"
+                                                    InfoText="Shifts the overall color balance between cool greens and warm pinks/reds (editable in Custom mode). Negative values push washes cooler toward green; positive values add rosy or terracotta warmth in Color Transfer and downstream stages."
+                                                    Minimum="-128"
+                                                    Maximum="127"
+                                                    Step="0.1"
+                                                    FormatString="F2"
+                                                    HasBaseline="False"
+                                                    IsReadOnly="{Binding PaletteMode, Converter={x:Static converters:PaletteModeMatchConverter.NotCustom}}"
+                                                    Value="{Binding MeanA, Mode=TwoWay}" />
+                            <Grid RowDefinitions="Auto,Auto" RowSpacing="2" Margin="0,0,0,4">
+                                <Border Grid.Row="0" Height="4" CornerRadius="2" Opacity="0.88">
+                                    <Border.Background>
+                                        <LinearGradientBrush StartPoint="0%,50%" EndPoint="100%,50%">
+                                            <GradientStop Offset="0" Color="#22C55E" />
+                                            <GradientStop Offset="0.5" Color="#94A3B8" />
+                                            <GradientStop Offset="1" Color="#EF4444" />
+                                        </LinearGradientBrush>
+                                    </Border.Background>
+                                </Border>
+                                <Grid Grid.Row="1" ColumnDefinitions="*,*">
+                                    <TextBlock Grid.Column="0" Classes="studio-muted" FontSize="10" Text="−a* Green" />
+                                    <TextBlock Grid.Column="1" Classes="studio-muted" FontSize="10" HorizontalAlignment="Right" Text="+a* Red" />
+                                </Grid>
                             </Grid>
-                        </Grid>
+                        </StackPanel>
+
+                        <StackPanel Spacing="0">
+                            <controls:NumericSlider Label="Mean b*"
+                                                    Description="Target mean CIELAB blue-yellow opponent axis (b*) for Custom palette statistics"
+                                                    InfoText="Shifts the overall color balance between cool blues and sunny yellows (editable in Custom mode). Negative values cool the scene toward cobalt blue; positive values add golden amber warmth across Color Transfer and the final image."
+                                                    Minimum="-128"
+                                                    Maximum="127"
+                                                    Step="0.1"
+                                                    FormatString="F2"
+                                                    HasBaseline="False"
+                                                    IsReadOnly="{Binding PaletteMode, Converter={x:Static converters:PaletteModeMatchConverter.NotCustom}}"
+                                                    Value="{Binding MeanB, Mode=TwoWay}" />
+                            <Grid RowDefinitions="Auto,Auto" RowSpacing="2" Margin="0,0,0,4">
+                                <Border Grid.Row="0" Height="4" CornerRadius="2" Opacity="0.88">
+                                    <Border.Background>
+                                        <LinearGradientBrush StartPoint="0%,50%" EndPoint="100%,50%">
+                                            <GradientStop Offset="0" Color="#3B82F6" />
+                                            <GradientStop Offset="0.5" Color="#94A3B8" />
+                                            <GradientStop Offset="1" Color="#EAB308" />
+                                        </LinearGradientBrush>
+                                    </Border.Background>
+                                </Border>
+                                <Grid Grid.Row="1" ColumnDefinitions="*,*">
+                                    <TextBlock Grid.Column="0" Classes="studio-muted" FontSize="10" Text="−b* Blue" />
+                                    <TextBlock Grid.Column="1" Classes="studio-muted" FontSize="10" HorizontalAlignment="Right" Text="+b* Yellow" />
+                                </Grid>
+                            </Grid>
+                        </StackPanel>
                     </StackPanel>
 
-                    <StackPanel Spacing="0">
-                        <controls:NumericSlider Label="Mean b*"
-                                                Description="Target mean CIELAB blue-yellow opponent axis (b*) for Custom palette statistics"
-                                                InfoText="Shifts the overall color balance between cool blues and sunny yellows (editable in Custom mode). Negative values cool the scene toward cobalt blue; positive values add golden amber warmth across Color Transfer and the final image."
-                                                Minimum="-128"
-                                                Maximum="127"
+                    <StackPanel x:Name="PART_StdDevLabPanel"
+                                Spacing="8"
+                                IsVisible="False">
+                        <controls:NumericSlider Label="StdDev L*"
+                                                Description="Target standard deviation of CIELAB lightness (L*) controlling tonal spread"
+                                                InfoText="Controls light-to-dark contrast across the palette (editable in Custom mode). Lower values soften contrast into gentle, misty midtones; higher values push deep shadows and bright highlights farther apart in Color Transfer and downstream stages."
+                                                Minimum="0"
+                                                Maximum="100"
+                                                ValidMinimum="0"
                                                 Step="0.1"
                                                 FormatString="F2"
                                                 HasBaseline="False"
                                                 IsReadOnly="{Binding PaletteMode, Converter={x:Static converters:PaletteModeMatchConverter.NotCustom}}"
-                                                Value="{Binding MeanB, Mode=TwoWay}" />
-                        <Grid RowDefinitions="Auto,Auto" RowSpacing="2" Margin="0,0,0,4">
-                            <Border Grid.Row="0" Height="4" CornerRadius="2" Opacity="0.88">
-                                <Border.Background>
-                                    <LinearGradientBrush StartPoint="0%,50%" EndPoint="100%,50%">
-                                        <GradientStop Offset="0" Color="#3B82F6" />
-                                        <GradientStop Offset="0.5" Color="#94A3B8" />
-                                        <GradientStop Offset="1" Color="#EAB308" />
-                                    </LinearGradientBrush>
-                                </Border.Background>
-                            </Border>
-                            <Grid Grid.Row="1" ColumnDefinitions="*,*">
-                                <TextBlock Grid.Column="0" Classes="studio-muted" FontSize="10" Text="−b* Blue" />
-                                <TextBlock Grid.Column="1" Classes="studio-muted" FontSize="10" HorizontalAlignment="Right" Text="+b* Yellow" />
-                            </Grid>
-                        </Grid>
+                                                Value="{Binding StdDevL, Mode=TwoWay}" />
+
+                        <controls:NumericSlider Label="StdDev a*"
+                                                Description="Target standard deviation of CIELAB a* controlling green-red chromatic spread"
+                                                InfoText="Controls how vivid greens and reds become (editable in Custom mode). Lower values mute green/red differences toward neutral grays; higher values boost rich magentas and emeralds in Color Transfer, also making boundaries stronger for later stages."
+                                                Minimum="0"
+                                                Maximum="128"
+                                                ValidMinimum="0"
+                                                Step="0.1"
+                                                FormatString="F2"
+                                                HasBaseline="False"
+                                                IsReadOnly="{Binding PaletteMode, Converter={x:Static converters:PaletteModeMatchConverter.NotCustom}}"
+                                                Value="{Binding StdDevA, Mode=TwoWay}" />
+
+                        <controls:NumericSlider Label="StdDev b*"
+                                                Description="Target standard deviation of CIELAB b* controlling blue-yellow chromatic spread"
+                                                InfoText="Controls how vivid blues and yellows become (editable in Custom mode). Lower values tone down blue/yellow contrast; higher values amplify vivid skies and warm ochres in Color Transfer and throughout the final painting."
+                                                Minimum="0"
+                                                Maximum="128"
+                                                ValidMinimum="0"
+                                                Step="0.1"
+                                                FormatString="F2"
+                                                HasBaseline="False"
+                                                IsReadOnly="{Binding PaletteMode, Converter={x:Static converters:PaletteModeMatchConverter.NotCustom}}"
+                                                Value="{Binding StdDevB, Mode=TwoWay}" />
                     </StackPanel>
-
-                    <controls:NumericSlider Label="StdDev L*"
-                                            Description="Target standard deviation of CIELAB lightness (L*) controlling tonal spread"
-                                            InfoText="Controls light-to-dark contrast across the palette (editable in Custom mode). Lower values soften contrast into gentle, misty midtones; higher values push deep shadows and bright highlights farther apart in Color Transfer and downstream stages."
-                                            Minimum="0"
-                                            Maximum="100"
-                                            ValidMinimum="0"
-                                            Step="0.1"
-                                            FormatString="F2"
-                                            HasBaseline="False"
-                                            IsReadOnly="{Binding PaletteMode, Converter={x:Static converters:PaletteModeMatchConverter.NotCustom}}"
-                                            Value="{Binding StdDevL, Mode=TwoWay}" />
-
-                    <controls:NumericSlider Label="StdDev a*"
-                                            Description="Target standard deviation of CIELAB a* controlling green-red chromatic spread"
-                                            InfoText="Controls how vivid greens and reds become (editable in Custom mode). Lower values mute green/red differences toward neutral grays; higher values boost rich magentas and emeralds in Color Transfer, also making boundaries stronger for later stages."
-                                            Minimum="0"
-                                            Maximum="128"
-                                            ValidMinimum="0"
-                                            Step="0.1"
-                                            FormatString="F2"
-                                            HasBaseline="False"
-                                            IsReadOnly="{Binding PaletteMode, Converter={x:Static converters:PaletteModeMatchConverter.NotCustom}}"
-                                            Value="{Binding StdDevA, Mode=TwoWay}" />
-
-                    <controls:NumericSlider Label="StdDev b*"
-                                            Description="Target standard deviation of CIELAB b* controlling blue-yellow chromatic spread"
-                                            InfoText="Controls how vivid blues and yellows become (editable in Custom mode). Lower values tone down blue/yellow contrast; higher values amplify vivid skies and warm ochres in Color Transfer and throughout the final painting."
-                                            Minimum="0"
-                                            Maximum="128"
-                                            ValidMinimum="0"
-                                            Step="0.1"
-                                            FormatString="F2"
-                                            HasBaseline="False"
-                                            IsReadOnly="{Binding PaletteMode, Converter={x:Static converters:PaletteModeMatchConverter.NotCustom}}"
-                                            Value="{Binding StdDevB, Mode=TwoWay}" />
                 </StackPanel>
             </Expander>
         </StackPanel>

@@ -17,12 +17,6 @@
             <Setter Property="Padding" Value="9,3" />
             <Setter Property="Margin" Value="0,1,6,1" />
             <Setter Property="Cursor" Value="Hand" />
-            <Setter Property="Transitions">
-                <Transitions>
-                    <BrushTransition Property="Background" Duration="0:0:0.12" />
-                    <BrushTransition Property="BorderBrush" Duration="0:0:0.12" />
-                </Transitions>
-            </Setter>
         </Style>
         <Style Selector="Button.substage-pill:pointerover /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Background" Value="{DynamicResource StudioPillHoverBrush}" />
@@ -55,12 +49,6 @@
             <Setter Property="Background" Value="{DynamicResource StudioFilmstripCardBrush}" />
             <Setter Property="BorderBrush" Value="{DynamicResource StudioFilmstripCardBorderBrush}" />
             <Setter Property="BorderThickness" Value="1.5" />
-            <Setter Property="Transitions">
-                <Transitions>
-                    <BrushTransition Property="Background" Duration="0:0:0.12" />
-                    <BrushTransition Property="BorderBrush" Duration="0:0:0.12" />
-                </Transitions>
-            </Setter>
         </Style>
         <Style Selector="Border.stage-card:pointerover">
             <Setter Property="Background" Value="{DynamicResource StudioFilmstripCardHoverBrush}" />

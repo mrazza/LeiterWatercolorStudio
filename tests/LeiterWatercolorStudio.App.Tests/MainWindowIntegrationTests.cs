@@ -430,11 +430,16 @@ public class MainWindowIntegrationTests
             TestAppHelpers.PumpUi();
             Assert.Equal(CompareMode.Off, vm.CompareMode);
 
+            Button holdCompareButton = window.FindControl<Button>("HoldCompareButton")!;
+            Assert.DoesNotContain("hold-active", holdCompareButton.Classes);
+
             vm.IsHoldComparing = true;
             TestAppHelpers.PumpUi();
             Assert.NotNull(vm.CompareBitmap);
+            Assert.Contains("hold-active", holdCompareButton.Classes);
             vm.IsHoldComparing = false;
             TestAppHelpers.PumpUi();
+            Assert.DoesNotContain("hold-active", holdCompareButton.Classes);
 
             // Artist Look Shortcut jumps to requested stage/section
             vm.ApplyLookShortcutCommand.Execute("paper-tooth");
